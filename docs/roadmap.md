@@ -34,8 +34,8 @@ workloads and targets: ADR-012. Explicit non-goals: see the README.
 1. **Make CI reliably green.** CI has run since 2026-09-28: Linux and macOS unit tests, PostgreSQL on Linux and
    pack pass; the Windows unit tests and the Windows browser/WPF job failed intermittently. One cause is fixed (a
    timing-sensitive HTTP test); the browser job's failure has not been reproduced locally. Done when ten
-   consecutive runs are green on Windows, Linux and macOS. Then: the improvement plan's workstream B (SQL Server
-   authority).
+   consecutive runs are green on Windows, Linux and macOS. Workstream B (SQL Server authority, write handler, publisher, server ergonomics) is implemented for
+   0.2.0 and verified on SQL Server 2025 LocalDB; the relational sample (B5) is next.
 2. **Mobile and desktop devices.** Build the MAUI sample for Android, iOS and Mac Catalyst (workloads and devices
    needed). Run the browser tests in native Safari and mobile browsers.
 3. **Performance.**
@@ -51,7 +51,7 @@ reports the elapsed time.
 
 ## Known limitations today
 
-- Durable authority: PostgreSQL only (verified on Windows with PostgreSQL 17.6); the in-memory authority is for tests and samples.
+- Durable authorities: PostgreSQL (verified on Windows with PostgreSQL 17.6) and SQL Server (unreleased; verified on SQL Server 2025 LocalDB); the in-memory authority is for tests and samples.
 - SQLite is verified on Windows only; IndexedDB in Playwright's Chromium, Firefox and WebKit builds on Windows.
 - Full-document replacement drops fields unknown to an older writer unless the document declares
   `[JsonExtensionData]` (I17 partial).

@@ -26,4 +26,9 @@ public sealed record PullResult<TDocument>(
     [JsonPropertyName("features")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? Features { get; init; }
+
+    /// <summary>The server's limits (feature <see cref="SyncFeatures.Limits"/>); absent from older servers.</summary>
+    [JsonPropertyName("limits")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SyncLimits? Limits { get; init; }
 }

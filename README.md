@@ -3,21 +3,22 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.1.0` is published on NuGet; this branch builds `0.1.1` (unreleased). Pre-1.0: minor versions may
+> **Status:** `0.1.0` is published on NuGet; this branch builds `0.2.0` (unreleased). Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
 
 This section is the single source of truth for release and verification status; other documents link here.
 
-- **Packages.** Six packages, all at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
-  `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. `dotnet pack`
-  builds exactly these six. The repository is at `0.1.1` (unreleased); changes are listed in
-  [CHANGELOG.md](CHANGELOG.md).
+- **Packages.** Six packages are at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
+  `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. The repository
+  is at `0.2.0` (unreleased) and adds a seventh, `Bsync.Server.SqlServer`; `dotnet pack` builds these seven.
+  Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
   ([compatibility policy](docs/compatibility.md#policy)).
-- **Authorities.** Durable: PostgreSQL (`Bsync.Server.PostgreSql`). The in-memory authority is for tests and
-  samples. SQL Server: planned, not implemented.
+- **Authorities.** Durable: PostgreSQL (`Bsync.Server.PostgreSql`, released) and SQL Server
+  (`Bsync.Server.SqlServer`, unreleased; verified on SQL Server 2025 LocalDB). The in-memory authority is for tests
+  and samples.
 - **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
 - **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
   including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
@@ -66,6 +67,7 @@ src/Bsync/Bsync/                        Core: engine, clock, conflicts, storage/
 src/Bsync/Bsync.Storage.Sqlite/         Durable SQLite store for native hosts (MAUI, WPF, WinForms, console)
 src/Bsync/Bsync.Server.AspNetCore/      ASP.NET Core endpoints for the protocol over any ISyncAuthority
 src/Bsync/Bsync.Server.PostgreSql/      Durable PostgreSQL authority (Npgsql)
+src/Bsync/Bsync.Server.SqlServer/       Durable SQL Server authority on the application's database (Microsoft.Data.SqlClient)
 src/Bsync/Bsync.Testing/                Public conformance suites for stores and authorities, with in-memory and HTTP
                                         authority drivers (framework-free; store cases also run in browsers)
 src/Bsync/Bsync.Blazor/                 Blazor integration: durable browser store (Bsync.Blazor.IndexedDb, with a
@@ -75,6 +77,8 @@ src/Samples/                            Samples and the demo
 src/Samples/Bsync.Samples.Shared/       Note model + NotesPanel component shared by the samples
 src/Samples/Bsync.Samples.Notes.*       Offline-capable notes PWA: ASP.NET Core server + WebAssembly client
 src/Samples/Bsync.Samples.WebApp*       Blazor Web App: one component in static SSR, Server, WebAssembly and Auto
+src/Samples/Bsync.Samples.Tasks.*       Relational system of record: EF Core on SQL Server, write handler, publisher,
+                                        bearer tokens; console (SQLite) and WebAssembly (IndexedDB) clients
 src/Samples/Bsync.Samples.Hybrid.Wpf/   WPF Blazor Hybrid app: SQLite replica, same NotesPanel
 src/Samples/Bsync.Samples.Hybrid.Maui/  .NET MAUI Blazor Hybrid app (Windows target; needs the maui-windows workload)
 src/Samples/Bsync.Demo/                 Blazor WebAssembly playground simulating several devices in one tab
@@ -82,6 +86,7 @@ src/Tests/                              Tests, test hosts and benchmarks
 src/Tests/Bsync.Tests/                  xUnit tests: unit, regression, provider conformance, wire fixtures,
                                         fault injection, process-kill, seeded randomized convergence
 src/Tests/Bsync.Tests.PostgreSql/       Authority conformance and PostgreSQL-specific tests (needs BSYNC_POSTGRES)
+src/Tests/Bsync.Tests.SqlServer/        Authority conformance and SQL Server-specific tests (needs BSYNC_SQLSERVER)
 src/Tests/Bsync.Tests.Browser/          Playwright tests (Chromium, Firefox, WebKit) and their WASM harness
 src/Tests/Bsync.Tests.CrashHost/        Helper process the tests kill mid-write
 src/Tests/Bsync.Benchmarks/             BenchmarkDotNet workloads (docs/benchmarks.md)
@@ -355,6 +360,55 @@ app.MapSyncCollection("notes", authority, json, endpointOptions).RequireAuthoriz
   and `PurgeReceiptsAsync`.
 - Tests: `BSYNC_POSTGRES="Host=...;Username=...;Password=..." dotnet test src/Tests/Bsync.Tests.PostgreSql`.
 
+## A durable server on your SQL Server database
+
+The authority keeps its tables in a `bsync` schema of the application's own database, so the application's tables
+and the replication feed commit together (ADR-014):
+
+```csharp
+var authority = await SqlServerSyncAuthority<Note>.CreateAsync(new()
+{
+    ConnectionString = connectionString, DocumentType = AppJson.Default.Note, Collection = "notes",
+    WriteHandler = new NoteRules(),            // optional: runs in the authority's transaction
+});
+app.MapSyncCollection("notes", authority, json, endpointOptions).RequireAuthorization();
+```
+
+A write handler sees each replicated write that would be accepted, with the open connection and transaction. It
+can write the application's tables, return a canonical document (for example with a server-computed field), or
+answer conflict, reject (a stable error code the replica keeps) or retry later:
+
+```csharp
+sealed class NoteRules : ISyncWriteHandler<Note>
+{
+    public async ValueTask<SyncWriteDecision<Note>> HandleAsync(SyncWriteContext<Note> write, CancellationToken ct)
+    {
+        if (write.Submitted.Title.Length > 200) return SyncWriteDecision<Note>.Reject("title-too-long");
+        await SaveToDomainTableAsync((SqlConnection)write.Connection!, (SqlTransaction)write.Transaction!, write.Submitted, ct);
+        write.Submitted.WordCount = Count(write.Submitted.Body);   // reaches every replica
+        return SyncWriteDecision<Note>.Accept(write.Submitted);
+    }
+}
+```
+
+Server-originated changes go through the publisher, optionally in the application's transaction (EF Core shown):
+
+```csharp
+await using var transaction = await db.Database.BeginTransactionAsync();
+db.Prices.Add(price);
+await db.SaveChangesAsync();
+await authority.UpsertAsync(tenant, new PriceDocument { Id = price.Id, Amount = price.Amount }, transaction.GetDbTransaction());
+await transaction.CommitAsync();
+authority.NotifyCommitted(new AuthorityCommit(tenant, [price.Id]));   // optional: prompt hint
+```
+
+`ReplaceScopeAsync(scope, documents)` rebuilds a projection: unchanged documents keep their version (a rebuild of
+10,000 unchanged documents adds no feed entry) and documents no longer listed become tombstones. Commits by other
+server processes are announced by polling the feed heads (`CommitPollInterval`, default 5 s) or by calling
+`NotifyCommitted` from your own message bus. After a restore call `BeginNewEpochAsync(versionFloor)`.
+A complete example with EF Core, bearer tokens and two kinds of clients: `src/Samples/Bsync.Samples.Tasks.Server`.
+Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer`.
+
 ## Native apps (WPF, .NET MAUI)
 
 `src/Samples/Bsync.Samples.Hybrid.Wpf` and `src/Samples/Bsync.Samples.Hybrid.Maui` host the same `NotesPanel` in a
@@ -487,6 +541,7 @@ dotnet run --project src/Samples/Bsync.Demo
 dotnet build src/Bsync.slnx -c Release
 dotnet test src/Tests/Bsync.Tests -c Release                      # unit, conformance, HTTP, Blazor, recovery
 BSYNC_POSTGRES="Host=localhost;Username=postgres;Password=..." dotnet test src/Tests/Bsync.Tests.PostgreSql -c Release
+BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer -c Release
 dotnet publish src/Samples/Bsync.Demo -c Release                              # optional
 dotnet publish src/Samples/Bsync.Demo -c Release -p:RunAOTCompilation=true    # needs the wasm-tools workload
 ```
@@ -502,18 +557,18 @@ dotnet test src/Tests/Bsync.Tests.Browser -c Release -p:BrowserHostAot=true   # 
 
 A change to a package's public API fails `PublicApiTests` until the baseline in `src/Tests/api` is regenerated on purpose
 (`BSYNC_UPDATE_API=1 dotnet test src/Tests/Bsync.Tests --filter PublicApiTests`) and reviewed. `dotnet pack` builds
-the six library packages; nothing is published from this repository's tooling.
-CI: `.github/workflows/ci.yml` (Windows, Linux and macOS unit tests, PostgreSQL, browser tests, pack and package
-consumers) and `.github/workflows/nightly.yml` (nightly `-preview` pack, not published).
+the seven library packages; nothing is published from this repository's tooling.
+CI: `.github/workflows/ci.yml` (Windows, Linux and macOS unit tests, PostgreSQL, SQL Server, browser tests, pack
+and package consumers) and `.github/workflows/nightly.yml` (nightly `-preview` pack, not published).
 
 Consume the packages exactly as a NuGet user would (no project references; `src/PackageConsumers/nuget.config` takes
 `Bsync*` only from `artifacts/packages`):
 
 ```bash
-for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Storage.Sqlite Bsync.Testing; do
+for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite Bsync.Testing; do
   dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
-dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.1.1-local
-dotnet publish src/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.1.1-local -o artifacts/consumer-web
+dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.2.0-local
+dotnet publish src/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.2.0-local -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
 ```
 

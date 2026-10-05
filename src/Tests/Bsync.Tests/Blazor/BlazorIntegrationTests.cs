@@ -254,7 +254,7 @@ public sealed class BlazorIntegrationTests
     public async Task CredentialRenewal()
     {
         var renewals = 0;
-        var harness = new LocalHarness(configure: o => o with { RenewCredentials = (_, _) => { renewals++; return Task.FromResult(true); } });
+        var harness = new LocalHarness(configure: o => o with { RenewCredentials = (_, _) => { renewals++; return Task.FromResult(Client.CredentialRenewal.Renewed); } });
         await using var _ = harness.Session;
         await harness.Collection.QueryAsync();
         await WaitUntil(() => harness.Collection.Status.State == SyncState.Synced, "synced");
@@ -267,6 +267,87 @@ public sealed class BlazorIntegrationTests
         harness.Session.RequestSync();
         await WaitUntil(() => harness.Collection.Status.State == SyncState.AttentionRequired, "attention");
         Assert.Equal(2, renewals);
+    }
+
+    [Fact(DisplayName = "D6 I01 I16: a renewal that cannot reach the identity provider keeps local saves and the queue, and is tried again")]
+    public async Task CredentialRenewalOffline()
+    {
+        var renewals = 0;
+        var reachable = false;
+        LocalHarness harness = null!;
+        harness = new LocalHarness(configure: o => o with
+        {
+            RenewCredentials = (_, _) =>
+            {
+                renewals++;
+                if (!reachable)
+                {
+                    return Task.FromResult(Client.CredentialRenewal.Offline);
+                }
+
+                harness.Transport.Failure = null; // the new token is accepted
+                return Task.FromResult(Client.CredentialRenewal.Renewed);
+            },
+        });
+        await using var _ = harness.Session;
+        await harness.Collection.QueryAsync();
+        await WaitUntil(() => harness.Collection.Status.State == SyncState.Synced, "synced");
+
+        harness.Transport.Failure = new SyncTransportException(SyncErrorCodes.Unauthorized, "expired", isTransient: false);
+        var saved = await harness.Collection.SaveAsync(new Note { Id = "while-expired" });
+        await WaitUntil(() => renewals == 1 && harness.Collection.Status.State == SyncState.Offline, "offline, not signed out");
+        Assert.Equal(SyncConfirmation.SavedLocally, saved.Confirmation);
+        Assert.Equal(1, harness.Collection.Status.Pending);
+
+        reachable = true;
+        harness.Time.Advance(TimeSpan.FromMinutes(1));
+        await WaitUntil(() => harness.Collection.Status is { State: SyncState.Synced, Pending: 0 }, "renewed after backoff and uploaded");
+        Assert.Equal(2, renewals);
+        Assert.NotNull(harness.Server.Server.GetVersion("while-expired"));
+    }
+
+    [Fact(DisplayName = "D6 I16: when sign-in is required, uploads stop until asked again while local saves keep working")]
+    public async Task CredentialRenewalSignInRequired()
+    {
+        var renewals = 0;
+        var harness = new LocalHarness(configure: o => o with { RenewCredentials = (_, _) => { renewals++; return Task.FromResult(Client.CredentialRenewal.SignInRequired); } });
+        await using var _ = harness.Session;
+        await harness.Collection.QueryAsync();
+        await WaitUntil(() => harness.Collection.Status.State == SyncState.Synced, "synced");
+
+        harness.Transport.Failure = new SyncTransportException(SyncErrorCodes.Unauthorized, "revoked", isTransient: false);
+        harness.Session.RequestSync();
+        await WaitUntil(() => renewals == 1 && harness.Collection.Status.State == SyncState.AttentionRequired, "sign-in required");
+        var attempts = harness.Transport.Attempts;
+        harness.Time.Advance(TimeSpan.FromSeconds(30));
+        await Task.Delay(100);
+
+        Assert.Equal(attempts, harness.Transport.Attempts); // no periodic upload attempts while the user must act
+        Assert.Equal(SyncConfirmation.SavedLocally, (await harness.Collection.SaveAsync(new Note { Id = "kept" })).Confirmation);
+        Assert.Equal(1, renewals);
+    }
+
+    [Fact(DisplayName = "D6: concurrent renewals for one account share one call; other accounts renew separately")]
+    public async Task RenewalsCoalesce()
+    {
+        var calls = 0;
+        var gate = new TaskCompletionSource();
+        var renew = CredentialRenewals.Coalesce(async (_, _) =>
+        {
+            Interlocked.Increment(ref calls);
+            await gate.Task;
+            return Client.CredentialRenewal.Renewed;
+        });
+
+        var first = renew("alice", CancellationToken.None);
+        var second = renew("alice", CancellationToken.None);
+        var other = renew("bob", CancellationToken.None);
+        gate.SetResult();
+
+        Assert.Equal([Client.CredentialRenewal.Renewed, Client.CredentialRenewal.Renewed, Client.CredentialRenewal.Renewed], await Task.WhenAll(first, second, other));
+        Assert.Equal(2, calls);
+        Assert.Equal(Client.CredentialRenewal.Renewed, await renew("alice", CancellationToken.None)); // a later failure renews again
+        Assert.Equal(3, calls);
     }
 
     [Fact(DisplayName = "I15: a lifecycle attachment lives exactly as long as the replica")]
@@ -298,7 +379,7 @@ public sealed class BlazorIntegrationTests
         var harness = new LocalHarness();
         await using var _ = harness.Session;
         harness.Transports["alice"] = new SwitchableTransport(new Bsync.Server.InProcessTransport<Note>(new InMemorySyncServer<Note>(
-            NoteJson.ServerOptions(SystemPhysicalClock.Instance, validator: (op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null))));
+            NoteJson.ServerOptions(SystemPhysicalClock.Instance, validator: (_, op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null))));
         harness.Transport.Gate = new TaskCompletionSource();
 
         await harness.Collection.SaveAsync(new Note { Id = "good" });
@@ -357,7 +438,7 @@ public sealed class BlazorIntegrationTests
         await using var _ = harness.Session;
         var strict = true;
         harness.Transports["alice"] = new SwitchableTransport(new Bsync.Server.InProcessTransport<Note>(new InMemorySyncServer<Note>(
-            NoteJson.ServerOptions(SystemPhysicalClock.Instance, validator: (op, _) => strict && op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null))));
+            NoteJson.ServerOptions(SystemPhysicalClock.Instance, validator: (_, op, _) => strict && op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null))));
         await harness.Collection.SaveAsync(new Note { Id = "retry", Title = "bad" });
         await harness.Collection.SaveAsync(new Note { Id = "revert", Title = "bad" });
         await WaitUntil(() => harness.Collection.GetItemStatusAsync("revert").Result!.State == SyncItemState.Rejected, "rejected");

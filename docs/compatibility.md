@@ -23,7 +23,26 @@
 3. Publishing to NuGet is a separate, explicitly authorized step (ADR-012); no workflow in this repository publishes.
 4. Previews: `.github/workflows/nightly.yml` packs `X.Y.Z-preview.YYYYMMDD.N` every night as a build artifact only.
 
-## 0.1.1 (unreleased)
+## 0.2.0 (unreleased)
+
+Builds on 0.1.1 and breaks two signatures (below).
+
+| Change | Why | Migration |
+|---|---|---|
+| **Breaking:** `InMemorySyncServerOptions<T>.Validator` and `PostgreSqlSyncAuthorityOptions<T>.Validator` are now `Func<SyncCallContext, PushOperation<T>, T?, string?>` (the caller comes first). | Validation often depends on who is writing (improvement plan F5). | Add a first parameter: `(op, current) => ...` becomes `(caller, op, current) => ...`. |
+| **Breaking:** `SyncSessionOptions<T>.RenewCredentials` returns `Task<CredentialRenewal>` (`Renewed`, `Offline`, `SignInRequired`) instead of `Task<bool>`. An exception from it counts as `Offline`. `CredentialRenewals.Coalesce` shares one renewal between an account's sessions. | A failed connection to the identity provider must not look like "sign in again" (task D6). | `true` becomes `CredentialRenewal.Renewed`; `false` becomes `SignInRequired` when the user must act, or `Offline` when the provider was unreachable. |
+| **Behaviour:** a push the server refuses as too large (`payload-too-large`) is split in halves down to one document or dependency group; one that is too large on its own is parked locally with rejection `payload-too-large` (`PushErrorCodes.PayloadTooLarge`). Before, the whole batch failed and blocked the queue. | Task D1 (I19). | Parked records are listed with the other rejections; make the document smaller and retry it. |
+| **Behaviour:** when the server defers operations (`retry-later`), the session retries with exponential backoff (`MinBackoff`..`MaxBackoff`, at most `Interval`). Before, it resynced at once in a loop (about 20,000 requests per second in a test). | Task D3. | None. |
+| `InMemorySyncServerOptions<T>.WriteHandler`; `PushErrorCodes.DependencyMissing` (`dependency-missing`, sent with `retry-later`). Retry-later outcomes store no receipt in the in-memory and SQL Server authorities, so the same operation is decided later. | Transient versus terminal outcomes (task D3). | Additive. |
+| New package `Bsync.Server.SqlServer` (`SqlServerSyncAuthority<T>`, `SqlServerSyncAuthorityOptions<T>`, `SqlServerSchemaException`; Microsoft.Data.SqlClient 7.1.1). Tables in a `bsync` schema of the application's database, created on first use. | ADR-014. | Additive. |
+| Core: `ISyncWriteHandler<T>`, `SyncWriteContext<T>`, `SyncWriteDecision<T>`, `SyncWriteDecisionKind`. | Domain logic in the authority's transaction (ADR-014). Used by the SQL Server authority. | Additive. |
+| Core: `ISyncPublisher<T>` and `SyncPublishResult`, implemented by `InMemorySyncServer`, `ScopedAuthority`, `PostgreSqlSyncAuthority` and `SqlServerSyncAuthority`. | Server-originated writes without fake operation ids (task B3). | Additive. Custom authorities may implement it. |
+| **Protocol (additive):** optional `limits` member (`maxOperationsPerPush`, `maxPageSize`) and feature `limits` in pull responses; all included authorities send them. `SyncLimits`, `SyncFeatures.Limits`, `PullResult.Limits`. Replicas clamp their batch sizes to advertised limits. | Limits were specified as advertised but were not (F6). | Older replicas ignore the member. Older servers do not send it; replicas then use their configuration as before. |
+| `Bsync.Testing`: `AuthorityCapabilities.Publisher` (and `All` now includes it), `AuthorityUnderTest.Publisher`, five publisher cases; **breaking for drivers written against 0.1.1:** `AuthorityConformanceOptions.Validator` takes the caller first. | Publisher conformance; same signature as the authorities. | Drivers pass the new delegate through unchanged. |
+| `Bsync.Server.AspNetCore`: `MapSyncCollections` and `SyncCollectionGroupBuilder`. | Several collections under one policy and one set of options. | Additive. |
+| Checkpoint scope encoding: unchanged. The improvement plan's finding F4 (PostgreSQL concatenates collection, scope and fingerprint without separators) was checked: the parts are joined with U+001F, which `SyncIds` excludes from collections and scopes, so the encoding is unambiguous and existing checkpoints stay valid. The SQL Server authority length-prefixes each part. | No reset needed. | None. |
+
+## 0.1.1 (committed as 93dee98; not yet on NuGet)
 
 | Change | Why | Migration |
 |---|---|---|

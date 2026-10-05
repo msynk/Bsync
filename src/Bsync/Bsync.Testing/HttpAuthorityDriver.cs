@@ -46,6 +46,8 @@ public sealed class HttpAuthorityDriver(
     {
         public override ISyncAuthority<ConformanceDocument> Authority => target.Authority;
 
+        public override ISyncPublisher<ConformanceDocument>? Publisher => target.Publisher;
+
         public override ISyncTransport<ConformanceDocument> Connect(SyncCallContext caller) =>
             new HttpSyncTransport<ConformanceDocument>(
                 server.CreateClient(caller),

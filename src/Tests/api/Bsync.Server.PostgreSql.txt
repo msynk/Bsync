@@ -3,8 +3,8 @@ sealed class Bsync.Server.PostgreSql.PostgreSqlSchemaException : System.NotSuppo
 sealed class Bsync.Server.PostgreSql.PostgreSqlSyncAuthorityOptions<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Clocks.IPhysicalClock PhysicalClock { get; init; }
   Npgsql.NpgsqlDataSource DataSource { get; init; }
-  System.Func<Bsync.Protocol.PushOperation<TDocument>, TDocument, System.String> Validator { get; init; }
   System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<TDocument>, TDocument, System.Boolean> CanWrite { get; init; }
+  System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<TDocument>, TDocument, System.String> Validator { get; init; }
   System.Func<Bsync.Server.SyncCallContext, System.String> ScopeFingerprint { get; init; }
   System.Func<Bsync.Server.SyncCallContext, TDocument, System.Boolean> CanRead { get; init; }
   System.Int32 MaxOperationsPerPush { get; init; }
@@ -13,13 +13,17 @@ sealed class Bsync.Server.PostgreSql.PostgreSqlSyncAuthorityOptions<TDocument> w
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> DocumentType { get; init; }
   System.TimeSpan MaxClockSkew { get; init; }
   ctor()
-sealed class Bsync.Server.PostgreSql.PostgreSqlSyncAuthority<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument>, System.IAsyncDisposable where TDocument : class, Bsync.ISyncEntity
+sealed class Bsync.Server.PostgreSql.PostgreSqlSyncAuthority<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument>, Bsync.Server.ISyncPublisher<TDocument>, System.IAsyncDisposable where TDocument : class, Bsync.ISyncEntity
   Bsync.Server.AuthorityLimits Limits { get; }
   System.String Epoch { get; }
   System.Threading.Tasks.Task BeginNewEpochAsync(System.Int64 versionFloor, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PullResult<TDocument>> PullAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PullRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PushResult<TDocument>> PushAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PushRequest<TDocument> request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Server.StoredDocument<TDocument>> GetAsync(Bsync.Server.SyncCallContext context, System.String id, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> DeleteAsync(System.String scope, System.String id, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> PublishAsync(TDocument document, System.Collections.Generic.IEnumerable<System.String> scopes, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> ReplaceScopeAsync(System.String scope, System.Collections.Generic.IEnumerable<TDocument> documents, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> UpsertAsync(System.String scope, TDocument document, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Server.StoredDocument<TDocument>>> ListAsync(Bsync.Server.SyncCallContext context, System.Int32 limit, System.String afterId = null, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int32> PurgeReceiptsAsync(System.String scope, System.Int64 throughVersion, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int32> PurgeTombstonesAsync(System.String scope, System.Int64 throughVersion, System.Threading.CancellationToken cancellationToken = default)

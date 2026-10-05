@@ -38,6 +38,11 @@ ordinary API endpoints, background jobs, admin tools, raw SQL.
 - Applications that keep their domain model in EF Core call the authority (in-process or over HTTP) for
   synchronized collections. Writes that bypass it stay unsupported, as decided above.
 
+## SQL Server (2026-10-05)
+
+ADR-014 adds the second provider, `Bsync.Server.SqlServer`, on the application's own database, with a write handler
+in the authority's transaction and a publisher for server-originated writes (both also part of alternative 1).
+
 Implementation details:
 - Documents are stored as their exact JSON text, per (collection, scope, id).
 - Receipts are keyed by (collection, scope, operation id).

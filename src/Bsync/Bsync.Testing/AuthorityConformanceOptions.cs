@@ -17,7 +17,7 @@ public sealed class AuthorityConformanceOptions
     public TimeSpan MaxClockSkew { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>Application validation: an error code rejects the operation permanently.</summary>
-    public Func<PushOperation<ConformanceDocument>, ConformanceDocument?, string?>? Validator { get; init; }
+    public Func<SyncCallContext, PushOperation<ConformanceDocument>, ConformanceDocument?, string?>? Validator { get; init; }
 
     /// <summary>Read authorization: documents the caller may not read are withheld.</summary>
     public Func<SyncCallContext, ConformanceDocument, bool>? CanRead { get; init; }

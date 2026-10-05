@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Bsync.Documents;
 using Bsync.Protocol;
 using Bsync.Server;
@@ -83,7 +84,7 @@ public sealed class InMemoryAuthorityDriver : IAuthorityConformanceDriver
                 VersionFloor = versionFloor,
             });
 
-        private sealed class Router(InMemoryAuthorityUnderTest owner) : ISyncAuthority<ConformanceDocument>
+        private sealed class Router(InMemoryAuthorityUnderTest owner) : ISyncAuthority<ConformanceDocument>, ISyncPublisher<ConformanceDocument>
         {
             public AuthorityLimits Limits { get; } = new(1000, 1000);
 
@@ -97,6 +98,27 @@ public sealed class InMemoryAuthorityDriver : IAuthorityConformanceDriver
             {
                 ArgumentNullException.ThrowIfNull(context);
                 return owner.For(context.Scope).PushAsync(context, request, cancellationToken);
+            }
+
+            public Task<SyncPublishResult> UpsertAsync(string scope, ConformanceDocument document, DbTransaction? transaction = null, CancellationToken cancellationToken = default) =>
+                owner.For(scope).UpsertAsync(scope, document, transaction, cancellationToken);
+
+            public Task<SyncPublishResult> DeleteAsync(string scope, string id, DbTransaction? transaction = null, CancellationToken cancellationToken = default) =>
+                owner.For(scope).DeleteAsync(scope, id, transaction, cancellationToken);
+
+            public Task<SyncPublishResult> ReplaceScopeAsync(string scope, IEnumerable<ConformanceDocument> documents, DbTransaction? transaction = null, CancellationToken cancellationToken = default) =>
+                owner.For(scope).ReplaceScopeAsync(scope, documents, transaction, cancellationToken);
+
+            public async Task<SyncPublishResult> PublishAsync(ConformanceDocument document, IEnumerable<string> scopes, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+            {
+                ArgumentNullException.ThrowIfNull(scopes);
+                var result = SyncPublishResult.None;
+                foreach (var scope in scopes.Distinct(StringComparer.Ordinal))
+                {
+                    result = result.Add(await owner.For(scope).UpsertAsync(scope, document, transaction, cancellationToken).ConfigureAwait(false));
+                }
+
+                return result;
             }
         }
     }

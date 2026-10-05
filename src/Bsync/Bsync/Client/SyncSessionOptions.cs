@@ -62,10 +62,14 @@ public sealed record SyncSessionOptions<TDocument>
     public Func<SyncSession<TDocument>, string, CancellationToken, Task<IAsyncDisposable?>>? AttachLifecycle { get; init; }
 
     /// <summary>
-    /// Called when the server answers <c>unauthorized</c>. Return <see langword="true"/> after renewing credentials
-    /// to retry at once; otherwise the session reports <see cref="SyncState.AttentionRequired"/>.
+    /// Called once per failure streak when the server answers <c>unauthorized</c>, with the account. Return
+    /// <see cref="CredentialRenewal.Renewed"/> to retry at once, <see cref="CredentialRenewal.Offline"/> when the identity
+    /// provider could not be reached (the session keeps everything and tries again with backoff; an exception counts as
+    /// offline), or <see cref="CredentialRenewal.SignInRequired"/> when only the user can fix it (uploads stop with
+    /// <see cref="SyncState.AttentionRequired"/>). Share one renewal between an account's sessions with
+    /// <see cref="CredentialRenewals.Coalesce"/>.
     /// </summary>
-    public Func<string, CancellationToken, Task<bool>>? RenewCredentials { get; init; }
+    public Func<string, CancellationToken, Task<CredentialRenewal>>? RenewCredentials { get; init; }
 
     /// <summary>
     /// Receives state changes and failures (category <c>Bsync.SyncSession</c>). Messages carry states, counts and

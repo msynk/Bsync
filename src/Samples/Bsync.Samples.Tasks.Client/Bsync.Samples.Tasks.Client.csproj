@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <Description>Sample: the tasks app in the browser, on an IndexedDB replica per signed-in user, syncing with a bearer token.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.12" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Blazor\Bsync.Blazor.csproj" />
+    <ProjectReference Include="..\Bsync.Samples.Tasks.Shared\Bsync.Samples.Tasks.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

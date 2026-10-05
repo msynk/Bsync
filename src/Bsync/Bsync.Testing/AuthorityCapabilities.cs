@@ -22,6 +22,9 @@ public enum AuthorityCapabilities
     /// <summary>The driver can start a new epoch with a version floor, as after a restore (<see cref="AuthorityUnderTest.BeginNewEpochAsync"/>).</summary>
     NewEpoch = 8,
 
+    /// <summary>The authority implements <see cref="Server.ISyncPublisher{TDocument}"/> (server-originated writes, ADR-014).</summary>
+    Publisher = 16,
+
     /// <summary>Everything above.</summary>
-    All = Groups | ScopeIsolation | Retention | NewEpoch,
+    All = Groups | ScopeIsolation | Retention | NewEpoch | Publisher,
 }

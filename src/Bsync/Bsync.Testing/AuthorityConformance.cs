@@ -144,7 +144,7 @@ public static class AuthorityConformance
 
         new("Authority I18: application validation rejects without writing", AuthorityCapabilities.None, async driver =>
         {
-            await using var authority = await CreateAsync(driver, validator: (op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null);
+            await using var authority = await CreateAsync(driver, validator: (caller, op, _) => op.Document.Title == "bad" && caller.Scope == SyncCallContext.Anonymous.Scope ? PushErrorCodes.Forbidden : null);
             var client = authority.Connect(SyncCallContext.Anonymous);
 
             var outcome = (await Push(client, Op("o1", "a", null, "bad")))[0];
@@ -395,6 +395,99 @@ public static class AuthorityConformance
             Check.True(next.Version > floor);
             Check.Sequence(["a", "b"], snapshot.Select(c => c.Document.Id).Order(StringComparer.Ordinal));
         }),
+
+        new("Authority B3: a published document gets a version and a timestamp; republishing unchanged content adds no feed entry", AuthorityCapabilities.Publisher, async driver =>
+        {
+            await using var authority = await CreateAsync(driver);
+            var client = authority.Connect(SyncCallContext.Anonymous);
+            var publisher = authority.Publisher!;
+            var scope = SyncCallContext.Anonymous.Scope;
+
+            var first = await publisher.UpsertAsync(scope, new ConformanceDocument { Id = "p", Title = "projected" });
+            var page = await client.PullAsync(new PullRequest(Checkpoint.Start, 10));
+            var again = await publisher.UpsertAsync(scope, new ConformanceDocument { Id = "p", Title = "projected" });
+            var idle = await client.PullAsync(new PullRequest(page.Checkpoint, 10));
+            var changed = await publisher.UpsertAsync(scope, new ConformanceDocument { Id = "p", Title = "changed" });
+            var next = await client.PullAsync(new PullRequest(page.Checkpoint, 10));
+
+            Check.Equal(new SyncPublishResult(1, 0, 0), first);
+            Check.True(Single(page.Changes).Document.UpdatedAt != default);
+            Check.Equal(new SyncPublishResult(0, 1, 0), again);
+            Check.Equal(0, idle.Changes.Count);
+            Check.Equal(new SyncPublishResult(1, 0, 0), changed);
+            Check.True(Single(next.Changes).Version > page.Changes[0].Version);
+            Check.Equal("changed", next.Changes[0].Document.Title);
+        }),
+
+        new("Authority B3 I10: replacing a scope writes changes, keeps unchanged documents and tombstones the ones no longer listed, without a reset", AuthorityCapabilities.Publisher, async driver =>
+        {
+            await using var authority = await CreateAsync(driver);
+            var client = authority.Connect(SyncCallContext.Anonymous);
+            var publisher = authority.Publisher!;
+            var scope = SyncCallContext.Anonymous.Scope;
+
+            var built = await publisher.ReplaceScopeAsync(scope, [Doc("a", "1"), Doc("b", "1"), Doc("c", "1")]);
+            var checkpoint = (await PullAllFrom(client, Checkpoint.Start)).Checkpoint;
+            var rebuilt = await publisher.ReplaceScopeAsync(scope, [Doc("a", "1"), Doc("b", "2")]);
+            var (changes, _) = await PullAllFrom(client, checkpoint);
+            var unchanged = await publisher.ReplaceScopeAsync(scope, [Doc("a", "1"), Doc("b", "2")]);
+
+            Check.Equal(new SyncPublishResult(3, 0, 0), built);
+            Check.Equal(new SyncPublishResult(1, 1, 1), rebuilt);
+            Check.Sequence(["b=2:False", "c=1:True"], changes.Select(c => $"{c.Document.Id}={c.Document.Title}:{c.Document.Deleted}").Order(StringComparer.Ordinal));
+            Check.Equal(new SyncPublishResult(0, 2, 0), unchanged);
+        }),
+
+        new("Authority B3 I05: a publisher write is a new version, so a replica's edit based on the older one conflicts", AuthorityCapabilities.Publisher, async driver =>
+        {
+            await using var authority = await CreateAsync(driver);
+            var client = authority.Connect(SyncCallContext.Anonymous);
+            var v1 = (await Push(client, Op("o1", "a", null, "replica")))[0].Version;
+
+            await authority.Publisher!.UpsertAsync(SyncCallContext.Anonymous.Scope, Doc("a", "back office"));
+            var stale = (await Push(client, Op("o2", "a", v1, "replica edit")))[0];
+
+            Check.Equal(PushOutcomeKind.Conflict, stale.Kind);
+            Check.Equal("back office", stale.Document!.Title);
+        }),
+
+        new("Authority B3 I10: deleting writes one tombstone; deleting an absent or deleted document changes nothing", AuthorityCapabilities.Publisher, async driver =>
+        {
+            await using var authority = await CreateAsync(driver);
+            var client = authority.Connect(SyncCallContext.Anonymous);
+            var publisher = authority.Publisher!;
+            var scope = SyncCallContext.Anonymous.Scope;
+            await publisher.UpsertAsync(scope, Doc("a", "x"));
+
+            var absent = await publisher.DeleteAsync(scope, "missing");
+            var deleted = await publisher.DeleteAsync(scope, "a");
+            var twice = await publisher.DeleteAsync(scope, "a");
+            var feed = await PullAll(client);
+
+            Check.Equal(SyncPublishResult.None, absent);
+            Check.Equal(new SyncPublishResult(0, 0, 1), deleted);
+            Check.Equal(new SyncPublishResult(0, 1, 0), twice);
+            Check.True(Single(feed).Document.Deleted);
+            Check.Equal("x", feed[0].Document.Title);
+        }),
+
+        new("Authority B3 I07: a fan-out writes one copy per scope, and republishing it adds nothing", AuthorityCapabilities.Publisher | AuthorityCapabilities.ScopeIsolation, async driver =>
+        {
+            await using var authority = await CreateAsync(driver);
+            var publisher = authority.Publisher!;
+
+            var first = await publisher.PublishAsync(Doc("menu", "today"), ["tenant-a", "tenant-b"]);
+            var again = await publisher.PublishAsync(Doc("menu", "today"), ["tenant-b", "tenant-a"]);
+            var inA = await authority.Connect(Caller("tenant-a")).PullAsync(new PullRequest(Checkpoint.Start, 10));
+            var inB = await authority.Connect(Caller("tenant-b")).PullAsync(new PullRequest(Checkpoint.Start, 10));
+            var inC = await authority.Connect(Caller("tenant-c")).PullAsync(new PullRequest(Checkpoint.Start, 10));
+
+            Check.Equal(new SyncPublishResult(2, 0, 0), first);
+            Check.Equal(new SyncPublishResult(0, 2, 0), again);
+            Check.Equal("today", Single(inA.Changes).Document.Title);
+            Check.Equal("today", Single(inB.Changes).Document.Title);
+            Check.Equal(0, inC.Changes.Count);
+        }),
     ];
 
     /// <summary>The cases a driver with <paramref name="capabilities"/> can run.</summary>
@@ -403,7 +496,7 @@ public static class AuthorityConformance
 
     private static Task<AuthorityUnderTest> CreateAsync(
         IAuthorityConformanceDriver driver,
-        Func<PushOperation<ConformanceDocument>, ConformanceDocument?, string?>? validator = null,
+        Func<SyncCallContext, PushOperation<ConformanceDocument>, ConformanceDocument?, string?>? validator = null,
         Func<SyncCallContext, ConformanceDocument, bool>? canRead = null,
         Func<SyncCallContext, string>? scopeFingerprint = null) =>
         driver.CreateAsync(new AuthorityConformanceOptions
@@ -445,6 +538,23 @@ public static class AuthorityConformance
             if (!page.HasMore)
             {
                 return all;
+            }
+        }
+
+        throw new ConformanceFailure("The feed did not end after 1000 pages.");
+    }
+
+    private static async Task<(List<RemoteChange<ConformanceDocument>> Changes, Checkpoint Checkpoint)> PullAllFrom(ISyncTransport<ConformanceDocument> client, Checkpoint checkpoint)
+    {
+        var all = new List<RemoteChange<ConformanceDocument>>();
+        for (var pages = 0; pages < 1000; pages++)
+        {
+            var page = await client.PullAsync(new PullRequest(checkpoint, 50)).ConfigureAwait(false);
+            all.AddRange(page.Changes);
+            checkpoint = page.Checkpoint;
+            if (!page.HasMore)
+            {
+                return (all, checkpoint);
             }
         }
 

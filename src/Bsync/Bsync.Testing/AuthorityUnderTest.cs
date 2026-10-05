@@ -12,6 +12,12 @@ public abstract class AuthorityUnderTest : IAsyncDisposable
     /// <summary>The authority, called in-process. HTTP drivers serve this instance.</summary>
     public abstract ISyncAuthority<ConformanceDocument> Authority { get; }
 
+    /// <summary>
+    /// The authority's publisher for server-originated writes (<see cref="AuthorityCapabilities.Publisher"/>). Default: the
+    /// authority itself, if it implements <see cref="ISyncPublisher{TDocument}"/>.
+    /// </summary>
+    public virtual ISyncPublisher<ConformanceDocument>? Publisher => Authority as ISyncPublisher<ConformanceDocument>;
+
     /// <summary>A transport that calls the authority as <paramref name="caller"/>. Default: in-process.</summary>
     public virtual ISyncTransport<ConformanceDocument> Connect(SyncCallContext caller) =>
         new InProcessTransport<ConformanceDocument>(Authority, caller);

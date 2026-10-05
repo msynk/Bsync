@@ -6,6 +6,7 @@ using Bsync.Documents;
 using Bsync.Protocol;
 using Bsync.Server;
 using Bsync.Server.AspNetCore;
+using Bsync.Server.SqlServer;
 using Bsync.Storage.Sqlite;
 using Bsync.Transport;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -57,6 +58,7 @@ try
 
     // The browser store ships as a static web asset of the Bsync.Blazor package; keep the type referenced.
     Console.WriteLine($"IndexedDB store type: {typeof(IndexedDbLocalStore<Item>).FullName}");
+    Console.WriteLine($"SQL Server authority type: {typeof(SqlServerSyncAuthority<Item>).FullName}");
     Console.WriteLine($"Sync complete: {result.IsComplete}; server has the item: {stored?.Title == "from a packaged SQLite replica"}");
     return result.IsComplete && stored is not null ? 0 : 1;
 }

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -35,7 +36,7 @@ namespace Bsync.Server.PostgreSql;
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, IAsyncDisposable
+public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>, IAsyncDisposable
     where TDocument : class, ISyncEntity
 {
     /// <summary>The <c>NOTIFY</c> channel used for commit hints.</summary>
@@ -44,6 +45,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
     private readonly PostgreSqlSyncAuthorityOptions<TDocument> _options;
     private readonly NpgsqlDataSource _source;
     private readonly IPhysicalClock _physical;
+    private readonly HybridLogicalClock _publisherClock;
     private readonly string _instance = Guid.NewGuid().ToString("N");
     private readonly object _listenGate = new();
     private Action<AuthorityCommit>? _committed;
@@ -56,6 +58,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         _options = options;
         _source = options.DataSource;
         _physical = options.PhysicalClock ?? SystemPhysicalClock.Instance;
+        _publisherClock = new HybridLogicalClock("server", _physical);
     }
 
     /// <summary>Creates the authority, creating or upgrading the schema if needed.</summary>
@@ -135,7 +138,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             .Select(e => new RemoteChange<TDocument>(e.Document, e.Version))
             .ToList();
         var position = window.Count > 0 ? window[^1].Version : Math.Max(since, 0);
-        return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups] };
+        return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize) };
     }
 
     /// <inheritdoc />
@@ -391,7 +394,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.Forbidden);
         }
 
-        if (_options.Validator?.Invoke(operation, current?.Document) is { } error)
+        if (_options.Validator?.Invoke(context, operation, current?.Document) is { } error)
         {
             return PushOutcome<TDocument>.Rejected(opId, error);
         }
@@ -419,6 +422,223 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             json).ConfigureAwait(false);
         return PushOutcome<TDocument>.Accepted(opId, version, Deserialize(json));
     }
+
+    /// <inheritdoc />
+    /// <remarks>With <paramref name="transaction"/> (an <see cref="NpgsqlTransaction"/>), the write enlists in it and the caller commits.</remarks>
+    public Task<SyncPublishResult> UpsertAsync(string scope, TDocument document, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return PublishAsync([scope], transaction, (write, ct) => PublishOneAsync(write, document, null, ct), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<SyncPublishResult> DeleteAsync(string scope, string id, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return PublishAsync([scope], transaction, (write, ct) => DeleteOneAsync(write, id, null, ct), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<SyncPublishResult> ReplaceScopeAsync(string scope, IEnumerable<TDocument> documents, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documents);
+        var list = documents.ToList();
+        return PublishAsync(
+            [scope],
+            transaction,
+            async (write, ct) =>
+            {
+                var stored = new Dictionary<string, (bool Deleted, string Json)>(StringComparer.Ordinal);
+                await using (var read = new NpgsqlCommand("SELECT id, deleted, document FROM bs_documents WHERE collection = $1 AND scope = $2", write.Connection, write.Transaction))
+                {
+                    read.Parameters.Add(new() { Value = _options.Collection });
+                    read.Parameters.Add(new() { Value = write.Scope });
+                    await using var reader = await read.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        stored[reader.GetString(0)] = (reader.GetBoolean(1), reader.GetString(2));
+                    }
+                }
+
+                var keep = new HashSet<string>(StringComparer.Ordinal);
+                var result = SyncPublishResult.None;
+                foreach (var document in list)
+                {
+                    if (!keep.Add(document.Id))
+                    {
+                        throw new ArgumentException($"The document '{document.Id}' is listed twice.", nameof(documents));
+                    }
+
+                    result = result.Add(await PublishOneAsync(write, document, stored.TryGetValue(document.Id, out var known) ? known : null, ct).ConfigureAwait(false));
+                }
+
+                foreach (var (id, current) in stored)
+                {
+                    if (!keep.Contains(id) && !current.Deleted)
+                    {
+                        result = result.Add(await DeleteOneAsync(write, id, current, ct).ConfigureAwait(false));
+                    }
+                }
+
+                return result;
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<SyncPublishResult> PublishAsync(TDocument document, IEnumerable<string> scopes, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(scopes);
+        return PublishAsync([.. scopes], transaction, (write, ct) => PublishOneAsync(write, document, null, ct), cancellationToken);
+    }
+
+    // Feeds are locked in ordinal scope order, so concurrent fan-outs cannot deadlock on each other.
+    private async Task<SyncPublishResult> PublishAsync(
+        IReadOnlyList<string> scopes,
+        DbTransaction? transaction,
+        Func<PublishScope, CancellationToken, Task<SyncPublishResult>> publish,
+        CancellationToken cancellationToken)
+    {
+        var ordered = scopes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        if (ordered.Any(scope => !SyncIds.IsValid(scope)))
+        {
+            throw new ArgumentException("Every scope must be a valid identifier.", nameof(scopes));
+        }
+
+        NpgsqlConnection? owned = null;
+        NpgsqlTransaction? ownTransaction = null;
+        NpgsqlConnection connection;
+        NpgsqlTransaction active;
+        if (transaction is not null)
+        {
+            active = transaction as NpgsqlTransaction
+                ?? throw new ArgumentException("The transaction must be an Npgsql transaction.", nameof(transaction));
+            connection = active.Connection ?? throw new ArgumentException("The transaction has already completed.", nameof(transaction));
+        }
+        else
+        {
+            owned = await _source.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            ownTransaction = await owned.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            connection = owned;
+            active = ownTransaction;
+        }
+
+        try
+        {
+            var total = SyncPublishResult.None;
+            var changed = new List<string>();
+            foreach (var scope in ordered)
+            {
+                await ExecuteAsync(connection, active, "INSERT INTO bs_feeds (collection, scope, sequence, purged_through) VALUES ($1, $2, 0, 0) ON CONFLICT DO NOTHING", cancellationToken, _options.Collection, scope).ConfigureAwait(false);
+                var sequence = await ScalarAsync<long>(connection, active, "SELECT sequence FROM bs_feeds WHERE collection = $1 AND scope = $2 FOR UPDATE", cancellationToken, _options.Collection, scope).ConfigureAwait(false);
+                var start = sequence;
+                total = total.Add(await publish(new PublishScope(connection, active, scope, () => ++sequence), cancellationToken).ConfigureAwait(false));
+                if (sequence != start)
+                {
+                    await ExecuteAsync(connection, active, "UPDATE bs_feeds SET sequence = $3 WHERE collection = $1 AND scope = $2", cancellationToken, _options.Collection, scope, sequence).ConfigureAwait(false);
+                    await ExecuteAsync(connection, active, "SELECT pg_notify($1, $2)", cancellationToken, Channel, $"{_instance}\u001f{_options.Collection}\u001f{scope}").ConfigureAwait(false);
+                    changed.Add(scope);
+                }
+            }
+
+            if (ownTransaction is not null)
+            {
+                await ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                foreach (var scope in changed)
+                {
+                    _committed?.Invoke(new AuthorityCommit(scope, []));
+                }
+            }
+
+            return total;
+        }
+        finally
+        {
+            if (ownTransaction is not null)
+            {
+                await ownTransaction.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (owned is not null)
+            {
+                await owned.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // Unchanged content (ignoring the timestamp) keeps its version, so rebuilding a projection adds no feed entries.
+    private async Task<SyncPublishResult> PublishOneAsync(PublishScope write, TDocument document, (bool Deleted, string Json)? known, CancellationToken cancellationToken)
+    {
+        SyncIds.Validate(document.Id);
+        var current = known ?? await ReadOneAsync(write, document.Id, cancellationToken).ConfigureAwait(false);
+        var stored = Deserialize(Serialize(document));
+        if (current is { } existing)
+        {
+            stored.UpdatedAt = Deserialize(existing.Json).UpdatedAt;
+            if (Serialize(stored) == existing.Json)
+            {
+                return new SyncPublishResult(0, 1, 0);
+            }
+
+            stored.UpdatedAt = document.UpdatedAt;
+        }
+
+        if (stored.UpdatedAt == default)
+        {
+            stored.UpdatedAt = _publisherClock.Now();
+        }
+
+        await WriteDocumentAsync(write, document.Id, stored, cancellationToken).ConfigureAwait(false);
+        return new SyncPublishResult(1, 0, 0);
+    }
+
+    private async Task<SyncPublishResult> DeleteOneAsync(PublishScope write, string id, (bool Deleted, string Json)? known, CancellationToken cancellationToken)
+    {
+        var current = known ?? await ReadOneAsync(write, id, cancellationToken).ConfigureAwait(false);
+        if (current is not { } existing)
+        {
+            return SyncPublishResult.None;
+        }
+
+        if (existing.Deleted)
+        {
+            return new SyncPublishResult(0, 1, 0);
+        }
+
+        var tombstone = Deserialize(existing.Json);
+        tombstone.Deleted = true;
+        tombstone.UpdatedAt = _publisherClock.Now();
+        await WriteDocumentAsync(write, id, tombstone, cancellationToken).ConfigureAwait(false);
+        return new SyncPublishResult(0, 0, 1);
+    }
+
+    private async Task<(bool Deleted, string Json)?> ReadOneAsync(PublishScope write, string id, CancellationToken cancellationToken)
+    {
+        await using var read = new NpgsqlCommand("SELECT deleted, document FROM bs_documents WHERE collection = $1 AND scope = $2 AND id = $3", write.Connection, write.Transaction);
+        read.Parameters.Add(new() { Value = _options.Collection });
+        read.Parameters.Add(new() { Value = write.Scope });
+        read.Parameters.Add(new() { Value = id });
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? (reader.GetBoolean(0), reader.GetString(1)) : null;
+    }
+
+    private Task WriteDocumentAsync(PublishScope write, string id, TDocument document, CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            write.Connection,
+            write.Transaction,
+            """
+            INSERT INTO bs_documents (collection, scope, id, id_key, version, deleted, document) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (collection, scope, id) DO UPDATE SET version = excluded.version, deleted = excluded.deleted, document = excluded.document
+            """,
+            cancellationToken,
+            _options.Collection,
+            write.Scope,
+            id,
+            Encoding.BigEndianUnicode.GetBytes(id),
+            write.NextVersion(),
+            document.Deleted,
+            Serialize(document));
 
     /// <inheritdoc />
     public async Task<StoredDocument<TDocument>?> GetAsync(SyncCallContext context, string id, CancellationToken cancellationToken = default)
@@ -711,4 +931,6 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
         return value is null or DBNull ? default! : (T)value;
     }
+
+    private sealed record PublishScope(NpgsqlConnection Connection, NpgsqlTransaction Transaction, string Scope, Func<long> NextVersion);
 }

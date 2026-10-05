@@ -8,6 +8,7 @@
     <PackageReference Include="Bsync" Version="$(BsyncPackageVersion)" />
     <PackageReference Include="Bsync.Blazor" Version="$(BsyncPackageVersion)" />
     <PackageReference Include="Bsync.Server.AspNetCore" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="Bsync.Server.SqlServer" Version="$(BsyncPackageVersion)" />
     <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" />
   </ItemGroup>
 

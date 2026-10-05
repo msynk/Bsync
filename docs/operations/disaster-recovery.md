@@ -37,6 +37,18 @@ var floor = /* a version at or above anything issued before the incident, e.g. f
 await authority.BeginNewEpochAsync(floor);   // new epoch for every collection in the database
 ```
 
+The SQL Server authority is restored the same way (`RESTORE DATABASE`, or a point-in-time restore of the
+application database, which holds the `bsync` schema next to the application's tables, ADR-014):
+
+```csharp
+var floor = /* at or above anything issued before the incident, e.g. GetHighestVersionAsync(scope) from monitoring */;
+await authority.BeginNewEpochAsync(floor);   // new epoch, and every feed (also feeds created later) continues above it
+```
+
+Restoring the application database restores the application's rows and the replication projection to the same
+point in time. Tested: `SqlServerAuthorityTests.RestoreDrill` (tables restored from a copy, new epoch, replicas reset
+and keep pending edits, no version reused) and `NewFeedStartsAboveFloor`.
+
 Receipts restored with the tables are kept. Tested: `PostgreSqlAuthorityTests.RestoreDrill`. It restores the
 tables from a copy taken earlier and checks that replicas reset, keep pending edits and reuse no version. A
 `pg_dump`/`pg_restore` round trip was not scripted.
@@ -62,9 +74,9 @@ tables from a copy taken earlier and checks that replicas reset, keep pending ed
   longest time a device may stay offline with unsent work. A resend after its receipt was purged is never
   applied twice, but it comes back as a conflict. With the default policy it is then kept for the user,
   although the write had in fact succeeded.
-- Neither purge runs automatically. With PostgreSQL, schedule `PurgeTombstonesAsync(scope, version)` and
-  `PurgeReceiptsAsync(scope, version)` per scope, for example from a background job. They are tested in
-  `PostgreSqlAuthorityTests.Retention`.
+- Neither purge runs automatically. With PostgreSQL or SQL Server, schedule `PurgeTombstonesAsync(scope, version)`
+  and `PurgeReceiptsAsync(scope, version)` per scope, for example from a background job. They are tested by the
+  public authority conformance suite on both, and in `PostgreSqlAuthorityTests.Retention`.
 
 ## 3. Access changes
 
@@ -155,7 +167,7 @@ upload queues drain first: an operation in flight across the change is answered 
 
 ## 8. Checklist before going to production
 
-With the PostgreSQL authority:
+With the PostgreSQL or SQL Server authority:
 
 - A backup schedule, and a tested restore that starts a new epoch with a version floor.
 - A receipt retention period longer than the longest supported offline period.

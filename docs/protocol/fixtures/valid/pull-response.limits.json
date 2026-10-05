@@ -1,0 +1,7 @@
+{
+  "changes": [],
+  "checkpoint": "cloud-5f0c2d7e9a1b4c3d8e6f7a8b9c0d1e2f~9A3F00C1D2E4B5A6:17",
+  "hasMore": false,
+  "features": ["groups", "limits"],
+  "limits": { "maxOperationsPerPush": 500, "maxPageSize": 200 }
+}

@@ -110,6 +110,26 @@ public static class SyncEndpoints
         return group;
     }
 
+    /// <summary>
+    /// Maps several collections that share <paramref name="options"/> (scope resolver, schemas, limits), for example
+    /// <c>app.MapSyncCollections(options, group => group.Add&lt;Order&gt;("orders").Add&lt;Customer&gt;("customers"))</c>.
+    /// </summary>
+    /// <returns>The route group of all the collections, for one authorization policy, CORS or rate limiting.</returns>
+    public static RouteGroupBuilder MapSyncCollections(
+        this IEndpointRouteBuilder endpoints,
+        SyncEndpointOptions options,
+        Action<SyncCollectionGroupBuilder> collections,
+        string prefix = "sync")
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(collections);
+        ArgumentNullException.ThrowIfNull(prefix);
+        var group = endpoints.MapGroup(prefix.Trim('/'));
+        collections(new SyncCollectionGroupBuilder(group, options));
+        return group;
+    }
+
     /// <summary>How often an idle hint stream sends a keep-alive comment.</summary>
     public static TimeSpan HintKeepAlive { get; set; } = TimeSpan.FromSeconds(15);
 

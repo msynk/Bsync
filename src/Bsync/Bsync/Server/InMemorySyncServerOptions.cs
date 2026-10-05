@@ -72,7 +72,15 @@ public sealed class InMemorySyncServerOptions<TDocument>
 
     /// <summary>
     /// Optional application validation. Return <see langword="null"/> to allow the operation, or an error
-    /// code to reject it permanently. Receives the operation and the current server state, if any.
+    /// code to reject it permanently. Receives the caller, the operation and the current server state, if any.
     /// </summary>
-    public Func<PushOperation<TDocument>, TDocument?, string?>? Validator { get; init; }
+    public Func<SyncCallContext, PushOperation<TDocument>, TDocument?, string?>? Validator { get; init; }
+
+    /// <summary>
+    /// Optional application logic for every write about to be accepted (ADR-014): return a canonical document, a conflict,
+    /// a permanent rejection, or <see cref="SyncWriteDecision{TDocument}.RetryLater"/> (no receipt is stored, so the replica
+    /// resends the same operation later). This server has no database: the handler gets no connection or transaction,
+    /// must not have side effects, and runs under the server's lock, so it must complete synchronously.
+    /// </summary>
+    public ISyncWriteHandler<TDocument>? WriteHandler { get; init; }
 }

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <Description>Sample: a relational system of record (EF Core on SQL Server) replicated by the SQL Server authority, with a write handler, a publisher used by an ordinary API endpoint and bearer-token authentication (task B5, ADR-014).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bsync.Samples.Tasks.Client\Bsync.Samples.Tasks.Client.csproj" />
+    <ProjectReference Include="..\Bsync.Samples.Tasks.Shared\Bsync.Samples.Tasks.Shared.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.AspNetCore\Bsync.Server.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
+  </ItemGroup>
+
+</Project>

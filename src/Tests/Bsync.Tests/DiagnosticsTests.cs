@@ -85,7 +85,7 @@ public sealed class DiagnosticsTests
     {
         var name = $"diag-{Guid.NewGuid():N}";
         using var recorder = new Recorder(name);
-        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
+        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (_, op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
         var other = new TestReplica(server, "other");
         var client = Replica(server, "client", name);
         await other.Engine.WriteAsync(new Note { Id = "shared", Title = "base" });

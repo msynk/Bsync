@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -31,7 +32,7 @@ namespace Bsync.Server;
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier
+public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>
     where TDocument : class, ISyncEntity
 {
     private readonly Dictionary<string, Entry> _documents = new(StringComparer.Ordinal);
@@ -41,6 +42,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
     private readonly IPhysicalClock _physical;
     private readonly InMemorySyncServerOptions<TDocument> _options;
     private readonly object _gate = new();
+    private readonly HybridLogicalClock _publisherClock;
     private long _sequence;
     private long _purgedThrough;
 
@@ -79,6 +81,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         _clone = options.Cloner;
         _fingerprint = options.Fingerprint;
         _physical = options.PhysicalClock ?? SystemPhysicalClock.Instance;
+        _publisherClock = new HybridLogicalClock("server", _physical);
         ArgumentOutOfRangeException.ThrowIfNegative(options.VersionFloor, nameof(options.VersionFloor));
         _sequence = options.VersionFloor;
         if (options.RestoreFrom is { } backup)
@@ -208,7 +211,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
                 .ToList();
 
             var position = window.Count > 0 ? window[^1].Version : Math.Max(since, 0);
-            return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups] };
+            return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize) };
         }
     }
 
@@ -273,6 +276,114 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
 
     /// <inheritdoc />
     public event Action<AuthorityCommit>? Committed;
+
+    /// <inheritdoc />
+    /// <remarks>This server is one feed: <paramref name="scope"/> only labels the commit hint (use <see cref="ScopedAuthority{TDocument}"/> for per-scope feeds). It has no database, so <paramref name="transaction"/> must be <see langword="null"/>.</remarks>
+    public Task<SyncPublishResult> UpsertAsync(string scope, TDocument document, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return PublishAsync(scope, transaction, () => PublishLocked(document), [document.Id]);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>This server is one feed: <paramref name="scope"/> only labels the commit hint. <paramref name="transaction"/> must be <see langword="null"/>.</remarks>
+    public Task<SyncPublishResult> DeleteAsync(string scope, string id, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        return PublishAsync(scope, transaction, () => DeleteLocked(id), [id]);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>This server is one feed: <paramref name="scope"/> only labels the commit hint. <paramref name="transaction"/> must be <see langword="null"/>.</remarks>
+    public Task<SyncPublishResult> ReplaceScopeAsync(string scope, IEnumerable<TDocument> documents, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documents);
+        var list = documents.ToList();
+        return PublishAsync(
+            scope,
+            transaction,
+            () =>
+            {
+                var keep = new HashSet<string>(list.Select(d => d.Id), StringComparer.Ordinal);
+                var result = list.Aggregate(SyncPublishResult.None, (sum, document) => sum.Add(PublishLocked(document)));
+                foreach (var gone in _documents.Where(kv => !kv.Value.Document.Deleted && !keep.Contains(kv.Key)).Select(kv => kv.Key).ToList())
+                {
+                    result = result.Add(DeleteLocked(gone));
+                }
+
+                return result;
+            },
+            null);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>This server is one feed: the document is written once, whatever <paramref name="scopes"/> lists. <paramref name="transaction"/> must be <see langword="null"/>.</remarks>
+    public Task<SyncPublishResult> PublishAsync(TDocument document, IEnumerable<string> scopes, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(scopes);
+        return PublishAsync(scopes.FirstOrDefault() ?? SyncCallContext.Anonymous.Scope, transaction, () => PublishLocked(document), [document.Id]);
+    }
+
+    private Task<SyncPublishResult> PublishAsync(string scope, DbTransaction? transaction, Func<SyncPublishResult> publish, IReadOnlyList<string>? ids)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        if (transaction is not null)
+        {
+            throw new ArgumentException("The in-memory authority has no database transaction to enlist in.", nameof(transaction));
+        }
+
+        SyncPublishResult result;
+        lock (_gate)
+        {
+            result = publish();
+        }
+
+        if (result.Written + result.Deleted > 0)
+        {
+            Committed?.Invoke(new AuthorityCommit(scope, ids ?? []));
+        }
+
+        return Task.FromResult(result);
+    }
+
+    // Unchanged content (ignoring the timestamp) keeps its version, so rebuilding a projection adds no feed entries.
+    private SyncPublishResult PublishLocked(TDocument document)
+    {
+        SyncIds.Validate(document.Id);
+        if (_documents.TryGetValue(document.Id, out var current))
+        {
+            var candidate = _clone(document);
+            candidate.UpdatedAt = current.Document.UpdatedAt;
+            if (_fingerprint(candidate) == _fingerprint(current.Document))
+            {
+                return new SyncPublishResult(0, 1, 0);
+            }
+        }
+
+        var stored = _clone(document);
+        if (stored.UpdatedAt == default)
+        {
+            stored.UpdatedAt = _publisherClock.Now();
+        }
+
+        _documents[document.Id] = new Entry(stored, ++_sequence);
+        return new SyncPublishResult(1, 0, 0);
+    }
+
+    private SyncPublishResult DeleteLocked(string id)
+    {
+        if (!_documents.TryGetValue(id, out var current) || current.Document.Deleted)
+        {
+            return current is null ? SyncPublishResult.None : new SyncPublishResult(0, 1, 0);
+        }
+
+        var tombstone = _clone(current.Document);
+        tombstone.Deleted = true;
+        tombstone.UpdatedAt = _publisherClock.Now();
+        _documents[id] = new Entry(tombstone, ++_sequence);
+        return new SyncPublishResult(0, 0, 1);
+    }
 
     /// <inheritdoc />
     public Task<StoredDocument<TDocument>?> GetAsync(SyncCallContext context, string id, CancellationToken cancellationToken = default)
@@ -348,8 +459,13 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             return replayed;
         }
 
-        var outcome = Evaluate(context, operation!) ?? Commit(operation!);
-        Remember(operation!, outcome);
+        var outcome = Evaluate(context, operation!, out var canonical) ?? Commit(operation!, canonical);
+        if (outcome.Kind != PushOutcomeKind.RetryLater)
+        {
+            // Not decided yet: the same operation id may be decided later (ADR-014).
+            Remember(operation!, outcome);
+        }
+
         return outcome;
     }
 
@@ -382,11 +498,13 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
 
         // Evaluate everything first; nothing changes until the whole group is known to succeed.
         var decided = new PushOutcome<TDocument>?[members.Count];
+        var canonical = new TDocument[members.Count];
         var allAccept = true;
         for (var m = 0; m < members.Count; m++)
         {
             var operation = operations[members[m]];
-            decided[m] = Replay(operation) ?? Evaluate(context, operation);
+            canonical[m] = operation.Document;
+            decided[m] = Replay(operation) ?? Evaluate(context, operation, out canonical[m]);
             allAccept &= decided[m] is null or { Kind: PushOutcomeKind.Accepted };
         }
 
@@ -397,14 +515,14 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             if (decided[m] is { } final)
             {
                 outcome = final;
-                if (!final.IsDuplicate)
+                if (!final.IsDuplicate && final.Kind != PushOutcomeKind.RetryLater)
                 {
                     Remember(operation, final);
                 }
             }
             else if (allAccept)
             {
-                outcome = Commit(operation);
+                outcome = Commit(operation, canonical[m]);
                 Remember(operation, outcome);
             }
             else
@@ -447,8 +565,9 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         _receipts[operation.OperationId] = new Receipt(Fingerprint(operation), outcome with { Document = outcome.Document is { } doc ? _clone(doc) : null });
 
     /// <summary>Decides an operation without changing anything: a final outcome, or <see langword="null"/> if it would be accepted.</summary>
-    private PushOutcome<TDocument>? Evaluate(SyncCallContext context, PushOperation<TDocument> operation)
+    private PushOutcome<TDocument>? Evaluate(SyncCallContext context, PushOperation<TDocument> operation, out TDocument canonical)
     {
+        canonical = operation.Document;
         var opId = operation.OperationId;
         var id = operation.DocumentId;
         var limit = _physical.NowMilliseconds() + (long)_options.MaxClockSkew.TotalMilliseconds;
@@ -471,7 +590,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.Forbidden);
         }
 
-        if (_options.Validator?.Invoke(operation, current is null ? null : _clone(current.Document)) is { } error)
+        if (_options.Validator?.Invoke(context, operation, current is null ? null : _clone(current.Document)) is { } error)
         {
             return PushOutcome<TDocument>.Rejected(opId, error);
         }
@@ -483,13 +602,42 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             return PushOutcome<TDocument>.Conflict(opId, current.Version, _clone(current.Document));
         }
 
+        if (_options.WriteHandler is { } handler)
+        {
+            // No database and no transaction here: the handler decides and may return a canonical document, but has no
+            // side effects to undo. It runs under the server's lock, so it must complete synchronously.
+            var stored = current is null ? null : new StoredDocument<TDocument>(_clone(current.Document), current.Version);
+            var write = new SyncWriteContext<TDocument>(context, operation with { Document = _clone(operation.Document) }, stored, null, null);
+            var decision = handler.HandleAsync(write, CancellationToken.None).AsTask().GetAwaiter().GetResult()
+                ?? throw new InvalidOperationException("The write handler returned no decision.");
+            switch (decision.Kind)
+            {
+                case SyncWriteDecisionKind.Accept:
+                    if (!string.Equals(decision.Document!.Id, operation.DocumentId, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException("The write handler accepted a document with a different id.");
+                    }
+
+                    canonical = decision.Document;
+                    break;
+                case SyncWriteDecisionKind.Conflict:
+                    return current is null
+                        ? throw new InvalidOperationException("The write handler answered a conflict for a document that does not exist.")
+                        : PushOutcome<TDocument>.Conflict(opId, current.Version, _clone(current.Document));
+                case SyncWriteDecisionKind.Reject:
+                    return PushOutcome<TDocument>.Rejected(opId, decision.ErrorCode!, decision.Message);
+                default:
+                    return PushOutcome<TDocument>.RetryLater(opId, decision.ErrorCode!, decision.Message);
+            }
+        }
+
         return null;
     }
 
-    private PushOutcome<TDocument> Commit(PushOperation<TDocument> operation)
+    private PushOutcome<TDocument> Commit(PushOperation<TDocument> operation, TDocument canonical)
     {
         var version = ++_sequence;
-        var stored = _clone(operation.Document);
+        var stored = _clone(canonical);
         _documents[operation.DocumentId] = new Entry(stored, version);
         return PushOutcome<TDocument>.Accepted(operation.OperationId, version, _clone(stored));
     }

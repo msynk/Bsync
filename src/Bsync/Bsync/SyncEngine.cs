@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using Bsync.Clocks;
 using Bsync.Conflicts;
 using Bsync.Diagnostics;
@@ -51,6 +52,7 @@ public sealed class SyncEngine<TDocument>
 
     // What the server advertised on the last pull page (null: not known yet in this engine instance).
     private volatile IReadOnlyList<string>? _serverFeatures;
+    private volatile SyncLimits? _serverLimits;
 
     /// <summary>
     /// Creates an engine for one collection that clones documents with reflection-based JSON. Not
@@ -652,7 +654,7 @@ public sealed class SyncEngine<TDocument>
             try
             {
                 result = await _transport
-                    .PullAsync(new PullRequest(cursor.Checkpoint, _options.PullBatchSize), cancellationToken)
+                    .PullAsync(new PullRequest(cursor.Checkpoint, PullBatchSize), cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (SyncResetRequiredException required) when (!cursor.Checkpoint.IsStart)
@@ -669,6 +671,8 @@ public sealed class SyncEngine<TDocument>
 
             ValidatePullPage(result, cursor.Checkpoint);
             _serverFeatures = result.Features ?? [];
+            _serverLimits = result.Features?.Contains(SyncFeatures.Limits, StringComparer.Ordinal) == true
+                && result.Limits is { MaxOperationsPerPush: > 0, MaxPageSize: > 0 } limits ? limits : null;
 
             var generation = cursor.Generation;
             var updates = new List<RecordUpdate<TDocument>>(result.Changes.Count);
@@ -744,6 +748,45 @@ public sealed class SyncEngine<TDocument>
         }
     }
 
+    /// <summary>
+    /// Sends a batch. When the server refuses it as too large (<c>payload-too-large</c>, nothing applied), sends each half
+    /// separately, down to a single document or dependency group. One that is too large on its own is parked locally with
+    /// a <see cref="PushErrorCodes.PayloadTooLarge"/> rejection, so the rest of the queue keeps moving (I19); after making
+    /// it smaller, <see cref="RetryRejectedAsync"/> sends it as a new operation.
+    /// </summary>
+    private async Task<List<PushOutcome<TDocument>>> SendSplittingAsync(IReadOnlyList<PushOperation<TDocument>> operations, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _transport.PushAsync(new PushRequest<TDocument>(operations), cancellationToken).ConfigureAwait(false);
+            return response?.Outcomes is { } outcomes ? [.. outcomes] : throw new SyncProtocolException("The server returned no push result.");
+        }
+        catch (SyncTransportException tooLarge) when (tooLarge.ErrorCode == SyncErrorCodes.PayloadTooLarge && !tooLarge.IsTransient)
+        {
+            // A group is never split: its members are applied together or not at all (protocol §4.1).
+            var units = operations
+                .Select((operation, index) => (operation, key: operation.Group ?? "\0" + index.ToString(CultureInfo.InvariantCulture)))
+                .GroupBy(pair => pair.key, StringComparer.Ordinal)
+                .Select(unit => unit.Select(pair => pair.operation).ToList())
+                .ToList();
+            if (units.Count == 1)
+            {
+                return [.. operations.Select(o => PushOutcome<TDocument>.Rejected(o.OperationId, PushErrorCodes.PayloadTooLarge, "Too large for the server, even on its own. Make it smaller, then retry it."))];
+            }
+
+            var half = units.Count / 2;
+            var first = await SendSplittingAsync([.. units.Take(half).SelectMany(u => u)], cancellationToken).ConfigureAwait(false);
+            var second = await SendSplittingAsync([.. units.Skip(half).SelectMany(u => u)], cancellationToken).ConfigureAwait(false);
+            return [.. first, .. second];
+        }
+    }
+
+    // The configured batch sizes, clamped to the limits the server advertised (feature "limits"), so a replica never
+    // sends a push the server must refuse as too large.
+    private int PullBatchSize => _serverLimits is { } limits ? Math.Min(_options.PullBatchSize, limits.MaxPageSize) : _options.PullBatchSize;
+
+    private int PushBatchSize => _serverLimits is { } limits ? Math.Min(_options.PushBatchSize, limits.MaxOperationsPerPush) : _options.PushBatchSize;
+
     private void ValidatePullPage(PullResult<TDocument>? result, Checkpoint requested)
     {
         if (result?.Changes is null)
@@ -751,7 +794,7 @@ public sealed class SyncEngine<TDocument>
             throw new SyncProtocolException("The server returned no pull result.");
         }
 
-        if (result.Changes.Count > _options.PullBatchSize)
+        if (result.Changes.Count > PullBatchSize)
         {
             throw new SyncProtocolException("The server returned more changes than requested.");
         }
@@ -857,7 +900,7 @@ public sealed class SyncEngine<TDocument>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var candidates = await _store.GetPendingAsync(_options.PushBatchSize, excluded, cancellationToken).ConfigureAwait(false);
+            var candidates = await _store.GetPendingAsync(PushBatchSize, excluded, cancellationToken).ConfigureAwait(false);
             if (candidates.Count == 0)
             {
                 break;
@@ -875,9 +918,7 @@ public sealed class SyncEngine<TDocument>
                 continue;
             }
 
-            var response = await _transport
-                .PushAsync(new PushRequest<TDocument>(operations), cancellationToken)
-                .ConfigureAwait(false);
+            var response = new PushResult<TDocument>(await SendSplittingAsync(operations, cancellationToken).ConfigureAwait(false));
             var outcomes = CorrelateOutcomes(operations, response);
             if (SyncDiagnostics.Operations.Enabled)
             {

@@ -3,6 +3,7 @@
     <Project Path="Bsync/Bsync.Blazor/Bsync.Blazor.csproj" />
     <Project Path="Bsync/Bsync.Server.AspNetCore/Bsync.Server.AspNetCore.csproj" />
     <Project Path="Bsync/Bsync.Server.PostgreSql/Bsync.Server.PostgreSql.csproj" />
+    <Project Path="Bsync/Bsync.Server.SqlServer/Bsync.Server.SqlServer.csproj" />
     <Project Path="Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" />
     <Project Path="Bsync/Bsync.Testing/Bsync.Testing.csproj" />
     <Project Path="Bsync/Bsync/Bsync.csproj" />
@@ -13,6 +14,10 @@
     <Project Path="Samples/Bsync.Samples.Notes.Client/Bsync.Samples.Notes.Client.csproj" />
     <Project Path="Samples/Bsync.Samples.Notes.Server/Bsync.Samples.Notes.Server.csproj" />
     <Project Path="Samples/Bsync.Samples.Shared/Bsync.Samples.Shared.csproj" />
+    <Project Path="Samples/Bsync.Samples.Tasks.Client/Bsync.Samples.Tasks.Client.csproj" />
+    <Project Path="Samples/Bsync.Samples.Tasks.Console/Bsync.Samples.Tasks.Console.csproj" />
+    <Project Path="Samples/Bsync.Samples.Tasks.Server/Bsync.Samples.Tasks.Server.csproj" />
+    <Project Path="Samples/Bsync.Samples.Tasks.Shared/Bsync.Samples.Tasks.Shared.csproj" />
     <Project Path="Samples/Bsync.Samples.WebApp.Client/Bsync.Samples.WebApp.Client.csproj" />
     <Project Path="Samples/Bsync.Samples.WebApp/Bsync.Samples.WebApp.csproj" />
   </Folder>
@@ -22,6 +27,7 @@
     <Project Path="Tests/Bsync.Tests.BrowserHost/Bsync.Tests.BrowserHost.csproj" />
     <Project Path="Tests/Bsync.Tests.CrashHost/Bsync.Tests.CrashHost.csproj" />
     <Project Path="Tests/Bsync.Tests.PostgreSql/Bsync.Tests.PostgreSql.csproj" />
+    <Project Path="Tests/Bsync.Tests.SqlServer/Bsync.Tests.SqlServer.csproj" />
     <Project Path="Tests/Bsync.Tests/Bsync.Tests.csproj" />
   </Folder>
 </Solution>

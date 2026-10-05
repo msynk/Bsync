@@ -29,7 +29,7 @@ jobs:
       - name: Pack with a dated preview suffix
         run: |
           suffix="preview.$(date -u +%Y%m%d).${{ github.run_number }}"
-          for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Storage.Sqlite Bsync.Testing; do
+          for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite Bsync.Testing; do
             dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=$suffix || exit 1
           done
       - uses: actions/upload-artifact@v4

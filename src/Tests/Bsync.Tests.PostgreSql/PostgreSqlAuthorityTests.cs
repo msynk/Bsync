@@ -44,12 +44,14 @@ public sealed class PostgreSqlAuthorityTests : IAsyncLifetime
             var checkpoint = Checkpoint.Start;
             while (true)
             {
+                // Read the flag before pulling: the last drain must start after every write committed.
+                var stopping = stop.IsCancellationRequested;
                 var page = await two.PullAsync(SyncCallContext.Anonymous, new PullRequest(checkpoint, 7));
                 seen.AddRange(page.Changes.Select(c => c.Version));
                 checkpoint = page.Checkpoint;
                 if (!page.HasMore)
                 {
-                    if (stop.IsCancellationRequested)
+                    if (stopping)
                     {
                         return;
                     }

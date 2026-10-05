@@ -12,7 +12,7 @@ public sealed class GroupTests
 {
     private static Note Doc(string id, string title) => new() { Id = id, Title = title };
 
-    private static async Task<(InMemorySyncServerRef Server, TestReplica Other, TestReplica Client)> WithSharedDocumentsAsync(IConflictHandler<Note>? handler = null, Func<Protocol.PushOperation<Note>, Note?, string?>? validator = null)
+    private static async Task<(InMemorySyncServerRef Server, TestReplica Other, TestReplica Client)> WithSharedDocumentsAsync(IConflictHandler<Note>? handler = null, Func<Server.SyncCallContext, Protocol.PushOperation<Note>, Note?, string?>? validator = null)
     {
         var server = new InMemorySyncServerRef(new InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: validator)));
         var other = new TestReplica(server, "other");
@@ -91,7 +91,7 @@ public sealed class GroupTests
     public async Task RejectionAndRetry()
     {
         var strict = true;
-        var (server, _, client) = await WithSharedDocumentsAsync(validator: (op, _) => strict && op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null);
+        var (server, _, client) = await WithSharedDocumentsAsync(validator: (_, op, _) => strict && op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null);
 
         await client.Engine.WriteGroupAsync([Doc("order", "fine"), Doc("line", "bad")]);
         await client.Engine.SyncAsync();

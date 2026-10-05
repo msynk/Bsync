@@ -247,9 +247,12 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
         SetStatus(new SyncStatus(SyncState.Stopped, 0, null, _status.LastSynced));
     }
 
+    private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
+
     private async Task RunAsync(Active active, CancellationToken stopping)
     {
         var failures = 0;
+        var deferrals = 0;
         var renewed = false;
         while (!stopping.IsCancellationRequested)
         {
@@ -302,7 +305,12 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
                         await PublishAsync(active, SyncState.Syncing, "More work is queued.").ConfigureAwait(false);
                     }
 
-                    wait = result.HasRemainingWork ? TimeSpan.Zero : _options.Interval;
+                    // Work the server deferred (retry-later, for example a missing dependency) stays pending and counts as
+                    // remaining work; retry it with backoff, never in a tight loop.
+                    deferrals = result.Deferred > 0 ? deferrals + 1 : 0;
+                    wait = deferrals > 0 ? Min(Backoff(deferrals, null), _options.Interval)
+                        : result.HasRemainingWork ? TimeSpan.Zero
+                        : _options.Interval;
                 }
             }
             catch (OperationCanceledException) when (stopping.IsCancellationRequested)
@@ -319,12 +327,34 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
             catch (SyncTransportException error) when (
                 error.ErrorCode == SyncErrorCodes.Unauthorized && !renewed && _options.RenewCredentials is { } renew)
             {
-                // One renewal attempt per failure streak; a second unauthorized answer needs the user.
+                // One renewal attempt per failure streak; a second unauthorized answer after a renewal needs the user. A
+                // renewal that could not reach the identity provider is a connection problem, never a reason to sign out.
                 renewed = true;
-                wait = await renew(active.Account, stopping).ConfigureAwait(false) ? TimeSpan.Zero : _options.MaxBackoff;
-                if (wait > TimeSpan.Zero)
+                CredentialRenewal renewal;
+                try
                 {
-                    await PublishAsync(active, SyncState.AttentionRequired, "Sign in again to continue syncing.").ConfigureAwait(false);
+                    renewal = await renew(active.Account, stopping).ConfigureAwait(false);
+                }
+                catch (Exception renewalError) when (renewalError is not OperationCanceledException || !stopping.IsCancellationRequested)
+                {
+                    renewal = CredentialRenewal.Offline;
+                }
+
+                switch (renewal)
+                {
+                    case CredentialRenewal.Renewed:
+                        wait = TimeSpan.Zero;
+                        break;
+                    case CredentialRenewal.Offline:
+                        renewed = false;
+                        failures++;
+                        wait = Backoff(failures, null);
+                        await PublishAsync(active, SyncState.Offline, "Credentials could not be renewed now; changes are kept on this device.").ConfigureAwait(false);
+                        break;
+                    default:
+                        wait = _options.MaxBackoff;
+                        await PublishAsync(active, SyncState.AttentionRequired, "Sign in again to continue syncing.").ConfigureAwait(false);
+                        break;
                 }
             }
             catch (SyncTransportException error)

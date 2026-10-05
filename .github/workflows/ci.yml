@@ -64,6 +64,33 @@ jobs:
           name: postgres-results
           path: src/Tests/Bsync.Tests.PostgreSql/TestResults
 
+  sqlserver:
+    name: SQL Server authority tests
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Bsync-Ci-Passw0rd
+        ports: ["1433:1433"]
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Bsync-Ci-Passw0rd -Q 'SELECT 1' || exit 1"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+    env:
+      BSYNC_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Bsync-Ci-Passw0rd;TrustServerCertificate=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test src/Tests/Bsync.Tests.SqlServer -c Release --logger "trx;LogFileName=sqlserver.trx"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sqlserver-results
+          path: src/Tests/Bsync.Tests.SqlServer/TestResults
+
   browser:
     name: Browser and WPF tests (Chromium, Firefox, WebKit)
     runs-on: windows-latest
@@ -97,7 +124,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: >-
-          for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql
+          for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer
           Bsync.Storage.Sqlite Bsync.Testing;
           do dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=$BSYNC_PACKAGE_SUFFIX || exit 1; done
       - name: Resolve the packed version

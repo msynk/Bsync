@@ -28,6 +28,7 @@
     <ProjectReference Include="..\Bsync.Tests.CrashHost\Bsync.Tests.CrashHost.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.AspNetCore\Bsync.Server.AspNetCore.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.PostgreSql\Bsync.Server.PostgreSql.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Testing\Bsync.Testing.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Blazor\Bsync.Blazor.csproj" />
   </ItemGroup>

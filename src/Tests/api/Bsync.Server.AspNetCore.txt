@@ -1,3 +1,6 @@
+sealed class Bsync.Server.AspNetCore.SyncCollectionGroupBuilder
+  Bsync.Server.AspNetCore.SyncCollectionGroupBuilder Add<TDocument>(System.String collection) where TDocument : class, Bsync.ISyncEntity
+  Bsync.Server.AspNetCore.SyncCollectionGroupBuilder Add<TDocument>(System.String collection, Bsync.Server.ISyncAuthority<TDocument> authority, Bsync.Protocol.SyncJsonTypes<TDocument> json) where TDocument : class, Bsync.ISyncEntity
 sealed class Bsync.Server.AspNetCore.SyncEndpointOptions
   System.Collections.Generic.IReadOnlySet<System.String> SupportedSchemas { get; init; }
   System.Func<Microsoft.AspNetCore.Http.HttpContext, System.String> ResolveScope { get; init; }
@@ -7,4 +10,5 @@ static class Bsync.Server.AspNetCore.SyncEndpoints
   const System.String MeterName = "Bsync.Server"
   const System.String ProtocolVersion = "1"
   static Microsoft.AspNetCore.Routing.RouteGroupBuilder MapSyncCollection<TDocument>(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints, System.String collection, Bsync.Server.ISyncAuthority<TDocument> authority, Bsync.Protocol.SyncJsonTypes<TDocument> json, Bsync.Server.AspNetCore.SyncEndpointOptions options, System.String prefix = "sync") where TDocument : class, Bsync.ISyncEntity
+  static Microsoft.AspNetCore.Routing.RouteGroupBuilder MapSyncCollections(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints, Bsync.Server.AspNetCore.SyncEndpointOptions options, System.Action<Bsync.Server.AspNetCore.SyncCollectionGroupBuilder> collections, System.String prefix = "sync")
   static System.TimeSpan HintKeepAlive { get; set; }

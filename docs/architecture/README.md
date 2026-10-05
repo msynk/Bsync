@@ -19,6 +19,7 @@
 | [011](adr-011-compatibility.md) | Wire, store and domain schema compatibility | Accepted; headers and store migrations implemented |
 | [012](adr-012-packaging-and-support.md) | Packaging, support tiers, target framework, workloads | Accepted |
 | [013](adr-013-recovery.md) | Recovery of local work: retry, revert, export/import, SQLite rebuild, schema roll-out | Accepted |
+| [014](adr-014-sql-server-authority.md) | SQL Server authority on the application's database: feed lock, transaction enlistment, write handler, publisher | Accepted; implemented (0.2.0, unreleased) |
 
 Operations: [disaster recovery and stuck replicas](../operations/disaster-recovery.md).
 

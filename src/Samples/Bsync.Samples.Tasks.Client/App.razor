@@ -1,0 +1,74 @@
+@inject SignIn Session
+@inject IServiceProvider Services
+@implements IDisposable
+
+<main>
+    <h1>Tasks</h1>
+    @if (_tasks is null)
+    {
+        <form @onsubmit="SignInAsync">
+            <input @bind="_user" placeholder="user" />
+            <input @bind="_tenant" placeholder="team" />
+            <button type="submit">Sign in</button>
+        </form>
+    }
+    else
+    {
+        <p>@_tasks.Status.State, @_tasks.Status.Pending unsynced</p>
+        <form @onsubmit="AddAsync">
+            <input @bind="_title" placeholder="What needs doing?" />
+            <button type="submit">Add</button>
+        </form>
+        <ul>
+            @foreach (var (task, status) in _items)
+            {
+                <li class="@(status?.State == SyncItemState.Rejected ? "rejected" : null)">
+                    @task.Title <small>@task.Slug</small>
+                    @if (status?.State == SyncItemState.Rejected)
+                    {
+                        <span> rejected: @status.Detail</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</main>
+
+@code {
+    private ISyncCollection<TaskDocument>? _tasks;
+    private IDisposable? _subscription;
+    private List<(TaskDocument Task, SyncItemStatus? Status)> _items = [];
+    private string _user = "alice";
+    private string _tenant = "team-1";
+    private string _title = string.Empty;
+
+    private async Task SignInAsync()
+    {
+        await Session.SignInAsync(_user, _tenant);
+        _tasks = (ISyncCollection<TaskDocument>)Services.GetService(typeof(ISyncCollection<TaskDocument>))!;
+        _subscription = _tasks.Subscribe(() => InvokeAsync(ReloadAsync));
+        await ReloadAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        // Saved locally at once; an empty title is rejected by the server with "title-required" and shown here.
+        await _tasks!.SaveAsync(new TaskDocument { Title = _title });
+        _title = string.Empty;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var items = new List<(TaskDocument, SyncItemStatus?)>();
+        foreach (var task in await _tasks!.QueryAsync())
+        {
+            items.Add((task, await _tasks.GetItemStatusAsync(task.Id)));
+        }
+
+        _items = items;
+        StateHasChanged();
+    }
+
+    public void Dispose() => _subscription?.Dispose();
+}

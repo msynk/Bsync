@@ -10,6 +10,12 @@ struct Bsync.Checkpoint
   virtual System.String ToString()
 static class Bsync.Client.ClientServiceCollectionExtensions
   static Microsoft.Extensions.DependencyInjection.IServiceCollection AddLocalSyncCollection<TDocument>(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, Bsync.Client.SyncSessionOptions<TDocument>> options, System.Func<System.IServiceProvider, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.String>> resolveAccount = null) where TDocument : class, Bsync.ISyncEntity
+enum Bsync.Client.CredentialRenewal
+  Offline = 1
+  Renewed = 0
+  SignInRequired = 2
+static class Bsync.Client.CredentialRenewals
+  static System.Func<System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.CredentialRenewal>> Coalesce(System.Func<System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.CredentialRenewal>> renew)
 interface Bsync.Client.ISyncCollection<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Client.SyncCapabilities Capabilities { get; }
   Bsync.Client.SyncStatus Status { get; }
@@ -112,8 +118,8 @@ record Bsync.Client.SyncSessionOptions<TDocument> where TDocument : class, Bsync
   System.Boolean LiveHints { get; init; }
   System.Func<Bsync.Client.SyncSession<TDocument>, System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.IAsyncDisposable>> AttachLifecycle { get; init; }
   System.Func<System.String, Bsync.Transport.ISyncTransport<TDocument>> CreateTransport { get; init; }
+  System.Func<System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.CredentialRenewal>> RenewCredentials { get; init; }
   System.Func<System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.LocalReplica<TDocument>>> OpenReplica { get; init; }
-  System.Func<System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Boolean>> RenewCredentials { get; init; }
   System.Func<System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.IAsyncDisposable>> AcquireLease { get; init; }
   System.Func<TDocument, TDocument> Cloner { get; init; }
   System.String Host { get; init; }
@@ -319,6 +325,7 @@ struct Bsync.Protocol.PullRequest
   virtual System.String ToString()
 record Bsync.Protocol.PullResult<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Checkpoint Checkpoint { get; init; }
+  Bsync.Protocol.SyncLimits Limits { get; init; }
   System.Boolean Equals(Bsync.Protocol.PullResult<TDocument> other)
   System.Boolean HasMore { get; init; }
   System.Collections.Generic.IReadOnlyList<Bsync.Protocol.RemoteChange<TDocument>> Changes { get; init; }
@@ -331,12 +338,14 @@ record Bsync.Protocol.PullResult<TDocument> where TDocument : class, Bsync.ISync
 static class Bsync.Protocol.PushErrorCodes
   const System.String BaseExpired = "base-expired"
   const System.String ClockSkew = "clock-skew"
+  const System.String DependencyMissing = "dependency-missing"
   const System.String Forbidden = "forbidden"
   const System.String GroupAborted = "group-aborted"
   const System.String GroupFailed = "group-failed"
   const System.String GroupsUnsupported = "groups-unsupported"
   const System.String Invalid = "invalid"
   const System.String OperationIdReused = "operation-id-reused"
+  const System.String PayloadTooLarge = "payload-too-large"
   const System.String Unavailable = "unavailable"
 record Bsync.Protocol.PushOperation<TDocument> where TDocument : class, Bsync.ISyncEntity
   System.Boolean Equals(Bsync.Protocol.PushOperation<TDocument> other)
@@ -416,6 +425,7 @@ record Bsync.Protocol.StreamEvent<TDocument> where TDocument : class, Bsync.ISyn
   virtual System.String ToString()
 static class Bsync.Protocol.SyncFeatures
   const System.String Groups = "groups"
+  const System.String Limits = "limits"
 record Bsync.Protocol.SyncJsonTypes<TDocument> where TDocument : class, Bsync.ISyncEntity
   System.Boolean Equals(Bsync.Protocol.SyncJsonTypes<TDocument> other)
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PullRequest> PullRequest { get; init; }
@@ -425,6 +435,15 @@ record Bsync.Protocol.SyncJsonTypes<TDocument> where TDocument : class, Bsync.IS
   System.Void Deconstruct(out System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PullRequest> PullRequest, out System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PullResult<TDocument>> PullResult, out System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PushRequest<TDocument>> PushRequest, out System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PushResult<TDocument>> PushResult)
   ctor(System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PullRequest> PullRequest, System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PullResult<TDocument>> PullResult, System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PushRequest<TDocument>> PushRequest, System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.PushResult<TDocument>> PushResult)
   static Bsync.Protocol.SyncJsonTypes<TDocument> From(System.Text.Json.Serialization.JsonSerializerContext context)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Protocol.SyncLimits
+  System.Boolean Equals(Bsync.Protocol.SyncLimits other)
+  System.Int32 MaxOperationsPerPush { get; init; }
+  System.Int32 MaxPageSize { get; init; }
+  System.Void Deconstruct(out System.Int32 MaxOperationsPerPush, out System.Int32 MaxPageSize)
+  ctor(System.Int32 MaxOperationsPerPush, System.Int32 MaxPageSize)
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
@@ -468,13 +487,21 @@ interface Bsync.Server.ISyncCommitNotifier
 interface Bsync.Server.ISyncDocumentReader<TDocument> where TDocument : class, Bsync.ISyncEntity
   abstract System.Threading.Tasks.Task<Bsync.Server.StoredDocument<TDocument>> GetAsync(Bsync.Server.SyncCallContext context, System.String id, System.Threading.CancellationToken cancellationToken = default)
   abstract System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Server.StoredDocument<TDocument>>> ListAsync(Bsync.Server.SyncCallContext context, System.Int32 limit, System.String afterId = null, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Server.ISyncPublisher<TDocument> where TDocument : class, Bsync.ISyncEntity
+  abstract System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> DeleteAsync(System.String scope, System.String id, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> PublishAsync(TDocument document, System.Collections.Generic.IEnumerable<System.String> scopes, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> ReplaceScopeAsync(System.String scope, System.Collections.Generic.IEnumerable<TDocument> documents, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> UpsertAsync(System.String scope, TDocument document, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Server.ISyncWriteHandler<TDocument> where TDocument : class, Bsync.ISyncEntity
+  abstract System.Threading.Tasks.ValueTask<Bsync.Server.SyncWriteDecision<TDocument>> HandleAsync(Bsync.Server.SyncWriteContext<TDocument> write, System.Threading.CancellationToken cancellationToken)
 sealed class Bsync.Server.InMemorySyncServerBackup<TDocument> where TDocument : class, Bsync.ISyncEntity
   System.Int64 Sequence { get; }
 sealed class Bsync.Server.InMemorySyncServerOptions<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Clocks.IPhysicalClock PhysicalClock { get; init; }
+  Bsync.Server.ISyncWriteHandler<TDocument> WriteHandler { get; init; }
   Bsync.Server.InMemorySyncServerBackup<TDocument> RestoreFrom { get; init; }
-  System.Func<Bsync.Protocol.PushOperation<TDocument>, TDocument, System.String> Validator { get; init; }
   System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<TDocument>, TDocument, System.Boolean> CanWrite { get; init; }
+  System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<TDocument>, TDocument, System.String> Validator { get; init; }
   System.Func<Bsync.Server.SyncCallContext, System.String> ScopeFingerprint { get; init; }
   System.Func<Bsync.Server.SyncCallContext, TDocument, System.Boolean> CanRead { get; init; }
   System.Func<TDocument, System.String> Fingerprint { get; init; }
@@ -484,7 +511,7 @@ sealed class Bsync.Server.InMemorySyncServerOptions<TDocument> where TDocument :
   System.Int64 VersionFloor { get; init; }
   System.TimeSpan MaxClockSkew { get; init; }
   ctor()
-sealed class Bsync.Server.InMemorySyncServer<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument> where TDocument : class, Bsync.ISyncEntity
+sealed class Bsync.Server.InMemorySyncServer<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument>, Bsync.Server.ISyncPublisher<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Protocol.PullResult<TDocument> Pull(Bsync.Protocol.PullRequest request)
   Bsync.Protocol.PullResult<TDocument> Pull(Bsync.Server.SyncCallContext context, Bsync.Protocol.PullRequest request)
   Bsync.Protocol.PushResult<TDocument> Push(Bsync.Protocol.PushRequest<TDocument> request)
@@ -502,6 +529,10 @@ sealed class Bsync.Server.InMemorySyncServer<TDocument> : Bsync.Server.ISyncAuth
   System.Threading.Tasks.Task<Bsync.Protocol.PullResult<TDocument>> PullAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PullRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PushResult<TDocument>> PushAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PushRequest<TDocument> request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Server.StoredDocument<TDocument>> GetAsync(Bsync.Server.SyncCallContext context, System.String id, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> DeleteAsync(System.String scope, System.String id, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> PublishAsync(TDocument document, System.Collections.Generic.IEnumerable<System.String> scopes, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> ReplaceScopeAsync(System.String scope, System.Collections.Generic.IEnumerable<TDocument> documents, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> UpsertAsync(System.String scope, TDocument document, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Server.StoredDocument<TDocument>>> ListAsync(Bsync.Server.SyncCallContext context, System.Int32 limit, System.String afterId = null, System.Threading.CancellationToken cancellationToken = default)
   ctor(Bsync.Server.InMemorySyncServerOptions<TDocument> options, System.String serverId = "server")
   ctor(System.String serverId = "server")
@@ -511,11 +542,15 @@ sealed class Bsync.Server.InProcessTransport<TDocument> : Bsync.Transport.ISyncT
   System.Threading.Tasks.Task<Bsync.Protocol.PullResult<TDocument>> PullAsync(Bsync.Protocol.PullRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PushResult<TDocument>> PushAsync(Bsync.Protocol.PushRequest<TDocument> request, System.Threading.CancellationToken cancellationToken = default)
   ctor(Bsync.Server.ISyncAuthority<TDocument> authority, Bsync.Server.SyncCallContext context = null)
-sealed class Bsync.Server.ScopedAuthority<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument> where TDocument : class, Bsync.ISyncEntity
+sealed class Bsync.Server.ScopedAuthority<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument>, Bsync.Server.ISyncPublisher<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Server.AuthorityLimits Limits { get; }
   System.Threading.Tasks.Task<Bsync.Protocol.PullResult<TDocument>> PullAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PullRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PushResult<TDocument>> PushAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PushRequest<TDocument> request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Server.StoredDocument<TDocument>> GetAsync(Bsync.Server.SyncCallContext context, System.String id, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> DeleteAsync(System.String scope, System.String id, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> PublishAsync(TDocument document, System.Collections.Generic.IEnumerable<System.String> scopes, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> ReplaceScopeAsync(System.String scope, System.Collections.Generic.IEnumerable<TDocument> documents, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SyncPublishResult> UpsertAsync(System.String scope, TDocument document, System.Data.Common.DbTransaction transaction = null, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Server.StoredDocument<TDocument>>> ListAsync(Bsync.Server.SyncCallContext context, System.Int32 limit, System.String afterId = null, System.Threading.CancellationToken cancellationToken = default)
   ctor(System.Func<System.String, Bsync.Server.ISyncAuthority<TDocument>> factory, Bsync.Server.AuthorityLimits limits)
   public event System.Action<Bsync.Server.AuthorityCommit> Committed
@@ -538,6 +573,41 @@ record Bsync.Server.SyncCallContext
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+record Bsync.Server.SyncPublishResult
+  Bsync.Server.SyncPublishResult Add(Bsync.Server.SyncPublishResult other)
+  System.Boolean Equals(Bsync.Server.SyncPublishResult other)
+  System.Int32 Deleted { get; init; }
+  System.Int32 Unchanged { get; init; }
+  System.Int32 Written { get; init; }
+  System.Void Deconstruct(out System.Int32 Written, out System.Int32 Unchanged, out System.Int32 Deleted)
+  ctor(System.Int32 Written, System.Int32 Unchanged, System.Int32 Deleted)
+  static Bsync.Server.SyncPublishResult None { get; }
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+sealed class Bsync.Server.SyncWriteContext<TDocument> where TDocument : class, Bsync.ISyncEntity
+  Bsync.Protocol.PushOperation<TDocument> Operation { get; }
+  Bsync.Server.StoredDocument<TDocument> Current { get; }
+  Bsync.Server.SyncCallContext Caller { get; }
+  System.Data.Common.DbConnection Connection { get; }
+  System.Data.Common.DbTransaction Transaction { get; }
+  System.Int64? BaseVersion { get; }
+  TDocument Submitted { get; }
+  ctor(Bsync.Server.SyncCallContext caller, Bsync.Protocol.PushOperation<TDocument> operation, Bsync.Server.StoredDocument<TDocument> current, System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction)
+enum Bsync.Server.SyncWriteDecisionKind
+  Accept = 0
+  Conflict = 1
+  Reject = 2
+  RetryLater = 3
+sealed class Bsync.Server.SyncWriteDecision<TDocument> where TDocument : class, Bsync.ISyncEntity
+  Bsync.Server.SyncWriteDecisionKind Kind { get; }
+  System.String ErrorCode { get; }
+  System.String Message { get; }
+  TDocument Document { get; }
+  static Bsync.Server.SyncWriteDecision<TDocument> Accept(TDocument canonical)
+  static Bsync.Server.SyncWriteDecision<TDocument> Conflict()
+  static Bsync.Server.SyncWriteDecision<TDocument> Reject(System.String errorCode, System.String message = null)
+  static Bsync.Server.SyncWriteDecision<TDocument> RetryLater(System.String errorCode, System.String message = null)
 interface Bsync.Storage.ILocalStore<TDocument> where TDocument : class, Bsync.ISyncEntity
   abstract System.Threading.Tasks.Task<Bsync.Clocks.HlcTimestamp> GetClockHighWaterAsync(System.Threading.CancellationToken cancellationToken = default)
   abstract System.Threading.Tasks.Task<Bsync.Storage.ReplicaCursor> GetCursorAsync(System.Threading.CancellationToken cancellationToken = default)

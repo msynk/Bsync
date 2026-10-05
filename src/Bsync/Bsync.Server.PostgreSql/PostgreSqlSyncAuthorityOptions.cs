@@ -44,5 +44,5 @@ public sealed class PostgreSqlSyncAuthorityOptions<TDocument>
     public Func<SyncCallContext, PushOperation<TDocument>, TDocument?, bool>? CanWrite { get; init; }
 
     /// <summary>Optional application validation: return an error code to reject the operation permanently.</summary>
-    public Func<PushOperation<TDocument>, TDocument?, string?>? Validator { get; init; }
+    public Func<SyncCallContext, PushOperation<TDocument>, TDocument?, string?>? Validator { get; init; }
 }
