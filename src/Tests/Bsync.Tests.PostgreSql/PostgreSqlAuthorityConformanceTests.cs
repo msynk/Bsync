@@ -1,30 +1,47 @@
-using System.Security.Claims;
-using Bsync.Clocks;
-using Bsync.Protocol;
 using Bsync.Server;
 using Bsync.Server.PostgreSql;
+using Bsync.Testing;
 using Bsync.Tests.Conformance;
-using Bsync.Tests.TestSupport;
-using Bsync.Transport;
 using Xunit;
 
 namespace Bsync.Tests.PostgreSql;
 
-/// <summary>The shared authority conformance suite against PostgreSQL (one collection per test, one database per class).</summary>
+/// <summary>The public authority conformance suite against PostgreSQL (one collection per authority, one database per class).</summary>
 public sealed class PostgreSqlAuthorityConformanceTests(PostgresFixture fixture) : AuthorityConformanceTests, IClassFixture<PostgresFixture>
 {
-    protected override ISyncTransport<Note> CreateAuthority(IPhysicalClock clock, Func<PushOperation<Note>, Note?, string?>? validator = null)
+    protected override IAuthorityConformanceDriver Driver { get; } = new PostgreSqlDriver(fixture);
+
+    private sealed class PostgreSqlDriver(PostgresFixture fixture) : IAuthorityConformanceDriver
     {
-        var authority = fixture.Database.AuthorityAsync(
-            $"c{Guid.NewGuid():N}",
-            configure: o => new PostgreSqlSyncAuthorityOptions<Note>
-            {
-                DataSource = o.DataSource,
-                DocumentType = o.DocumentType,
-                Collection = o.Collection,
-                PhysicalClock = clock,
-                Validator = validator,
-            }).GetAwaiter().GetResult();
-        return new InProcessTransport<Note>(authority);
+        public AuthorityCapabilities Capabilities => AuthorityCapabilities.All;
+
+        public async Task<AuthorityUnderTest> CreateAsync(AuthorityConformanceOptions options, CancellationToken cancellationToken = default) =>
+            new PostgreSqlUnderTest(await PostgreSqlSyncAuthority<ConformanceDocument>.CreateAsync(
+                new PostgreSqlSyncAuthorityOptions<ConformanceDocument>
+                {
+                    DataSource = fixture.Database.DataSource,
+                    DocumentType = ConformanceJsonContext.Default.ConformanceDocument,
+                    Collection = $"c{Guid.NewGuid():N}",
+                    PhysicalClock = options.Clock,
+                    MaxClockSkew = options.MaxClockSkew,
+                    Validator = options.Validator,
+                    CanRead = options.CanRead,
+                    ScopeFingerprint = options.ScopeFingerprint,
+                },
+                cancellationToken));
+    }
+
+    private sealed class PostgreSqlUnderTest(PostgreSqlSyncAuthority<ConformanceDocument> authority) : AuthorityUnderTest
+    {
+        public override ISyncAuthority<ConformanceDocument> Authority => authority;
+
+        public override Task PurgeTombstonesAsync(string scope, long throughVersion, CancellationToken cancellationToken = default) =>
+            authority.PurgeTombstonesAsync(scope, throughVersion, cancellationToken);
+
+        public override Task PurgeReceiptsAsync(string scope, long throughVersion, CancellationToken cancellationToken = default) =>
+            authority.PurgeReceiptsAsync(scope, throughVersion, cancellationToken);
+
+        public override Task BeginNewEpochAsync(long versionFloor, CancellationToken cancellationToken = default) =>
+            authority.BeginNewEpochAsync(versionFloor, cancellationToken);
     }
 }

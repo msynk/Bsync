@@ -1,3 +1,38 @@
+enum Bsync.Testing.AuthorityCapabilities
+  All = 15
+  Groups = 1
+  NewEpoch = 8
+  None = 0
+  Retention = 4
+  ScopeIsolation = 2
+static class Bsync.Testing.AuthorityConformance
+  static System.Collections.Generic.IEnumerable<Bsync.Testing.AuthorityConformanceCase> CasesFor(Bsync.Testing.AuthorityCapabilities capabilities)
+  static System.Collections.Generic.IReadOnlyList<Bsync.Testing.AuthorityConformanceCase> Cases { get; }
+record Bsync.Testing.AuthorityConformanceCase
+  Bsync.Testing.AuthorityCapabilities Requires { get; init; }
+  System.Boolean Equals(Bsync.Testing.AuthorityConformanceCase other)
+  System.Func<Bsync.Testing.IAuthorityConformanceDriver, System.Threading.Tasks.Task> RunAsync { get; init; }
+  System.String Name { get; init; }
+  System.Void Deconstruct(out System.String Name, out Bsync.Testing.AuthorityCapabilities Requires, out System.Func<Bsync.Testing.IAuthorityConformanceDriver, System.Threading.Tasks.Task> RunAsync)
+  ctor(System.String Name, Bsync.Testing.AuthorityCapabilities Requires, System.Func<Bsync.Testing.IAuthorityConformanceDriver, System.Threading.Tasks.Task> RunAsync)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+sealed class Bsync.Testing.AuthorityConformanceOptions
+  Bsync.Clocks.IPhysicalClock Clock { get; init; }
+  System.Func<Bsync.Protocol.PushOperation<Bsync.Testing.ConformanceDocument>, Bsync.Testing.ConformanceDocument, System.String> Validator { get; init; }
+  System.Func<Bsync.Server.SyncCallContext, Bsync.Testing.ConformanceDocument, System.Boolean> CanRead { get; init; }
+  System.Func<Bsync.Server.SyncCallContext, System.String> ScopeFingerprint { get; init; }
+  System.TimeSpan MaxClockSkew { get; init; }
+  ctor()
+abstract class Bsync.Testing.AuthorityUnderTest : System.IAsyncDisposable
+  Bsync.Server.ISyncAuthority<Bsync.Testing.ConformanceDocument> Authority { get; }
+  protected ctor()
+  virtual Bsync.Transport.ISyncTransport<Bsync.Testing.ConformanceDocument> Connect(Bsync.Server.SyncCallContext caller)
+  virtual System.Threading.Tasks.Task BeginNewEpochAsync(System.Int64 versionFloor, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.Task PurgeReceiptsAsync(System.String scope, System.Int64 throughVersion, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.Task PurgeTombstonesAsync(System.String scope, System.Int64 throughVersion, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.ValueTask DisposeAsync()
 static class Bsync.Testing.Check
   static System.Threading.Tasks.Task Throws<TException>(System.Func<System.Threading.Tasks.Task> action, System.String expression = null) where TException : System.Exception
   static System.Void Equal<T>(T expected, T actual, System.String expression = null)
@@ -49,5 +84,23 @@ sealed class Bsync.Testing.ConformanceJsonContext : System.Text.Json.Serializati
   protected System.Text.Json.JsonSerializerOptions GeneratedSerializerOptions { get; }
   static Bsync.Testing.ConformanceJsonContext Default { get; }
   virtual System.Text.Json.Serialization.Metadata.JsonTypeInfo GetTypeInfo(System.Type type)
+sealed class Bsync.Testing.HttpAuthorityDriver : Bsync.Testing.IAuthorityConformanceDriver
+  Bsync.Testing.AuthorityCapabilities Capabilities { get; }
+  System.Threading.Tasks.Task<Bsync.Testing.AuthorityUnderTest> CreateAsync(Bsync.Testing.AuthorityConformanceOptions options, System.Threading.CancellationToken cancellationToken = default)
+  const System.String Collection = "conformance"
+  const System.String SchemaId = "conformance-v1"
+  ctor(Bsync.Testing.IAuthorityConformanceDriver inner, System.Func<Bsync.Server.ISyncAuthority<Bsync.Testing.ConformanceDocument>, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Testing.HttpConformanceServer>> serve)
+  static Bsync.Protocol.SyncJsonTypes<Bsync.Testing.ConformanceDocument> Json { get; }
+abstract class Bsync.Testing.HttpConformanceServer : System.IAsyncDisposable
+  abstract System.Net.Http.HttpClient CreateClient(Bsync.Server.SyncCallContext caller)
+  abstract System.Threading.Tasks.ValueTask DisposeAsync()
+  protected ctor()
+interface Bsync.Testing.IAuthorityConformanceDriver
+  Bsync.Testing.AuthorityCapabilities Capabilities { get; }
+  abstract System.Threading.Tasks.Task<Bsync.Testing.AuthorityUnderTest> CreateAsync(Bsync.Testing.AuthorityConformanceOptions options, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Testing.InMemoryAuthorityDriver : Bsync.Testing.IAuthorityConformanceDriver
+  Bsync.Testing.AuthorityCapabilities Capabilities { get; }
+  System.Threading.Tasks.Task<Bsync.Testing.AuthorityUnderTest> CreateAsync(Bsync.Testing.AuthorityConformanceOptions options, System.Threading.CancellationToken cancellationToken = default)
+  ctor()
 static class Bsync.Testing.LocalStoreConformance
   static System.Collections.Generic.IReadOnlyList<Bsync.Testing.ConformanceCase> Cases { get; }

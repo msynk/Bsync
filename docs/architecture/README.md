@@ -9,14 +9,14 @@
 | [001](adr-001-build-versus-adopt.md) | Build a native protocol vs adopt Datasync, Dotmim.Sync, PowerSync, RxDB, Replicache/Zero, Fusion, Electric | Accepted |
 | [002](adr-002-consistency-model.md) | Consistency model and scope | Accepted |
 | [003](adr-003-metadata-separation.md) | Local revision, operation id, server version, checkpoint, origin HLC | Accepted |
-| [004](adr-004-store-operations.md) | Atomic store operations, ownership and queue coalescing | Accepted (contract) |
+| [004](adr-004-store-operations.md) | Atomic store operations, ownership and queue coalescing | Accepted; three stores implemented |
 | [005](adr-005-feed-ordering.md) | Committed-prefix feed ordering and epochs | Accepted; reference and PostgreSQL implemented |
 | [006](adr-006-conflict-model.md) | Conflict model, policies and defaults | Accepted (Phase 1, Phase 8: default `Defer`, three-way merge) |
 | [007](adr-007-hosting-and-lifecycle.md) | Hosting profiles, application API, DI and lifecycle | Accepted; every profile has a tested sample |
 | [008](adr-008-browser-storage.md) | IndexedDB baseline, OPFS/SQLite only on evidence | Accepted; IndexedDB implemented |
 | [009](adr-009-server-integration.md) | Controlled write service, PostgreSQL first, capture coverage | Accepted; PostgreSQL authority implemented |
-| [010](adr-010-auth-and-scope.md) | Authentication, scope identity, revocation and account switching | Accepted; implemented for the reference authority |
-| [011](adr-011-compatibility.md) | Wire, store and domain schema compatibility | Accepted in principle |
+| [010](adr-010-auth-and-scope.md) | Authentication, scope identity, revocation and account switching | Accepted; implemented for the reference and PostgreSQL authorities |
+| [011](adr-011-compatibility.md) | Wire, store and domain schema compatibility | Accepted; headers and store migrations implemented |
 | [012](adr-012-packaging-and-support.md) | Packaging, support tiers, target framework, workloads | Accepted |
 | [013](adr-013-recovery.md) | Recovery of local work: retry, revert, export/import, SQLite rebuild, schema roll-out | Accepted |
 

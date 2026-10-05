@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <Description>An ASP.NET Core host built only from the Bsync packages: endpoints, the browser store's static assets, and a SQLite replica (--smoke).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bsync" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="Bsync.Blazor" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="Bsync.Server.AspNetCore" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" />
+  </ItemGroup>
+
+</Project>

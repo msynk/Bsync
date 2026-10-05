@@ -120,7 +120,7 @@ public sealed class PostgreSqlAuthorityTests : IAsyncLifetime
 
         Assert.True(result.IsComplete);
         Assert.False(result.ResetPerformed);
-        Assert.Equal(1, afterRestart.Transport.PushLog.Single().Operations.Count); // the lost response is replayed from the receipt
+        Assert.Single(afterRestart.Transport.PushLog.Single().Operations); // the lost response is replayed from the receipt
         await again.Engine.SyncAsync();
         Assert.Equal("durable", (await again.RecordAsync("n1")).Current.Title);
     }

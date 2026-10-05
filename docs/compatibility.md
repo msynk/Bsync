@@ -2,27 +2,52 @@
 
 ## Policy
 
-- Bsync is pre-1.0 and has not been published as a package. Minor versions may contain breaking
-  changes. Every breaking change is listed below with a migration path.
+- Bsync is pre-1.0. `0.1.0` is published on NuGet; current release status is in the
+  [README](../README.md#status) and user-visible changes per version in [CHANGELOG.md](../CHANGELOG.md).
+- **0.x releases.** A *minor* release (`0.x` to `0.(x+1)`) may break the public API, behaviour, the store schemas or
+  optional wire features. Every break is listed below with a migration path. A *patch* release (`0.x.y` to
+  `0.x.(y+1)`) never breaks: it contains fixes, additive API and documentation only, never a store schema change,
+  and never a wire change an older peer of the same minor version cannot ignore.
+- **Public API baselines** (`src/Tests/api`, checked by `PublicApiTests`) are updated only deliberately and reviewed,
+  with an entry below when the change is not purely additive.
 - From 1.0: semantic versioning; public API compatibility checked in CI; wire protocol, store schema and
   domain schema versioned independently (ADR-011); a documented client/server compatibility window.
 - Behavioural changes count as breaking even when signatures do not change.
 
-## Unreleased (package consolidation)
+## Release process
+
+1. Every user-visible change adds a line to `CHANGELOG.md` under *Unreleased* in the same change; breaking ones also
+   get an entry in this file.
+2. A release sets `VersionPrefix` in `src/Directory.Build.props`, renames *Unreleased* to the version and date, and
+   packs from a clean tree whose CI run is green, including the package-consumer job.
+3. Publishing to NuGet is a separate, explicitly authorized step (ADR-012); no workflow in this repository publishes.
+4. Previews: `.github/workflows/nightly.yml` packs `X.Y.Z-preview.YYYYMMDD.N` every night as a build artifact only.
+
+## 0.1.1 (unreleased)
+
+| Change | Why | Migration |
+|---|---|---|
+| `Bsync.Testing` gains the public authority conformance suite: `AuthorityConformance` (21 cases), `AuthorityConformanceCase`, `AuthorityCapabilities`, `AuthorityConformanceOptions`, `IAuthorityConformanceDriver`, `AuthorityUnderTest`, `InMemoryAuthorityDriver`, `HttpAuthorityDriver`, `HttpConformanceServer`. | Out-of-repository authorities can prove conformance (I04–I07, I10, I12, I14, I18, I19). | Additive. |
+
+## Before 0.1.0
+
+The sections below describe changes made before the first published release; all of them shipped in `0.1.0`.
+
+### Package consolidation
 
 | Change | Why | Migration |
 |---|---|---|
 | **Breaking:** `Bsync.Client` and `Bsync.Transport.Http` merged into `Bsync`. The client types keep namespace `Bsync.Client`; `HttpSyncTransport<T>` and `HttpSyncTransportOptions` moved from `Bsync.Transport.Http` to `Bsync.Transport`. `Bsync` now depends on `Microsoft.Extensions.DependencyInjection.Abstractions` and `Logging.Abstractions` 10.0.12. | Fewer packages; neither package carried a dependency that had to stay out of any host (ADR-012). | Replace references to `Bsync.Client` and `Bsync.Transport.Http` with `Bsync`. Replace `using Bsync.Transport.Http;` with `using Bsync.Transport;`. |
 | **Breaking:** `Bsync.Storage.IndexedDb` merged into `Bsync.Blazor`. Its types moved from namespace `Bsync.Storage.IndexedDb` to `Bsync.Blazor.IndexedDb`, and the JavaScript module is served from `_content/Bsync.Blazor/bsync-indexeddb.js`. | Both are Blazor-only; an Auto-mode app uses both. | Replace references to `Bsync.Storage.IndexedDb` with `Bsync.Blazor`. Replace `using Bsync.Storage.IndexedDb;` with `using Bsync.Blazor.IndexedDb;`. Service workers or CSP rules that list the old module path need the new one. |
 
-## Unreleased (UI-independent client package)
+### UI-independent client package
 
 | Change | Why | Migration |
 |---|---|---|
 | **Breaking:** new package `Bsync.Client` (namespace `Bsync.Client`) with `ISyncCollection<T>`, `SyncQuery<T>`, `SyncCapabilities`, `SyncStatus`, `SyncState`, `SyncItemStatus`, `SyncItemState`, `SyncDocumentConflict<T>`, `SyncConfirmation`, `SyncWriteResult`, `SyncSession<T>`, `SyncSessionOptions<T>`, `LocalReplica<T>`, `LocalSyncCollection<T>` and `AddLocalSyncCollection` (now on `ClientServiceCollectionExtensions`). They moved out of `Bsync.Blazor`, which keeps `ServerSyncCollection<T>`, `ServerSyncClock` and `AddServerSyncCollection` and references `Bsync.Client`. `Bsync.Client` depends only on the core and `Microsoft.Extensions.DependencyInjection.Abstractions`/`Logging.Abstractions`. | Native UIs without Blazor (MAUI XAML, WPF, WinForms, Avalonia) and headless hosts can use the session loop without `Microsoft.AspNetCore.Components`. | Add `using Bsync.Client;` (and `@using Bsync.Client` in Razor). Local-replica clients (WebAssembly, Hybrid, native) reference `Bsync.Client` instead of `Bsync.Blazor`; server projects keep `Bsync.Blazor`. `Bsync.Storage.IndexedDb` now references `Bsync.Client` instead of `Bsync.Blazor`. |
 | `SyncQuery<T>.Apply` evaluates a query in memory. | Shared by the collections in both packages; usable by custom `ISyncCollection` implementations. | Additive. |
 
-## Unreleased (PostgreSQL, dependency groups, hybrid hosts)
+### PostgreSQL, dependency groups, hybrid hosts
 
 | Change | Why | Migration |
 |---|---|---|
@@ -36,7 +61,7 @@
 | `DocumentUpgrade.TryTake`. | Upgrading old document shapes on read (ADR-013). | Additive. |
 | Samples: `Bsync.Samples.Hybrid.Wpf` (in the solution) and `Bsync.Samples.Hybrid.Maui` (Windows target; outside the solution because it needs the `maui-windows` workload). | Native hosts (ADR-007). | Samples only. |
 
-## Unreleased (Phase 10: operations and packaging)
+### Phase 10: operations and packaging
 
 | Change | Why | Migration |
 |---|---|---|
@@ -44,10 +69,10 @@
 | `SyncSessionOptions<T>.Logger`; `Bsync.Blazor` references `Microsoft.Extensions.Logging.Abstractions` 10.0.12 explicitly; the DI recipes pass the container's logger factory. | Session logs. | Additive. |
 | **Behaviour:** an unexpected exception in the session loop (a store, serializer or application failure) now reports `AttentionRequired`, is logged, and is retried after `MaxBackoff` or on `RequestSync`. Before, it ended the loop silently and the status stayed `Syncing`. | Found while adding logging. | None; apps that watched for a stuck `Syncing` state can rely on `AttentionRequired`. |
 | **Behaviour:** an unexpected exception from the authority in `MapSyncCollection` endpoints is answered with `503` and code `unavailable`, and logged. Before, it propagated to the host (usually a bare 500). `SyncEndpoints.MeterName` added. | Clients retry `unavailable`; details stay in server logs. | Authorities that relied on exception middleware to shape responses map their errors to `SyncTransportException` instead. |
-| Package metadata for the seven libraries (`src/Directory.Build.props` and `.targets`): version `0.1.0-preview`, MIT, repository links, README, symbols (snupkg), deterministic builds. The demo, samples, tests and benchmarks are not packable. | Phase 10 packaging. Nothing is published. | None. |
+| Package metadata for the libraries (`src/Directory.Build.props` and `.targets`; seven at the time, six after the consolidation above): version `0.1.0-preview` at the time, released as `0.1.0`, MIT, repository links, README, symbols (snupkg), deterministic builds. The demo, samples, tests and benchmarks are not packable. | Phase 10 packaging. Nothing is published. | None. |
 | Public API baselines in `src/Tests/api/*.txt`, checked by `PublicApiTests`. | API review (ADR-011). | Update with `BSYNC_UPDATE_API=1` after review. |
 
-## Unreleased (Phase 9: recovery)
+### Phase 9: recovery
 
 | Change | Why | Migration |
 |---|---|---|
@@ -57,7 +82,7 @@
 | `SqliteStoreRecovery.CheckAsync`, `RebuildAsync`, `SqliteRebuildReport`. | Damaged SQLite replicas. | Additive. |
 | SQLite schema DDL moved to an internal `SqliteSchema` class; `SqliteLocalStore.SchemaVersion` is unchanged (2). | Shared by the store and the rebuild. | None. |
 
-## Unreleased (Phase 8: conflicts, selective sync, retention)
+### Phase 8: conflicts, selective sync, retention
 
 | Change | Why | Migration |
 |---|---|---|
@@ -73,7 +98,7 @@
 | `SqliteStorePool.Release(dataSource)`. | Close pooled connections of one database file without `SqliteConnection.ClearAllPools()`, which disrupts other databases in the process. | Additive. |
 | `SyncEngine.DeleteAsync` no longer mutates the stored record's document instance inside the store transform. | Transforms must be pure (ADR-004). | None. |
 
-## Unreleased (session lifecycle and hints)
+### Session lifecycle and hints
 
 | Change | Why | Migration |
 |---|---|---|
@@ -83,7 +108,7 @@
 | `MapSyncCollection` maps `GET …/hints` (SSE) when the authority implements `ISyncCommitNotifier`; `HttpSyncTransport.StreamAsync` reads it. | Hints. | Service workers must not proxy `/sync/` requests (see protocol §8). |
 | `AddBrowserSyncCollection` enables hints and attaches an `online`/visibility watcher (`BrowserLifecycleWatcher`). | Prompt sync in browsers. | Additive. |
 
-## Blazor integration
+### Blazor integration
 
 | Change | Why | Migration |
 |---|---|---|
@@ -92,7 +117,7 @@
 | Core: `ISyncDocumentReader<T>`, `StoredDocument<T>`, `ISyncCommitNotifier`, `AuthorityCommit`; implemented by `InMemorySyncServer` and `ScopedAuthority`. | Server-connected reads and hints. | Custom authorities implement them to support server-connected hosts. |
 | Samples: `Note` moved to `Bsync.Samples.Shared`; the notes PWA uses the shared `NotesPanel` and the browser recipe; new Blazor Web App sample. | One component in every render mode. | Samples only. |
 
-## Browser storage, samples
+### Browser storage, samples
 
 | Change | Why | Migration |
 |---|---|---|
@@ -101,7 +126,7 @@
 | Store conformance cases moved to `Bsync.Testing` (`LocalStoreConformance`, `ConformanceDocument`, `Check`). | Run the same cases in browsers. | Custom providers run `LocalStoreConformance.Cases`. |
 | New packages `Bsync.Storage.IndexedDb` and `Bsync.Testing`; samples `Bsync.Samples.Notes.Client/Server`. | Phase 5. | Additive. |
 
-## Reset/resnapshot, SQLite store, change observation
+### Reset/resnapshot, SQLite store, change observation
 
 | Change | Why | Migration |
 |---|---|---|
@@ -117,7 +142,7 @@
 | `SyncTransportException`, `SyncErrorCodes`, `SyncJsonTypes<T>` added. | Classified transport errors, shared JSON metadata. | Additive. |
 | New package projects `Bsync.Server.AspNetCore` and `Bsync.Transport.Http`. | HTTP binding. | Additive. |
 
-## Phase 2: wire encoding, conformance, AOT
+### Phase 2: wire encoding, conformance, AOT
 
 | Change | Why | Migration |
 |---|---|---|
@@ -130,9 +155,9 @@
 | `DocumentCloner.Json(JsonTypeInfo<T>)` and `DocumentCloner.JsonFingerprint(JsonTypeInfo<T>)` added; `Bsync` is marked `IsAotCompatible`. | AOT-safe helpers. | Additive. |
 | `InMemoryLocalStore.UpdateAsync` returns a fresh copy of the committed record for unchanged entries (previously the transform's working copy). | Found by the store conformance suite. | None. |
 
-## Phase 1 and first part of Phase 2
+### Phase 1 and first part of Phase 2
 
-### Behaviour
+#### Behaviour
 
 | Change | Why | Migration |
 |---|---|---|
@@ -147,7 +172,7 @@
 | Document ids must satisfy `SyncIds.IsValid` (1–256 UTF-16 code units, no control characters or unpaired surrogates). | T59. | Validate ids at creation. |
 | HLC node ids must be 1–64 characters from `[A-Za-z0-9._~-]`; `HlcTimestamp` validates its fields; `Parse` is strict. | S06, S07, I12. | Use GUIDs in "N" format or similar for node ids. |
 
-### API
+#### API
 
 | Change | Migration |
 |---|---|
@@ -164,7 +189,7 @@
 | `InMemorySyncServer`: new options constructor (`InMemorySyncServerOptions`), `Epoch`, `GetVersion`, `ReceiptCount`. First constructor parameter renamed `node` → `serverId`. | Named-argument callers update the name. |
 | Added `SyncProtocolException`, `SyncResetRequiredException`, `SyncIds`, `PushErrorCodes`. | Additive. |
 
-### Test changes
+#### Test changes
 
 The 18 original tests are kept. One assertion changed: `ConflictHandlerTests.LastWriteWins_PrefersTheNewerTimestamp`
 now expects `KeepFork` instead of `UseResolved` for a newer fork.

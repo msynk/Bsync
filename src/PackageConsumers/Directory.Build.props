@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    Projects here consume the libraries only as packages from the local feed (artifacts/packages), never as project
+    references, so they prove what a NuGet consumer gets. They are not in Bsync.slnx. Pack first with a version suffix
+    and pass the same version, for example:
+
+      dotnet pack src/Bsync/Bsync -c Release -o artifacts/packages -p:VersionSuffix=local   (and the other packages)
+      dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.1.1-local
+
+    This file deliberately does not import src/Directory.Build.props: nothing here is packable.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <Target Name="RequireBsyncPackageVersion" BeforeTargets="CollectPackageReferences" Condition="'$(BsyncPackageVersion)' == ''">
+    <Error Text="Set BsyncPackageVersion to the version packed into artifacts/packages (for example -p:BsyncPackageVersion=0.1.1-local)." />
+  </Target>
+
+</Project>

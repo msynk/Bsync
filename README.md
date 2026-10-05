@@ -3,13 +3,30 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status: pre-1.0, not published.**
-> - Tested: durable client stores (SQLite on native hosts, IndexedDB in browsers), a PostgreSQL authority, the
->   HTTP binding, and the Blazor integration: web render modes in Chromium, Firefox and WebKit, plus WPF and .NET
->   MAUI Hybrid on Windows.
-> - Everything was verified on one Windows machine; the CI workflow for Linux and macOS has not run yet.
->
-> See [docs/support-matrix.md](docs/support-matrix.md) and [docs/roadmap.md](docs/roadmap.md). Targets `net10.0`.
+> **Status:** `0.1.0` is published on NuGet; this branch builds `0.1.1` (unreleased). Pre-1.0: minor versions may
+> break. What is released, tested and where: [Status](#status). Targets `net10.0`.
+
+## Status
+
+This section is the single source of truth for release and verification status; other documents link here.
+
+- **Packages.** Six packages, all at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
+  `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. `dotnet pack`
+  builds exactly these six. The repository is at `0.1.1` (unreleased); changes are listed in
+  [CHANGELOG.md](CHANGELOG.md).
+- **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
+  ([compatibility policy](docs/compatibility.md#policy)).
+- **Authorities.** Durable: PostgreSQL (`Bsync.Server.PostgreSql`). The in-memory authority is for tests and
+  samples. SQL Server: planned, not implemented.
+- **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
+- **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
+  including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
+  Windows machine.
+- **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push: unit tests on Windows, Linux
+  and macOS; the PostgreSQL authority on Linux; browser and WPF tests on Windows; pack, plus a build and test of
+  consumers that reference only the packed packages. Its current state is in the support matrix; it is not yet
+  reliably green.
+- **Roadmap.** [docs/roadmap.md](docs/roadmap.md).
 
 ## What it guarantees today
 
@@ -49,7 +66,8 @@ src/Bsync/Bsync/                        Core: engine, clock, conflicts, storage/
 src/Bsync/Bsync.Storage.Sqlite/         Durable SQLite store for native hosts (MAUI, WPF, WinForms, console)
 src/Bsync/Bsync.Server.AspNetCore/      ASP.NET Core endpoints for the protocol over any ISyncAuthority
 src/Bsync/Bsync.Server.PostgreSql/      Durable PostgreSQL authority (Npgsql)
-src/Bsync/Bsync.Testing/                Provider conformance cases (framework-free; also run in browsers)
+src/Bsync/Bsync.Testing/                Public conformance suites for stores and authorities, with in-memory and HTTP
+                                        authority drivers (framework-free; store cases also run in browsers)
 src/Bsync/Bsync.Blazor/                 Blazor integration: durable browser store (Bsync.Blazor.IndexedDb, with a
                                         multi-tab replication lease, AddBrowserSyncCollection) and the
                                         server-connected collection (AddServerSyncCollection)
@@ -68,6 +86,7 @@ src/Tests/Bsync.Tests.Browser/          Playwright tests (Chromium, Firefox, Web
 src/Tests/Bsync.Tests.CrashHost/        Helper process the tests kill mid-write
 src/Tests/Bsync.Benchmarks/             BenchmarkDotNet workloads (docs/benchmarks.md)
 src/Tests/api/                          Public API baselines checked by PublicApiTests
+src/PackageConsumers/                   Projects that use only the packed packages (CI pack job)
 docs/                                   Baseline review, architecture decisions, invariants, roadmap, compatibility
 ```
 
@@ -407,7 +426,7 @@ Errors surface as `SyncResetRequiredException` (handled by the engine), `SyncPro
 `SyncTransportException` with `ErrorCode`, `IsTransient` and `RetryAfter`. Server-rendered code calls the
 same authority in-process with `new InProcessTransport<Note>(authority, new SyncCallContext(user, scope))`,
 so authorization is identical. `CanRead`/`CanWrite` hooks on the reference authority filter and authorize
-per document. The in-memory authority is still the only authority; a PostgreSQL-backed one is planned.
+per document. For a durable authority see [A durable server: PostgreSQL](#a-durable-server-postgresql).
 
 ## Wire protocol
 
@@ -416,6 +435,29 @@ and the rules for authorities and replicas are specified in [docs/protocol/v1.md
 with fixtures in `docs/protocol/fixtures`. Add the protocol types for your document to a
 `JsonSerializerContext` (`PullRequest`, `PullResult<T>`, `PushRequest<T>`, `PushResult<T>`). Give
 documents a `[JsonExtensionData]` member so fields unknown to older clients are not erased.
+
+## Testing your own store or authority
+
+The package `Bsync.Testing` carries the conformance suites that every provider in this repository passes. They have
+no test-framework dependency; wrap each case in your framework's test:
+
+```csharp
+// An authority: implement IAuthorityConformanceDriver (create an empty authority from AuthorityConformanceOptions,
+// and optionally purge/new-epoch operations), then run every case its capabilities allow.
+foreach (var conformanceCase in AuthorityConformance.CasesFor(driver.Capabilities))
+    await conformanceCase.RunAsync(driver);
+
+// The same cases over HTTP: serve each authority with MapSyncCollection and let the driver connect to it.
+var overHttp = new HttpAuthorityDriver(driver, (authority, ct) => StartMyServerAsync(authority, ct));
+
+// A local store.
+foreach (var conformanceCase in LocalStoreConformance.Cases)
+    await conformanceCase.RunAsync(() => OpenEmptyStoreAsync());
+```
+
+`InMemoryAuthorityDriver` is the reference driver. Provider-specific drills (delayed commits, several processes,
+crashes, restores from a real backup) are not part of the public suites; see `src/Tests/Bsync.Tests.PostgreSql` for
+the PostgreSQL ones.
 
 ## Hybrid Logical Clock
 
@@ -460,8 +502,20 @@ dotnet test src/Tests/Bsync.Tests.Browser -c Release -p:BrowserHostAot=true   # 
 
 A change to a package's public API fails `PublicApiTests` until the baseline in `src/Tests/api` is regenerated on purpose
 (`BSYNC_UPDATE_API=1 dotnet test src/Tests/Bsync.Tests --filter PublicApiTests`) and reviewed. `dotnet pack` builds
-the seven library packages (`0.1.0-preview`); nothing is published from this repository's tooling.
-CI: `.github/workflows/ci.yml` (Windows, Linux and macOS unit tests, browser tests, pack).
+the six library packages; nothing is published from this repository's tooling.
+CI: `.github/workflows/ci.yml` (Windows, Linux and macOS unit tests, PostgreSQL, browser tests, pack and package
+consumers) and `.github/workflows/nightly.yml` (nightly `-preview` pack, not published).
+
+Consume the packages exactly as a NuGet user would (no project references; `src/PackageConsumers/nuget.config` takes
+`Bsync*` only from `artifacts/packages`):
+
+```bash
+for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Storage.Sqlite Bsync.Testing; do
+  dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
+dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.1.1-local
+dotnet publish src/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.1.1-local -o artifacts/consumer-web
+dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
+```
 
 Run the notes sample: `dotnet run --project src/Samples/Bsync.Samples.Notes.Server` (the offline service worker
 is active only in a published build).

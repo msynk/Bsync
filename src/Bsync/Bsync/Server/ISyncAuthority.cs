@@ -4,7 +4,7 @@ namespace Bsync.Server;
 
 /// <summary>
 /// The server side of the protocol for one collection (docs/protocol/v1.md §4 and §6). Implementations
-/// must pass <c>AuthorityConformanceTests</c>.
+/// must pass the cases in <c>Bsync.Testing.AuthorityConformance</c> (package <c>Bsync.Testing</c>).
 /// </summary>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
 public interface ISyncAuthority<TDocument>

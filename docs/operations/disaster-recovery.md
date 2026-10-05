@@ -149,7 +149,9 @@ whether to grant it.
 
 Stored documents are read with the app's current JSON contract. Keep changes JSON-compatible: add members,
 and use `[JsonPropertyName]` to keep old names. Declare `[JsonExtensionData]` so older apps do not erase new
-members. There is no upcasting hook yet.
+members. To change a shape, let the document upgrade itself on read: `IJsonOnDeserialized` plus
+`DocumentUpgrade.TryTake` moves old members found in the extension data (ADR-013, `DocumentUpgradeTests`). Let
+upload queues drain first: an operation in flight across the change is answered `operation-id-reused`.
 
 ## 8. Checklist before going to production
 

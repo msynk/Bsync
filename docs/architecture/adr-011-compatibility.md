@@ -1,6 +1,7 @@
 # ADR-011: Wire, store and domain compatibility
 
-- **Status:** Accepted in principle; fixtures in Phase 2, full policy in Phase 9 (2026-09-27)
+- **Status:** Accepted; fixtures in Phase 2, version headers in Phase 4, full policy in Phase 9 (2026-09-27; current
+  state checked 2026-10-05)
 - **Invariants:** I14, I17
 
 ## Decision
@@ -28,4 +29,6 @@
   library is `IsAotCompatible` and builds without warnings; trim-safe overloads take delegates or
   `JsonTypeInfo<T>`.
 - Unknown document fields survive only for documents that declare `[JsonExtensionData]`.
-- Protocol/schema version headers are specified for the HTTP binding (Phase 4) but not implemented.
+- The HTTP binding sends `Bsync-Protocol` and `Bsync-Schema` on every request (`HttpSyncTransport`); the endpoints
+  require both and refuse an unsupported protocol version or schema id with `upgrade-required` before reading or
+  writing anything (`SyncEndpointOptions.SupportedSchemas`; `HttpBindingTests`, `SchemaUpgradeTests`).

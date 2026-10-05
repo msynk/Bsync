@@ -83,10 +83,12 @@ jobs:
           path: src/Tests/Bsync.Tests.Browser/TestResults
 
   pack:
-    name: Pack (not published)
+    name: Pack (not published) and consume the packages
     runs-on: ubuntu-latest
     env:
       CI: true
+      # A prerelease suffix per run, so the consumers below can never restore the published 0.x packages instead.
+      BSYNC_PACKAGE_SUFFIX: ci.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,8 +99,23 @@ jobs:
       - run: >-
           for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql
           Bsync.Storage.Sqlite Bsync.Testing;
-          do dotnet pack src/Bsync/$p -c Release -o artifacts/packages || exit 1; done
+          do dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=$BSYNC_PACKAGE_SUFFIX || exit 1; done
+      - name: Resolve the packed version
+        run: echo "BSYNC_PACKAGE_VERSION=$(ls artifacts/packages/Bsync.Testing.*.nupkg | sed -E 's|.*/Bsync\.Testing\.(.*)\.nupkg|\1|')" >> "$GITHUB_ENV"
+      # Only PackageReference from artifacts/packages (src/PackageConsumers/nuget.config maps Bsync.* to that feed).
+      - name: Public conformance suites from the Bsync.Testing package
+        run: dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION --logger "trx;LogFileName=package-consumer.trx"
+      - name: ASP.NET Core host, browser assets and SQLite replica from the packages
+        run: |
+          dotnet publish src/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION -o artifacts/consumer-web
+          test -f artifacts/consumer-web/wwwroot/_content/Bsync.Blazor/bsync-indexeddb.js
+          dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
       - uses: actions/upload-artifact@v4
         with:
           name: packages
           path: artifacts/packages
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-consumer-results
+          path: src/PackageConsumers/Bsync.PackageConsumer.Tests/TestResults

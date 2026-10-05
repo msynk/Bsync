@@ -22,8 +22,9 @@ public interface ISyncTransport<TDocument>
     Task<PushResult<TDocument>> PushAsync(PushRequest<TDocument> request, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Subscribes to the server's live change stream. Not consumed by the engine yet; see
-    /// <c>docs/roadmap.md</c>. Implementations that do not support live streaming may throw
+    /// Subscribes to the server's live change stream. <see cref="Client.SyncSession{TDocument}"/> consumes it as hints
+    /// when <see cref="Client.SyncSessionOptions{TDocument}.LiveHints"/> is set; the engine itself does not. Events are
+    /// hints only: losing them never loses data (I13). Implementations that do not support live streaming may throw
     /// <see cref="NotSupportedException"/>.
     /// </summary>
     IAsyncEnumerable<StreamEvent<TDocument>> StreamAsync(Checkpoint since, CancellationToken cancellationToken = default);

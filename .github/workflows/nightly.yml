@@ -1,0 +1,39 @@
+# Nightly preview packages. Pack only: the packages are uploaded as build artifacts and never pushed to a feed.
+# Publishing remains a separate, explicitly authorized step (ADR-012, docs/compatibility.md "Release process").
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CI: true
+
+jobs:
+  preview-pack:
+    name: Preview pack (not published)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pack with a dated preview suffix
+        run: |
+          suffix="preview.$(date -u +%Y%m%d).${{ github.run_number }}"
+          for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Storage.Sqlite Bsync.Testing; do
+            dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=$suffix || exit 1
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-packages
+          path: artifacts/packages
+          retention-days: 14
