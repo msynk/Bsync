@@ -60,6 +60,17 @@ public static class SyncEndpoints
         SyncJsonTypes<TDocument> json,
         SyncEndpointOptions options,
         string prefix = "sync")
+        where TDocument : class, ISyncEntity =>
+        MapCollection(endpoints, collection, authority, json, options, prefix, multiplexedHints: false);
+
+    internal static RouteGroupBuilder MapCollection<TDocument>(
+        IEndpointRouteBuilder endpoints,
+        string collection,
+        ISyncAuthority<TDocument> authority,
+        SyncJsonTypes<TDocument> json,
+        SyncEndpointOptions options,
+        string prefix,
+        bool multiplexedHints)
         where TDocument : class, ISyncEntity
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -72,7 +83,13 @@ public static class SyncEndpoints
         }
 
         var logger = endpoints.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Bsync.Server") ?? NullLogger.Instance;
-        Func<SyncCallContext, PullRequest, CancellationToken, Task<PullResult<TDocument>>> pull = authority.PullAsync;
+        Func<SyncCallContext, PullRequest, CancellationToken, Task<PullResult<TDocument>>> pull = multiplexedHints
+            ? async (context, request, cancellationToken) =>
+            {
+                var result = await authority.PullAsync(context, request, cancellationToken).ConfigureAwait(false);
+                return result with { Features = [.. result.Features ?? [], SyncFeatures.HintsMultiplex] };
+            }
+            : authority.PullAsync;
         Func<SyncCallContext, PushRequest<TDocument>, CancellationToken, Task<PushResult<TDocument>>> push = authority.PushAsync;
         Func<PullRequest, string?> validatePull = static request => request.BatchSize < 1 ? "The pull limit must be at least 1." : null;
         Func<PushRequest<TDocument>, string?> validatePush = request => request.Operations is null
@@ -126,7 +143,12 @@ public static class SyncEndpoints
         ArgumentNullException.ThrowIfNull(collections);
         ArgumentNullException.ThrowIfNull(prefix);
         var group = endpoints.MapGroup(prefix.Trim('/'));
-        collections(new SyncCollectionGroupBuilder(group, options));
+        var builder = new SyncCollectionGroupBuilder(group, options);
+        collections(builder);
+        var logger = endpoints.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Bsync.Server") ?? NullLogger.Instance;
+        var site = new Site("*", "hints", logger);
+        var notifiers = builder.Notifiers;
+        group.MapGet("hints", (RequestDelegate)(context => MultiplexedHintsAsync(context, site, options, notifiers)));
         return group;
     }
 
@@ -209,6 +231,97 @@ public static class SyncEndpoints
         finally
         {
             notifier.Committed -= OnCommitted;
+        }
+    }
+
+    /// <summary>
+    /// One hint stream for several collections of a group (feature <c>hints-multiplex</c>): <c>?collections=a,b</c> names
+    /// them; each event's data is the name of a collection that changed in the caller's scope. Every requested collection
+    /// is announced once on connect. Unknown names are ignored.
+    /// </summary>
+    private static async Task MultiplexedHintsAsync(HttpContext http, Site site, SyncEndpointOptions options, IReadOnlyDictionary<string, ISyncCommitNotifier> notifiers)
+    {
+        var scope = await AuthorizeAsync(http, site, options, requireJson: false);
+        if (scope is null)
+        {
+            return;
+        }
+
+        var requested = http.Request.Query["collections"].ToString()
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(Uri.UnescapeDataString)
+            .Where(notifiers.ContainsKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        site.Count(Ok);
+        var signal = System.Threading.Channels.Channel.CreateUnbounded<string>();
+        var handlers = new List<(ISyncCommitNotifier Notifier, Action<AuthorityCommit> Handler)>();
+        foreach (var collection in requested)
+        {
+            Action<AuthorityCommit> handler = commit =>
+            {
+                if (string.Equals(commit.Scope, scope, StringComparison.Ordinal))
+                {
+                    signal.Writer.TryWrite(collection);
+                }
+            };
+            notifiers[collection].Committed += handler;
+            handlers.Add((notifiers[collection], handler));
+        }
+
+        try
+        {
+            http.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+            http.Response.StatusCode = StatusCodes.Status200OK;
+            http.Response.ContentType = "text/event-stream";
+            http.Response.Headers.CacheControl = "no-store";
+            foreach (var collection in requested)
+            {
+                signal.Writer.TryWrite(collection);
+            }
+
+            var aborted = http.RequestAborted;
+            var due = new HashSet<string>(StringComparer.Ordinal);
+            while (!aborted.IsCancellationRequested)
+            {
+                using var keepAlive = CancellationTokenSource.CreateLinkedTokenSource(aborted);
+                keepAlive.CancelAfter(HintKeepAlive);
+                var message = new System.Text.StringBuilder();
+                try
+                {
+                    // Coalesce: one event per collection however many commits arrived meanwhile.
+                    due.Add(await signal.Reader.ReadAsync(keepAlive.Token));
+                    while (signal.Reader.TryRead(out var more))
+                    {
+                        due.Add(more);
+                    }
+
+                    foreach (var collection in due)
+                    {
+                        message.Append("event: hint\ndata: ").Append(collection).Append("\n\n");
+                    }
+
+                    due.Clear();
+                }
+                catch (OperationCanceledException) when (!aborted.IsCancellationRequested)
+                {
+                    message.Append(": keep-alive\n\n");
+                }
+
+                await http.Response.WriteAsync(message.ToString(), aborted);
+                await http.Response.Body.FlushAsync(aborted);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The client disconnected.
+        }
+        finally
+        {
+            foreach (var (notifier, handler) in handlers)
+            {
+                notifier.Committed -= handler;
+            }
         }
     }
 

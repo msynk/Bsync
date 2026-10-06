@@ -23,7 +23,7 @@ namespace Bsync.Client;
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class SyncSession<TDocument> : IAsyncDisposable
+public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSession
     where TDocument : class, ISyncEntity
 {
     private readonly SyncSessionOptions<TDocument> _options;
@@ -34,6 +34,8 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
     private SyncStatus _status = SyncStatus.Starting;
     private volatile bool _paused;
     private int _disposed;
+    private readonly List<Waiter> _waiters = [];
+    private int _runsStarted;
 
     /// <summary>Creates a session. Nothing is opened until first use.</summary>
     public SyncSession(SyncSessionOptions<TDocument> options)
@@ -44,6 +46,7 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxBackoff, options.MinBackoff, nameof(options.MaxBackoff));
         _options = options;
         _logger = options.Logger ?? NullLogger.Instance;
+        options.Coordination?.Coordinator.Attach(this, options.Coordination);
     }
 
     /// <summary>Raised when documents or <see cref="Status"/> may have changed. May run on any thread.</summary>
@@ -60,6 +63,9 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
 
     /// <summary>Whether the session listens to server hints.</summary>
     public bool LiveHints => _options.LiveHints;
+
+    /// <summary>Whether the replica is <see cref="SyncMode.PullOnly"/> (read-only).</summary>
+    public bool PullOnly => _options.EngineOptions?.Mode == SyncMode.PullOnly;
 
     /// <summary>
     /// Returns the engine for <paramref name="account"/>, opening its replica and starting replication if needed.
@@ -102,10 +108,12 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
             _active = started;
             SetStatus(SyncStatus.Starting);
             started.Loop = Task.Run(() => RunAsync(started, stopping.Token), CancellationToken.None);
-            if (_options.LiveHints)
+            if (_options.LiveHints && _options.Coordination?.Coordinator.MultiplexesHints != true)
             {
                 started.Hints = Task.Run(() => ListenAsync(started, stopping.Token), CancellationToken.None);
             }
+
+            _options.Coordination?.Coordinator.OnActive(account);
 
             if (_options.AttachLifecycle is { } attach)
             {
@@ -137,6 +145,70 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
 
         RequestSync();
     }
+
+    /// <inheritdoc />
+    async Task ICoordinatedSession.SyncNowAsync(CancellationToken cancellationToken)
+    {
+        if (_active is { } active)
+        {
+            await active.Engine.SyncAsync(cancellationToken).ConfigureAwait(false);
+            await PublishAsync(active, _status.State, _status.Detail).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc />
+    void ICoordinatedSession.ListenOnOwn()
+    {
+        if (_options.LiveHints && _active is { Hints: null } active)
+        {
+            active.Hints = Task.Run(() => ListenAsync(active, active.Stopping.Token), CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Waits until <paramref name="goal"/> is reached for <paramref name="account"/>, or <paramref name="budget"/> runs out
+    /// (task C4). The session's own loop does the work, so replication stays single-flight and compatible waits share runs.
+    /// Budget expiry returns a result with <see cref="SyncGoalResult.Reached"/> false; cancelling the wait never undoes a
+    /// local write. A wait for revision N is never completed by the acceptance of an older revision.
+    /// </summary>
+    public async Task<SyncGoalResult> SyncAsync(string account, SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(goal);
+        ArgumentOutOfRangeException.ThrowIfLessThan(budget, TimeSpan.Zero);
+        await GetEngineAsync(account, cancellationToken).ConfigureAwait(false);
+        var active = _active ?? throw new InvalidOperationException("The session stopped.");
+        var waiter = new Waiter(goal, active, Volatile.Read(ref _runsStarted), progress);
+        lock (_waiters)
+        {
+            _waiters.Add(waiter);
+        }
+
+        try
+        {
+            RequestSync();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var expiry = Task.Delay(budget, _options.TimeProvider, timeout.Token);
+            var finished = await Task.WhenAny(waiter.Done.Task, expiry).ConfigureAwait(false);
+            await timeout.CancelAsync().ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return finished == waiter.Done.Task
+                ? await waiter.Done.Task.ConfigureAwait(false)
+                : await EvaluateAsync(waiter).ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_waiters)
+            {
+                _waiters.Remove(waiter);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    Task<SyncGoalResult> ICoordinatedSession.SyncActiveAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress, CancellationToken cancellationToken) =>
+        _active is { } active
+            ? SyncAsync(active.Account, goal, budget, progress, cancellationToken)
+            : throw new InvalidOperationException("The session has no open replica yet.");
 
     /// <summary>Asks the loop to sync soon (for example after a local write or when the network returns).</summary>
     public void RequestSync()
@@ -204,6 +276,18 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
         }
 
         _active = null;
+        Waiter[] abandoned;
+        lock (_waiters)
+        {
+            abandoned = [.. _waiters.Where(w => w.Active == active)];
+        }
+
+        foreach (var waiter in abandoned)
+        {
+            // The replica is closing (sign-out, account switch): the wait ends unreached; nothing local is undone.
+            waiter.Done.TrySetResult(new SyncGoalResult(false, waiter.CaughtUp, 0, waiter.Goal.Documents ?? [], waiter.Work));
+        }
+
         await active.Stopping.CancelAsync().ConfigureAwait(false);
         if (active.Loop is { } loop)
         {
@@ -244,10 +328,79 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
         }
 
         active.Stopping.Dispose();
-        SetStatus(new SyncStatus(SyncState.Stopped, 0, null, _status.LastSynced));
+        SetStatus(_status with { State = SyncState.Stopped, Pending = 0, Detail = null });
     }
 
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
+
+    private async Task SettleWaitersAsync(Active active, int run, SyncResult result)
+    {
+        Waiter[] waiters;
+        lock (_waiters)
+        {
+            waiters = [.. _waiters.Where(w => w.Active == active)];
+        }
+
+        foreach (var waiter in waiters)
+        {
+            waiter.Runs++;
+            waiter.Work += result;
+
+            // Only a run that started after the wait began proves the replica caught up with the server.
+            if (run >= waiter.FirstRun && !result.HasRemainingWork)
+            {
+                waiter.CaughtUp = true;
+            }
+
+            var state = await EvaluateAsync(waiter).ConfigureAwait(false);
+            waiter.Progress?.Report(new SyncProgress(waiter.Runs, waiter.Work.Pulled, waiter.Work.Pushed, state.Pending));
+            if (state.Reached)
+            {
+                waiter.Done.TrySetResult(state);
+            }
+        }
+    }
+
+    private static async Task<SyncGoalResult> EvaluateAsync(Waiter waiter)
+    {
+        var engine = waiter.Active.Engine;
+        var dirty = await engine.CountDirtyAsync().ConfigureAwait(false);
+        var issues = await engine.CountIssuesAsync().ConfigureAwait(false);
+        var pending = Math.Max(0, dirty - issues.Rejected);
+        var unaccepted = new List<SyncDocumentRevision>();
+        foreach (var wanted in waiter.Goal.Documents ?? [])
+        {
+            // Accepted at N or later: the record is clean (no local change waits) and its revision reached N.
+            if (await engine.GetAsync(wanted.Id).ConfigureAwait(false) is not { IsDirty: false, Conflict: null } record || record.LocalRevision < wanted.Revision)
+            {
+                unaccepted.Add(wanted);
+            }
+        }
+
+        var reached = (!waiter.Goal.CaughtUp || waiter.CaughtUp)
+            && (!waiter.Goal.AllPendingAccepted || pending == 0)
+            && unaccepted.Count == 0;
+        return new SyncGoalResult(reached, waiter.CaughtUp, pending, unaccepted, waiter.Work);
+    }
+
+    private sealed class Waiter(SyncGoal goal, Active active, int firstRun, IProgress<SyncProgress>? progress)
+    {
+        public SyncGoal Goal { get; } = goal;
+
+        public Active Active { get; } = active;
+
+        public int FirstRun { get; } = firstRun;
+
+        public IProgress<SyncProgress>? Progress { get; } = progress;
+
+        public TaskCompletionSource<SyncGoalResult> Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int Runs { get; set; }
+
+        public SyncResult Work { get; set; }
+
+        public bool CaughtUp { get; set; }
+    }
 
     private async Task RunAsync(Active active, CancellationToken stopping)
     {
@@ -287,17 +440,32 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
                 }
                 else
                 {
-                    await PublishAsync(active, SyncState.Syncing, null).ConfigureAwait(false);
-                    var result = await active.Engine.SyncAsync(stopping).ConfigureAwait(false);
+                    if (_status is not { State: SyncState.Synced, Pending: 0 })
+                    {
+                        // A background refresh of an idle, synced replica is not announced: subscribers hear about it only
+                        // if data or status actually change (F14).
+                        await PublishAsync(active, SyncState.Syncing, null).ConfigureAwait(false);
+                    }
+
+                    var run = Interlocked.Increment(ref _runsStarted) - 1;
+                    var result = _options.Coordination is { } coordination
+                        ? await coordination.Coordinator.RunAsync(coordination.Name, active.Engine.SyncAsync, stopping).ConfigureAwait(false)
+                        : await active.Engine.SyncAsync(stopping).ConfigureAwait(false);
+                    var now = _options.TimeProvider.GetUtcNow();
+                    _status = _status with { LastPulled = now, LastPushed = now };
+                    var issues = await IssuesAsync(active).ConfigureAwait(false);
+                    await SettleWaitersAsync(active, run, result).ConfigureAwait(false);
                     failures = 0;
                     renewed = false;
-                    if (result.Rejected > 0)
+                    if (result.Rejected > 0 || issues.Total > 0)
                     {
-                        await PublishAsync(active, SyncState.AttentionRequired, $"{result.Rejected} change(s) were rejected by the server.").ConfigureAwait(false);
+                        // Never "synced" while a person must decide something (C5): kept conflicts and parked rejections,
+                        // whether they happened in this run or earlier.
+                        await PublishAsync(active, SyncState.AttentionRequired, Describe(issues)).ConfigureAwait(false);
                     }
                     else if (result.IsComplete)
                     {
-                        _status = _status with { LastSynced = _options.TimeProvider.GetUtcNow() };
+                        _status = _status with { LastSynced = now };
                         await PublishAsync(active, SyncState.Synced, null).ConfigureAwait(false);
                     }
                     else
@@ -467,16 +635,52 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable
         {
         }
 
+        var issues = await IssuesAsync(active).ConfigureAwait(false);
         if (ReferenceEquals(_active, active))
         {
-            SetStatus(new SyncStatus(state, pending, detail, _status.LastSynced));
+            SetStatus(_status with
+            {
+                State = state,
+                Pending = pending,
+                Detail = detail,
+                Conflicts = issues.Conflicts,
+                Rejected = issues.Rejected,
+                Blocked = issues.Blocked,
+            });
         }
     }
+
+    private static async Task<SyncIssueCounts> IssuesAsync(Active active)
+    {
+        try
+        {
+            return await active.Engine.CountIssuesAsync().ConfigureAwait(false);
+        }
+        catch (LocalStoreUnavailableException)
+        {
+            return SyncIssueCounts.None;
+        }
+    }
+
+    private static string Describe(SyncIssueCounts issues) => (issues.Conflicts, issues.Rejected) switch
+    {
+        (0, var rejected) => $"{rejected} change(s) were rejected by the server.",
+        (var conflicts, 0) => $"{conflicts} conflict(s) wait for a decision.",
+        var (conflicts, rejected) => $"{conflicts} conflict(s) wait for a decision and {rejected} change(s) were rejected by the server.",
+    };
 
     private void SetStatus(SyncStatus status)
     {
         var previous = _status;
         _status = status;
+
+        // Timestamps alone are not a change worth announcing (F14). A follower's tick is: another tab may have changed the
+        // shared replica, so readers refresh.
+        if (status.State != SyncState.Follower && previous with { LastSynced = null, LastPulled = null, LastPushed = null } == status with { LastSynced = null, LastPulled = null, LastPushed = null })
+        {
+            return;
+        }
+
         if (previous.State != status.State)
         {
             var level = status.State is SyncState.Offline or SyncState.AttentionRequired ? LogLevel.Warning

@@ -24,6 +24,39 @@ public sealed class SqlServerAuthorityTests : IAsyncLifetime
     private static TestReplica Replica(ISyncAuthority<Note> authority, string node, IConflictHandler<Note>? handler = null, SyncCallContext? context = null, SyncOptions<Note>? options = null) =>
         new(InMemorySyncServerRef.Create(), node, handler, options, SystemPhysicalClock.Instance, transport: _ => new InProcessTransport<Note>(authority, context));
 
+    [Fact(DisplayName = "D5 F18: the retention service reads every feed's head and purges each scope by age")]
+    public async Task RetentionPurgesEachScope()
+    {
+        await using var authority = await _database.AuthorityAsync();
+        var tenant = new SyncCallContext(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "u")], "test")), "tenant-a");
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var retention = new SyncRetention(new SyncRetentionOptions { MaxOfflineHorizon = TimeSpan.FromDays(45), TimeProvider = time }, [authority]);
+        foreach (var context in new[] { SyncCallContext.Anonymous, tenant })
+        {
+            var writer = Replica(authority, $"w-{context.Scope}", context: context);
+            await writer.Engine.WriteAsync(Stamped("gone"));
+            await writer.Engine.SyncAsync();
+            await writer.Engine.DeleteAsync("gone");
+            await writer.Engine.SyncAsync();
+        }
+
+        var heads = await authority.GetFeedHeadsAsync();
+        var first = await retention.RunOnceAsync();
+        time.Advance(TimeSpan.FromDays(44));
+        var early = await retention.RunOnceAsync();
+        time.Advance(TimeSpan.FromDays(2));
+        var late = await retention.RunOnceAsync();
+
+        Assert.Equal(["default", "tenant-a"], heads.Keys.Order());
+        Assert.All(heads.Values, head => Assert.Equal(2, head));
+        Assert.Equal((0, 0), first);
+        Assert.Equal((0, 0), early);
+        Assert.Equal((2, 4), late); // one tombstone and two receipts per scope
+        var pull = await authority.PullAsync(tenant, new PullRequest(Checkpoint.Start, 10));
+        Assert.Empty(pull.Changes);
+        Assert.Equal(2, pull.RetentionHorizon);
+    }
+
     [Fact(DisplayName = "T24 T30 I05 I06: concurrent writers on two instances never lose updates, and a concurrent reader never skips a version")]
     public async Task ConcurrentInstancesKeepCommittedPrefix()
     {

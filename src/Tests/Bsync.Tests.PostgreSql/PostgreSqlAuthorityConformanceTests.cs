@@ -9,11 +9,19 @@ namespace Bsync.Tests.PostgreSql;
 /// <summary>The public authority conformance suite against PostgreSQL (one collection per authority, one database per class).</summary>
 public sealed class PostgreSqlAuthorityConformanceTests(PostgresFixture fixture) : AuthorityConformanceTests, IClassFixture<PostgresFixture>
 {
+    private const AuthorityCapabilities Supported = AuthorityCapabilities.All & ~AuthorityCapabilities.Membership; // ADR-015 is not implemented for PostgreSQL
+
     protected override IAuthorityConformanceDriver Driver { get; } = new PostgreSqlDriver(fixture);
+
+    public static TheoryData<string> SupportedCaseNames() => CaseNamesFor(Supported);
+
+    [Theory]
+    [MemberData(nameof(SupportedCaseNames))]
+    public Task Conformance(string name) => RunAsync(name);
 
     private sealed class PostgreSqlDriver(PostgresFixture fixture) : IAuthorityConformanceDriver
     {
-        public AuthorityCapabilities Capabilities => AuthorityCapabilities.All;
+        public AuthorityCapabilities Capabilities => Supported;
 
         public async Task<AuthorityUnderTest> CreateAsync(AuthorityConformanceOptions options, CancellationToken cancellationToken = default) =>
             new PostgreSqlUnderTest(await PostgreSqlSyncAuthority<ConformanceDocument>.CreateAsync(

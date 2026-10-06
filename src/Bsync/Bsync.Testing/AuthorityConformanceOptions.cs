@@ -24,4 +24,10 @@ public sealed class AuthorityConformanceOptions
 
     /// <summary>A fingerprint of what the caller may see, bound into checkpoints.</summary>
     public Func<SyncCallContext, string>? ScopeFingerprint { get; init; }
+
+    /// <summary>Read membership: who may read a document (ADR-015). Set together with <see cref="PrincipalKey"/>.</summary>
+    public Func<ConformanceDocument, IEnumerable<string>>? Readers { get; init; }
+
+    /// <summary>The caller's principal key for <see cref="Readers"/>.</summary>
+    public Func<SyncCallContext, string?>? PrincipalKey { get; init; }
 }

@@ -44,6 +44,15 @@ public readonly record struct SyncResult(int Pulled, int Pushed, int Conflicts)
     /// </summary>
     public int PurgedAfterReset { get; init; }
 
+    /// <summary>
+    /// Documents that left this replica's view without a reset (feature <c>removals</c>, ADR-015): clean copies removed from
+    /// the device, plus copies with local changes that were hidden.
+    /// </summary>
+    public int Removed { get; init; }
+
+    /// <summary>Clean local tombstones dropped because the server purged them (task D4).</summary>
+    public int Compacted { get; init; }
+
     /// <summary>Whether the run drained everything it could see without deferring or leaving work.</summary>
     public bool IsComplete => !HasRemainingWork && Deferred == 0;
 
@@ -57,5 +66,7 @@ public readonly record struct SyncResult(int Pulled, int Pushed, int Conflicts)
             ResetPerformed = a.ResetPerformed || b.ResetPerformed,
             MissingAfterReset = a.MissingAfterReset + b.MissingAfterReset,
             PurgedAfterReset = a.PurgedAfterReset + b.PurgedAfterReset,
+            Removed = a.Removed + b.Removed,
+            Compacted = a.Compacted + b.Compacted,
         };
 }

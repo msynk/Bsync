@@ -33,6 +33,7 @@ public sealed class TaskWriteHandler : ISyncWriteHandler<TaskDocument>
         row.Slug = task.Slug;
         row.Done = task.Done;
         row.Deleted = task.Deleted;
+        task.Revision = ++row.Revision;
         row.ChangedBy = write.Caller.Principal.FindFirst("sub")?.Value;
         await db.SaveChangesAsync(cancellationToken);
 

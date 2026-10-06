@@ -1,12 +1,33 @@
 namespace Bsync.Client;
 
-/// <summary>A snapshot of replication status.</summary>
-/// <param name="State">The state.</param>
-/// <param name="Pending">Local changes not yet confirmed by the server (0 for server-connected hosts).</param>
-/// <param name="Detail">A human-readable explanation for <see cref="SyncState.Offline"/> or <see cref="SyncState.AttentionRequired"/>.</param>
+/// <summary>What a collection's synchronization is doing, for the UI.</summary>
+/// <param name="State">The overall state. Never <see cref="SyncState.Synced"/> while conflicts or rejections wait for a decision.</param>
+/// <param name="Pending">Local changes not yet accepted by the server (including parked ones).</param>
+/// <param name="Detail">A short explanation for the UI, or <see langword="null"/>.</param>
 /// <param name="LastSynced">When a sync last completed without remaining work, if ever.</param>
 public sealed record SyncStatus(SyncState State, int Pending, string? Detail, DateTimeOffset? LastSynced)
 {
-    /// <summary>The initial status.</summary>
+    /// <summary>Before the first sync of the session.</summary>
     public static SyncStatus Starting { get; } = new(SyncState.Starting, 0, null, null);
+
+    /// <summary>Local changes kept after a conflict, waiting for a decision.</summary>
+    public int Conflicts { get; init; }
+
+    /// <summary>Local changes the server rejected, parked until retried or reverted.</summary>
+    public int Rejected { get; init; }
+
+    /// <summary>Of <see cref="Rejected"/>, members of a dependency group parked because another member failed.</summary>
+    public int Blocked { get; init; }
+
+    /// <summary>When server changes were last pulled successfully in this session.</summary>
+    public DateTimeOffset? LastPulled { get; init; }
+
+    /// <summary>When local changes were last pushed successfully (or found nothing to push) in this session.</summary>
+    public DateTimeOffset? LastPushed { get; init; }
+
+    /// <summary>How old the replica's view of the server is at <paramref name="now"/>; <see langword="null"/> if it never pulled.</summary>
+    public TimeSpan? Staleness(DateTimeOffset now) => LastPulled is { } pulled ? now - pulled : null;
+
+    /// <summary>Whether the replica has not pulled within <paramref name="threshold"/> of <paramref name="now"/> (or never).</summary>
+    public bool IsStale(TimeSpan threshold, DateTimeOffset now) => Staleness(now) is not { } age || age > threshold;
 }

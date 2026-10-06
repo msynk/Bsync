@@ -13,10 +13,17 @@ namespace Bsync.Samples.Tasks;
 [JsonSerializable(typeof(TokenRequest))]
 [JsonSerializable(typeof(TokenResponse))]
 [JsonSerializable(typeof(NewTask))]
+[JsonSerializable(typeof(TaskIntent))]
+[JsonSerializable(typeof(PullResult<TaskIntent>))]
+[JsonSerializable(typeof(PushRequest<TaskIntent>))]
+[JsonSerializable(typeof(PushResult<TaskIntent>))]
 public sealed partial class TasksJson : JsonSerializerContext
 {
     /// <summary>The collection name.</summary>
     public const string Collection = "tasks";
+
+    /// <summary>The intents collection (task F3).</summary>
+    public const string IntentCollection = "task-intents";
 
     /// <summary>The application schema id sent with every sync request.</summary>
     public const string SchemaId = "tasks-v1";

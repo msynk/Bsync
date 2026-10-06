@@ -49,6 +49,17 @@ public sealed class SqlServerSyncAuthorityOptions<TDocument>
     public Func<SyncCallContext, PushOperation<TDocument>, TDocument?, string?>? Validator { get; init; }
 
     /// <summary>
+    /// Optional read membership (ADR-015): the principal keys that may read a document, computed at every write (replicated,
+    /// handler or publisher). With it, each caller's pull reads only its own access rows (full pages), and documents that
+    /// leave its view are listed as removals. A change of readers is a new version: republish a document after a membership
+    /// change elsewhere. Set together with <see cref="PrincipalKey"/>.
+    /// </summary>
+    public Func<TDocument, IEnumerable<string>>? Readers { get; init; }
+
+    /// <summary>The caller's principal key for <see cref="Readers"/> (for example a user id claim); <see langword="null"/> reads nothing.</summary>
+    public Func<SyncCallContext, string?>? PrincipalKey { get; init; }
+
+    /// <summary>
     /// Optional application logic that runs in the authority's transaction for every write about to be accepted
     /// (ADR-014). Without one, the submitted document is stored unchanged.
     /// </summary>

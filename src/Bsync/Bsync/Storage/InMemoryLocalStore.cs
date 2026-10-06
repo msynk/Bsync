@@ -66,7 +66,8 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                     throw new ArgumentException($"Duplicate record id '{update.Id}' in one update.", nameof(updates));
                 }
 
-                var existing = _records.TryGetValue(update.Id, out var stored) ? CloneRecord(stored) : null;
+                var owned = new HashSet<TDocument>(ReferenceEqualityComparer.Instance);
+                var existing = _records.TryGetValue(update.Id, out var stored) ? CloneRecord(stored, owned) : null;
                 var next = update.Transform(existing);
                 if (next is null)
                 {
@@ -81,7 +82,8 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                         $"Transform for '{update.Id}' returned a record with id '{next.Current.Id}'.");
                 }
 
-                staged.Add((update.Id, CloneRecord(next), true));
+                // Documents the transform took from its input are copies this store made; only the others need copying.
+                staged.Add((update.Id, CloneRecord(next, reuse: owned), true));
             }
 
             var results = new List<RecordUpdateResult<TDocument>>(staged.Count);
@@ -119,7 +121,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .OrderBy(static r => r.Current.UpdatedAt)
                 .ThenBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(pending);
@@ -132,6 +134,36 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         lock (_gate)
         {
             return Task.FromResult(_records.Values.Count(static r => r.IsDirty));
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<int> PurgeTombstonesAsync(long throughVersion, long generation, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var gone = _records
+                .Where(kv => kv.Value is { IsDirty: false, Conflict: null, Current.Deleted: true, BaseVersion: { } version } record && version <= throughVersion && record.Generation == generation)
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var id in gone)
+            {
+                _records.Remove(id);
+            }
+
+            return Task.FromResult(gone.Count);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            return Task.FromResult(new SyncIssueCounts(
+                _records.Values.Count(static r => r.Conflict is not null),
+                _records.Values.Count(static r => r.IsDirty && r.Rejection is not null),
+                _records.Values.Count(static r => r.IsDirty && r.Rejection?.ErrorCode == Protocol.PushErrorCodes.GroupFailed)));
         }
     }
 
@@ -184,7 +216,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .Where(static r => r.Conflict is not null)
                 .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(conflicts);
         }
@@ -200,7 +232,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .Where(static r => r.Rejection is not null)
                 .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(rejected);
         }
@@ -236,7 +268,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .Where(r => !r.IsDirty && !r.MissingAfterReset && r.Generation < generation)
                 .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(stale);
@@ -265,13 +297,34 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         }
     }
 
-    private SyncRecord<TDocument> CloneRecord(SyncRecord<TDocument> record) =>
-        record with
+    // One copy per distinct document instance: a record often holds the same document as current, base and pending
+    // payload, and documents in records are never mutated in place, so the copy is shared within the copied record (D9).
+    private SyncRecord<TDocument> CloneRecord(SyncRecord<TDocument> record, HashSet<TDocument>? owned = null, HashSet<TDocument>? reuse = null)
+    {
+        var copies = new Dictionary<TDocument, TDocument>(4, ReferenceEqualityComparer.Instance);
+        TDocument Copy(TDocument document)
         {
-            Current = _clone(record.Current),
-            Base = record.Base is { } b ? _clone(b) : null,
-            Observed = record.Observed is { } o ? _clone(o) : null,
-            Conflict = record.Conflict is { } c ? c with { Server = _clone(c.Server), Local = _clone(c.Local), Base = c.Base is { } cb ? _clone(cb) : null } : null,
-            Pending = record.Pending is { } p ? p with { Payload = _clone(p.Payload) } : null,
+            if (reuse is not null && reuse.Contains(document))
+            {
+                return document;
+            }
+
+            if (!copies.TryGetValue(document, out var copy))
+            {
+                copies[document] = copy = _clone(document);
+                owned?.Add(copy);
+            }
+
+            return copy;
+        }
+
+        return record with
+        {
+            Current = Copy(record.Current),
+            Base = record.Base is { } b ? Copy(b) : null,
+            Observed = record.Observed is { } o ? Copy(o) : null,
+            Conflict = record.Conflict is { } c ? c with { Server = Copy(c.Server), Local = Copy(c.Local), Base = c.Base is { } cb ? Copy(cb) : null } : null,
+            Pending = record.Pending is { } p ? p with { Payload = Copy(p.Payload) } : null,
         };
+    }
 }

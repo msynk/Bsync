@@ -58,6 +58,39 @@ public interface ILocalStore<TDocument>
     Task<int> CountDirtyAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Physically removes clean tombstones of <paramref name="generation"/> whose server version is at or below
+    /// <paramref name="throughVersion"/> (task D4: the server already purged them). Records with local changes or a kept
+    /// conflict are never removed. The default enumerates; stores override it with one statement. Returns the number removed.
+    /// </summary>
+    async Task<int> PurgeTombstonesAsync(long throughVersion, long generation, CancellationToken cancellationToken = default)
+    {
+        var ids = new List<string>();
+        foreach (var document in await QueryAsync(includeDeleted: true, cancellationToken).ConfigureAwait(false))
+        {
+            if (document.Deleted
+                && await GetAsync(document.Id, cancellationToken).ConfigureAwait(false) is { IsDirty: false, Conflict: null, BaseVersion: { } version } record
+                && version <= throughVersion
+                && record.Generation == generation)
+            {
+                ids.Add(document.Id);
+            }
+        }
+
+        return ids.Count == 0 ? 0 : await PurgeAsync(ids, generation + 1, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Counts records that need a decision: kept conflicts and parked rejections (task C5). The default enumerates them;
+    /// stores override it with a count.
+    /// </summary>
+    async Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default)
+    {
+        var conflicts = await GetConflictsAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        var rejected = await GetRejectedAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        return new SyncIssueCounts(conflicts.Count, rejected.Count, rejected.Count(static r => r.Rejection?.ErrorCode == Protocol.PushErrorCodes.GroupFailed));
+    }
+
+    /// <summary>
     /// Returns up to <paramref name="limit"/> clean records that are not marked
     /// <see cref="SyncRecord{TDocument}.MissingAfterReset"/> and whose
     /// <see cref="SyncRecord{TDocument}.Generation"/> is lower than <paramref name="generation"/>: the

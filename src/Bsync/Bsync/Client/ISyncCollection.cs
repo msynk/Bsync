@@ -50,6 +50,21 @@ public interface ISyncCollection<TDocument>
     Task<IReadOnlyList<SyncDocumentConflict<TDocument>>> GetConflictsAsync(int limit = 100, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Waits until <paramref name="goal"/> is reached or <paramref name="budget"/> runs out (task C4), for example
+    /// <see cref="SyncGoal.Complete"/> before signing out, or <see cref="SyncGoal.Accepted"/> with a write's revision.
+    /// Background replication continues either way; cancelling the wait never undoes a local write.
+    /// </summary>
+    Task<SyncGoalResult> SyncAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This collection cannot wait for sync goals.");
+
+    /// <summary>
+    /// Returns a page of documents that need a decision (kept conflicts, rejections, blocked group members) and how many
+    /// there are in all (task C5). Hosts without a local replica return an empty page.
+    /// </summary>
+    Task<SyncIssuePage> GetIssuesAsync(int offset = 0, int limit = 100, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This collection does not list issues.");
+
+    /// <summary>
     /// Resolves a kept conflict: <paramref name="resolved"/> becomes a new local change based on the newest server
     /// state known locally, and is uploaded like any other write. Returns <see cref="SyncConfirmation.NotFound"/> if
     /// the document has no unresolved conflict.

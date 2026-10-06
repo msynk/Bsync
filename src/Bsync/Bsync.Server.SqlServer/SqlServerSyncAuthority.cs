@@ -33,7 +33,7 @@ namespace Bsync.Server.SqlServer;
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>, IAsyncDisposable
+public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>, ISyncRetentionTarget, IAsyncDisposable
     where TDocument : class, ISyncEntity
 {
     private const string OperationSavepoint = "bs_op";
@@ -72,6 +72,10 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPageSize, 1, nameof(options.MaxPageSize));
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxClockSkew, TimeSpan.Zero, nameof(options.MaxClockSkew));
         ArgumentOutOfRangeException.ThrowIfLessThan(options.CommandTimeout, TimeSpan.Zero, nameof(options.CommandTimeout));
+        if ((options.Readers is null) != (options.PrincipalKey is null))
+        {
+            throw new ArgumentException("Readers and PrincipalKey are set together.", nameof(options));
+        }
         if (!SyncIds.IsValid(options.Collection))
         {
             throw new ArgumentException("The collection name must be a valid identifier.", nameof(options));
@@ -155,6 +159,10 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         await RefreshEpochAsync(connection, null, cancellationToken).ConfigureAwait(false);
         var since = ParseCheckpoint(context, request.Since);
         var limit = Math.Min(request.BatchSize, _options.MaxPageSize);
+        if (_options.PrincipalKey is { } principalKey)
+        {
+            return await PullMembershipAsync(connection, context, request, principalKey(context), since, limit, cancellationToken).ConfigureAwait(false);
+        }
 
         // The documents are read first and the retention horizon second: a purge between the two is then seen as a
         // raised horizon (reset), never as tombstones silently missing from the page.
@@ -222,7 +230,7 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         }
 
         var position = raw.Count > 0 ? raw[^1].Version : Math.Max(since, 0);
-        return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize) };
+        return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize), ServerTime = _physical.NowMilliseconds(), RetentionHorizon = purgedThrough };
     }
 
     /// <inheritdoc />
@@ -409,6 +417,8 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
                         DECLARE @through bigint = CASE WHEN @requested < @sequence THEN @requested ELSE @sequence END;
                         DELETE FROM {_schema}.[documents] WHERE [feed_id] = @feed AND [deleted] = 1 AND [version] <= @through;
                         DECLARE @removed int = @@ROWCOUNT;
+                        DELETE a FROM {_schema}.[document_access] a
+                        WHERE a.[feed_id] = @feed AND NOT EXISTS (SELECT 1 FROM {_schema}.[documents] d WHERE d.[feed_id] = a.[feed_id] AND d.[id_key] = a.[id_key]);
                         UPDATE {_schema}.[feeds] SET [purged_through] = CASE WHEN [purged_through] > @through THEN [purged_through] ELSE @through END
                         WHERE [feed_id] = @feed;
                         SELECT @removed;
@@ -471,6 +481,22 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
             },
             cancellationToken).ConfigureAwait(false);
         _epoch = epoch;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, long>> GetFeedHeadsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = Command($"SELECT [scope], [sequence] FROM {_schema}.[feeds] WHERE [collection_key] = @collection", connection, null);
+        command.Parameters.Add("@collection", SqlDbType.VarBinary, 512).Value = _collectionKey;
+        var heads = new Dictionary<string, long>(StringComparer.Ordinal);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            heads[reader.GetString(0)] = reader.GetInt64(1);
+        }
+
+        return heads;
     }
 
     /// <summary>The highest version issued in <paramref name="scope"/> (diagnostics, restore planning).</summary>
@@ -701,7 +727,8 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         if (current is not null)
         {
             stored.UpdatedAt = Deserialize(current.Json).UpdatedAt;
-            if (Serialize(stored) == current.Json)
+            if (Serialize(stored) == current.Json
+                && (_options.Readers is not { } readers || (await ReadGrantedAsync(write, document.Id, cancellationToken).ConfigureAwait(false)).SetEquals(readers(stored))))
             {
                 return new SyncPublishResult(0, 1, 0);
             }
@@ -777,7 +804,161 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         store.Parameters.Add("@deleted", SqlDbType.Bit).Value = document.Deleted;
         store.Parameters.Add("@document", SqlDbType.NVarChar, -1).Value = Serialize(document);
         await store.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        if (_options.Readers is { } readers)
+        {
+            await WriteAccessAsync(write, id, document.Deleted ? null : readers(document), version, cancellationToken).ConfigureAwait(false);
+        }
+
         return version;
+    }
+
+    /// <summary>
+    /// ADR-015: moves every current reader's access row to <paramref name="version"/> (granted) and marks principals that
+    /// just lost access as revoked at the same version. A tombstone (<paramref name="readers"/> null) goes to everyone who
+    /// could read the document.
+    /// </summary>
+    private async Task WriteAccessAsync(WriteScope write, string id, IEnumerable<string>? readers, long version, CancellationToken cancellationToken)
+    {
+        var before = await ReadGrantedAsync(write, id, cancellationToken).ConfigureAwait(false);
+        var after = readers is null ? before : readers.Where(SyncIds.IsValid).ToHashSet(StringComparer.Ordinal);
+        var rows = after.Select(p => (Principal: p, Granted: true)).Concat(before.Where(p => !after.Contains(p)).Select(p => (Principal: p, Granted: false))).ToList();
+        foreach (var chunk in rows.Chunk(500))
+        {
+            var sql = new StringBuilder();
+            await using var command = Command(string.Empty, write.Connection, write.Transaction);
+            command.Parameters.Add("@feed", SqlDbType.Int).Value = write.Feed;
+            command.Parameters.Add("@id", SqlDbType.VarBinary, 512).Value = Key(id);
+            command.Parameters.Add("@name", SqlDbType.NVarChar, 256).Value = id;
+            command.Parameters.Add("@version", SqlDbType.BigInt).Value = version;
+            for (var i = 0; i < chunk.Length; i++)
+            {
+                var granted = chunk[i].Granted ? 1 : 0;
+                sql.Append(CultureInfo.InvariantCulture, $"""
+                    UPDATE {_schema}.[document_access] SET [version] = @version, [granted] = {granted} WHERE [feed_id] = @feed AND [id_key] = @id AND [principal_key] = @p{i};
+                    IF @@ROWCOUNT = 0 INSERT INTO {_schema}.[document_access] ([feed_id], [principal_key], [version], [id_key], [id], [granted]) VALUES (@feed, @p{i}, @version, @id, @name, {granted});
+
+                    """);
+                command.Parameters.Add($"@p{i}", SqlDbType.VarBinary, 512).Value = Key(chunk[i].Principal);
+            }
+
+            command.CommandText = sql.ToString();
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<HashSet<string>> ReadGrantedAsync(WriteScope write, string id, CancellationToken cancellationToken)
+    {
+        await using var read = Command(
+            $"SELECT [principal_key] FROM {_schema}.[document_access] WHERE [feed_id] = @feed AND [id_key] = @id AND [granted] = 1",
+            write.Connection,
+            write.Transaction);
+        read.Parameters.Add("@feed", SqlDbType.Int).Value = write.Feed;
+        read.Parameters.Add("@id", SqlDbType.VarBinary, 512).Value = Key(id);
+        var granted = new HashSet<string>(StringComparer.Ordinal);
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            granted.Add(Encoding.BigEndianUnicode.GetString((byte[])reader[0]));
+        }
+
+        return granted;
+    }
+
+    /// <summary>
+    /// ADR-015: reads the caller's access rows in version order (full pages; cost follows what the caller can see). Revoked
+    /// rows become removals for replicas that asked for them; others must resnapshot (<c>scope-changed</c>).
+    /// </summary>
+    private async Task<PullResult<TDocument>> PullMembershipAsync(SqlConnection connection, SyncCallContext context, PullRequest request, string? key, long since, int limit, CancellationToken cancellationToken)
+    {
+        var raw = new List<(long Version, bool Granted, string Id, long? DocumentVersion, string? Json)>();
+        long purgedThrough = 0;
+        if (key is not null && SyncIds.IsValid(key))
+        {
+            await using var command = Command(
+                $"""
+                SELECT TOP (@take) a.[version], a.[granted], a.[id], d.[version], d.[document]
+                FROM {_schema}.[document_access] a
+                JOIN {_schema}.[feeds] f ON f.[feed_id] = a.[feed_id]
+                LEFT JOIN {_schema}.[documents] d ON a.[granted] = 1 AND d.[feed_id] = a.[feed_id] AND d.[id_key] = a.[id_key]
+                WHERE f.[collection_key] = @collection AND f.[scope_key] = @scope AND a.[principal_key] = @principal AND a.[version] > @since
+                ORDER BY a.[version];
+                SELECT [purged_through] FROM {_schema}.[feeds] WHERE [collection_key] = @collection AND [scope_key] = @scope;
+                """,
+                connection,
+                null);
+            command.Parameters.Add("@take", SqlDbType.Int).Value = limit + 1;
+            AddFeedKey(command, context.Scope);
+            command.Parameters.Add("@principal", SqlDbType.VarBinary, 512).Value = Key(key);
+            command.Parameters.Add("@since", SqlDbType.BigInt).Value = since;
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                raw.Add((reader.GetInt64(0), reader.GetBoolean(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetInt64(3), reader.IsDBNull(4) ? null : reader.GetString(4)));
+            }
+
+            if (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false) && await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                purgedThrough = reader.GetInt64(0);
+            }
+        }
+
+        if (since > 0 && since < purgedThrough)
+        {
+            throw new SyncResetRequiredException("The checkpoint is older than the retention horizon.", ResetReasons.Expired);
+        }
+
+        var hasMore = raw.Count > limit;
+        if (hasMore)
+        {
+            raw.RemoveAt(raw.Count - 1);
+        }
+
+        // As in the plain pull: a row updated during a locking scan can be read twice; keep its newest version.
+        var newest = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < raw.Count; i++)
+        {
+            newest[raw[i].Id] = i;
+        }
+
+        var acceptsRemovals = request.Features?.Contains(SyncFeatures.Removals, StringComparer.Ordinal) == true;
+        var changes = new List<RemoteChange<TDocument>>();
+        var removals = new List<string>();
+        for (var i = 0; i < raw.Count; i++)
+        {
+            var row = raw[i];
+            if (newest[row.Id] != i)
+            {
+                continue;
+            }
+
+            if (row.Granted && row.Json is not null)
+            {
+                var document = Deserialize(row.Json);
+                if (_options.CanRead?.Invoke(context, document) ?? true)
+                {
+                    changes.Add(new RemoteChange<TDocument>(document, row.DocumentVersion!.Value));
+                }
+            }
+            else if (!row.Granted && since > 0)
+            {
+                // A snapshot from the start never needs a removal: the replica holds nothing it may not see.
+                if (!acceptsRemovals)
+                {
+                    throw new SyncResetRequiredException("A document left this caller's view.", ResetReasons.ScopeChanged);
+                }
+
+                removals.Add(row.Id);
+            }
+        }
+
+        var position = raw.Count > 0 ? raw[^1].Version : Math.Max(since, 0);
+        return new PullResult<TDocument>(changes, FormatCheckpoint(context, position), hasMore)
+        {
+            Features = [SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention, SyncFeatures.Removals],
+            Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize),
+            ServerTime = _physical.NowMilliseconds(), RetentionHorizon = purgedThrough,
+            Removals = acceptsRemovals ? removals : null,
+        };
     }
 
     private async Task AdvanceAsync(SqlConnection connection, SqlTransaction transaction, int feed, long sequence, CancellationToken cancellationToken)
@@ -899,6 +1080,13 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         if (current is null && operation.BaseVersion is { } baseVersion && baseVersion <= write.PurgedThrough)
         {
             return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.BaseExpired, "The document no longer exists on the server.");
+        }
+
+        // ADR-015: only a current reader may change an existing document.
+        if (current is not null && _options.PrincipalKey is { } principalKey
+            && (principalKey(write.Context) is not { } key || !(await ReadGrantedAsync(write, operation.DocumentId, cancellationToken).ConfigureAwait(false)).Contains(key)))
+        {
+            return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.Forbidden);
         }
 
         if (_options.CanWrite is { } canWrite && !canWrite(write.Context, operation, current?.Document))
@@ -1065,7 +1253,9 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
     }
 
     private PushOutcome<TDocument> Visible(SyncCallContext context, PushOutcome<TDocument> outcome) =>
-        outcome.Document is { } document && _options.CanRead is { } canRead && !canRead(context, document)
+        outcome.Document is { } document
+        && ((_options.CanRead is { } canRead && !canRead(context, document))
+            || (_options.PrincipalKey is { } principalKey && (principalKey(context) is not { } key || !_options.Readers!(document).Contains(key, StringComparer.Ordinal))))
             ? PushOutcome<TDocument>.Rejected(outcome.OperationId, PushErrorCodes.Forbidden) with { IsDuplicate = outcome.IsDuplicate }
             : outcome;
 
@@ -1093,6 +1283,14 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         var text = string.Create(
             CultureInfo.InvariantCulture,
             $"{_options.Collection.Length}:{_options.Collection}|{context.Scope.Length}:{context.Scope}|{fingerprint.Length}:{fingerprint}");
+
+        // With membership a checkpoint names a position in one principal's view.
+        if (_options.PrincipalKey is { } principalKey)
+        {
+            var key = principalKey(context) ?? string.Empty;
+            text += string.Create(CultureInfo.InvariantCulture, $"|{key.Length}:{key}");
+        }
+
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
     }
 

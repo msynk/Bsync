@@ -29,6 +29,7 @@ public sealed class HybridLogicalClock
     private readonly object _gate = new();
     private long _wallTime;
     private int _counter;
+    private long _offset;
 
     /// <summary>
     /// Creates a clock for the given <paramref name="node"/>. The node id should be stable and
@@ -71,6 +72,34 @@ public sealed class HybridLogicalClock
         }
     }
 
+    /// <summary>
+    /// A correction added to the physical clock: the server's time minus this device's (task D2). The engine sets it from
+    /// the time a server advertises (feature <c>server-time</c>), so a device whose clock is wrong stamps writes the
+    /// server accepts. It never makes timestamps go backwards: <see cref="Now"/> stays strictly greater than
+    /// <see cref="Last"/>.
+    /// </summary>
+    public TimeSpan PhysicalOffset
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return TimeSpan.FromMilliseconds(_offset);
+            }
+        }
+
+        set
+        {
+            lock (_gate)
+            {
+                _offset = (long)value.TotalMilliseconds;
+            }
+        }
+    }
+
+    /// <summary>The uncorrected physical time, for measuring the offset.</summary>
+    internal long PhysicalMilliseconds() => _physical.NowMilliseconds();
+
     /// <summary>Identifies this clock's node; used as the final tie-breaker in timestamp ordering.</summary>
     public string Node { get; }
 
@@ -91,7 +120,7 @@ public sealed class HybridLogicalClock
     {
         lock (_gate)
         {
-            var physicalNow = _physical.NowMilliseconds();
+            var physicalNow = _physical.NowMilliseconds() + _offset;
             var newWall = Math.Max(_wallTime, physicalNow);
             var newCounter = newWall == _wallTime ? (long)_counter + 1 : 0;
             return Commit(newWall, newCounter);
@@ -109,7 +138,7 @@ public sealed class HybridLogicalClock
     {
         lock (_gate)
         {
-            var physicalNow = _physical.NowMilliseconds();
+            var physicalNow = _physical.NowMilliseconds() + _offset;
             if (_maxForwardDrift is { } drift && remote.WallTime - physicalNow > (long)drift.TotalMilliseconds)
             {
                 throw new ClockDriftException(remote, physicalNow, drift);

@@ -70,14 +70,69 @@ Allocated is the total over the run, not peak memory. Time grows roughly linearl
 |---|---:|---:|
 | `ThreeWayMerge.Merge` of a ~1 KiB document, disjoint edits | 12.6 µs | 22.8 KB |
 
+## Storage and allocation after 0.3.0 (2026-10-05)
+
+Measured with temporary probe tests on the same machine, not with BenchmarkDotNet; the probes were removed after
+the run.
+
+| Measurement | Before | After |
+|---|---:|---:|
+| SQLite file, 10,000 clean documents of ~1 KiB (D8: base not stored when equal to current) | 41,811,968 B (4,181 B/doc) | 14,450,688 B (1,445 B/doc) |
+| Allocated per pushed document, in-memory store (D9) | 66.9 KB | 30.7 KB |
+| Allocated per accepted write, in-memory server (D9) | 16.4 KB | 8.1 KB |
+| Allocated per pushed document, SQLite store (D9) | 80.6 KB | 62.6 KB |
+
+The plan's target of under 16 KB per pushed document is not met. The remaining copies are required by isolation
+(I02): a caller's document is copied on write, the store's copies are never handed out, and the SQLite store
+serializes and deserializes each distinct state once.
+
+## Local queries (task E1, 2026-10-06)
+
+```bash
+dotnet run -c Release --project src/Tests/Bsync.Benchmarks -- --filter "*LocalQuery*" --job short
+dotnet src/Tests/Bsync.Benchmarks/bin/Release/net10.0/Bsync.Benchmarks.dll peak <file.db> 50000
+```
+
+Same machine as above (Windows 10 22H2, Intel Core Ultra 7 255H, .NET 10.0.12), BenchmarkDotNet ShortRun. Both
+queries go through the public `LocalSyncCollection.QueryAsync` on clean, synced documents of about 1 KiB. "Ordered"
+is a 50-item page ordered by a `DateTimeOffset` field (`SyncQuery.Order`); "selective" is a 50-item page of
+`Where = d => d.Category == 42`, which 1% of the documents match, in the default id order.
+
+| Query | Documents | Store | Mean | P95 | Allocated |
+|---|---:|---|---:|---:|---:|
+| ordered page | 10,000 | in-memory | 30.2 ms | 32.2 ms | 23.7 MB |
+| ordered page | 10,000 | SQLite, `FULL` | 57.9 ms | 60.6 ms | 43.7 MB |
+| ordered page | 50,000 | in-memory | 313.4 ms | 317.8 ms | 119.1 MB |
+| ordered page | 50,000 | SQLite, `FULL` | 337.1 ms | 365.3 ms | 218.5 MB |
+| selective page | 10,000 | in-memory | 13.9 ms | 14.2 ms | 15.4 MB |
+| selective page | 10,000 | SQLite, `FULL` | 23.5 ms | 25.6 ms | 21.8 MB |
+| selective page | 50,000 | in-memory | 115.6 ms | 117.8 ms | 34.7 MB |
+| selective page | 50,000 | SQLite, `FULL` | 20.3 ms | 22.3 ms | 21.8 MB |
+
+Peak working set of a fresh process that opens a SQLite replica and reads one ordered page (cold, including JIT):
+63.6 MiB at 10,000 documents (195 ms) and 154.9 MiB at 50,000 (509 ms); 29 MiB after opening the store.
+
+The selective page stops once it has 50 matches, which here are within the first 5,000 documents in id order, so its
+SQLite cost does not grow with the collection; a filter whose matches are rare or late scans everything. The
+in-memory store's paged read sorts its keys on every page, which is why its selective page grows with the collection.
+
+**Bar: p95 under 50 ms for a 50-item ordered page. Missed** on this desktop at 50,000 documents by six to seven
+times, and at 10,000 documents with SQLite. Phones and tablets are slower. Task E2 (declared indexes) is therefore
+needed; its design needs a store schema change and is proposed in
+[ADR-018](architecture/adr-018-local-secondary-indexes.md).
+
+Not measured for E1: a mid-range Android device and an iPad (none available), IndexedDB in any browser, and first
+sync at 50,000 documents (100,000 is under "Scale" above).
+
 ## Observations
 
 - A durable SQLite write stays around a millisecond on this machine, far inside the 50 ms target. A
   reference *mobile* device has not been measured.
 - `QueryAsync` materializes the whole collection. It takes tens of milliseconds at 10,000 documents, so large
   collections need paging or indexed queries (not implemented).
-- Allocation per synced document is high: about 64 KB per document to push and 24 KB to pull. JSON cloning
-  for isolation and fingerprinting dominates. This is the first thing to optimize if memory matters.
+- Allocation per synced document is high: about 64 KB per document to push and 24 KB to pull in the recorded
+  run. JSON cloning for isolation and fingerprinting dominates. 0.3.0 roughly halves the push cost with the
+  in-memory store (see above).
 - Not measured:
   - peak memory;
   - PostgreSQL throughput with concurrent sessions (the authority exists; no benchmark yet);

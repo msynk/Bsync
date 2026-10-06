@@ -15,7 +15,26 @@ public static class Workload
 
     public static readonly Func<BenchDocument, BenchDocument> Clone = DocumentCloner.Json(BenchJson.Default.BenchDocument);
 
-    public static BenchDocument Document(int i) => new() { Id = $"doc-{i:D6}", Title = $"Document {i}", Body = Body, Priority = i % 5 };
+    public static readonly DateTimeOffset Start = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+    /// <summary>A document; <c>Due</c> is spread pseudo-randomly so that its order differs from the id order.</summary>
+    public static BenchDocument Document(int i) => new()
+    {
+        Id = $"doc-{i:D6}", Title = $"Document {i}", Body = Body, Priority = i % 5, Category = i % 100,
+        Due = Start.AddMinutes((long)i * 7919 % 1_000_003),
+    };
+
+    /// <summary>Stores <paramref name="count"/> clean, synced documents in one store transaction.</summary>
+    public static Task SeedSyncedAsync(ILocalStore<BenchDocument> store, int count, string node)
+    {
+        var clock = new HybridLogicalClock(node);
+        return store.UpdateAsync(Enumerable.Range(0, count).Select(i =>
+        {
+            var document = Document(i);
+            document.UpdatedAt = clock.Now();
+            return new RecordUpdate<BenchDocument>(document.Id, _ => new SyncRecord<BenchDocument>(document, document, IsDirty: false) { BaseVersion = i + 1 });
+        }).ToList());
+    }
 
     public static InMemorySyncServer<BenchDocument> Server() => new(new InMemorySyncServerOptions<BenchDocument>
     {

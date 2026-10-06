@@ -42,6 +42,8 @@ sealed class Bsync.Blazor.ServerSyncCollection<TDocument> : Bsync.Client.ISyncCo
   Bsync.Client.SyncStatus Status { get; }
   System.IDisposable Subscribe(System.Action onChanged)
   System.Int32 SubscriberCount { get; }
+  System.Threading.Tasks.Task<Bsync.Client.SyncGoalResult> SyncAsync(Bsync.Client.SyncGoal goal, System.TimeSpan budget, System.IProgress<Bsync.Client.SyncProgress> progress = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Client.SyncIssuePage> GetIssuesAsync(System.Int32 offset = 0, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Client.SyncItemStatus> GetItemStatusAsync(System.String id, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Client.SyncWriteResult> DeleteAsync(System.String id, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Client.SyncWriteResult> ResolveConflictAsync(System.String id, TDocument resolved, System.Threading.CancellationToken cancellationToken = default)

@@ -28,6 +28,9 @@ public sealed class TaskDocument : ISyncEntity
     /// <summary>Computed by the server from <see cref="Title"/>; whatever a client sends is replaced.</summary>
     public string Slug { get; set; } = string.Empty;
 
+    /// <summary>Set by the server: incremented by every accepted change. Intents name the revision the user saw.</summary>
+    public long Revision { get; set; }
+
     /// <summary>Members added by newer versions of the app, kept so this version never erases them (I17).</summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }

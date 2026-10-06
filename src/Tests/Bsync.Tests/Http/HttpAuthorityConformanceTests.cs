@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace Bsync.Tests.Http;
 
@@ -15,6 +16,10 @@ namespace Bsync.Tests.Http;
 public sealed class HttpAuthorityConformanceTests : AuthorityConformanceTests
 {
     protected override IAuthorityConformanceDriver Driver { get; } = new HttpAuthorityDriver(new InMemoryAuthorityDriver(), TestServerHost.StartAsync);
+
+    [Theory]
+    [MemberData(nameof(CaseNames))]
+    public Task Conformance(string name) => RunAsync(name);
 
     /// <summary>Serves one authority with the real endpoints; the caller's scope travels as an authenticated claim.</summary>
     private sealed class TestServerHost(WebApplication app) : HttpConformanceServer

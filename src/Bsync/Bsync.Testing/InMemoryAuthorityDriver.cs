@@ -80,6 +80,8 @@ public sealed class InMemoryAuthorityDriver : IAuthorityConformanceDriver
                 Validator = options.Validator,
                 CanRead = options.CanRead,
                 ScopeFingerprint = options.ScopeFingerprint,
+                Readers = options.Readers,
+                PrincipalKey = options.PrincipalKey,
                 RestoreFrom = restoreFrom,
                 VersionFloor = versionFloor,
             });

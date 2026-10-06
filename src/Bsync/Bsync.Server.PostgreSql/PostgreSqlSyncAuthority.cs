@@ -36,7 +36,7 @@ namespace Bsync.Server.PostgreSql;
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>, IAsyncDisposable
+public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>, ISyncRetentionTarget, IAsyncDisposable
     where TDocument : class, ISyncEntity
 {
     /// <summary>The <c>NOTIFY</c> channel used for commit hints.</summary>
@@ -138,7 +138,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             .Select(e => new RemoteChange<TDocument>(e.Document, e.Version))
             .ToList();
         var position = window.Count > 0 ? window[^1].Version : Math.Max(since, 0);
-        return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize) };
+        return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize), ServerTime = _physical.NowMilliseconds(), RetentionHorizon = purgedThrough };
     }
 
     /// <inheritdoc />
@@ -743,6 +743,21 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         _epoch = null;
         await RefreshEpochAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, long>> GetFeedHeadsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var command = _source.CreateCommand("SELECT scope, sequence FROM bs_feeds WHERE collection = $1");
+        command.Parameters.Add(new() { Value = _options.Collection });
+        var heads = new Dictionary<string, long>(StringComparer.Ordinal);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            heads[reader.GetString(0)] = reader.GetInt64(1);
+        }
+
+        return heads;
     }
 
     /// <summary>The highest version issued in <paramref name="scope"/> (diagnostics, restore planning).</summary>

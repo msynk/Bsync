@@ -2,6 +2,7 @@ using Bsync.Server;
 using Bsync.Testing;
 using Bsync.Tests.TestSupport;
 using Bsync.Transport;
+using Xunit;
 
 namespace Bsync.Tests.Conformance;
 
@@ -9,6 +10,10 @@ namespace Bsync.Tests.Conformance;
 public sealed class InMemoryAuthorityOverJsonConformanceTests : AuthorityConformanceTests
 {
     protected override IAuthorityConformanceDriver Driver { get; } = new JsonWireDriver(new InMemoryAuthorityDriver());
+
+    [Theory]
+    [MemberData(nameof(CaseNames))]
+    public Task Conformance(string name) => RunAsync(name);
 
     private sealed class JsonWireDriver(IAuthorityConformanceDriver inner) : IAuthorityConformanceDriver
     {

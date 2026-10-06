@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -40,9 +41,29 @@ public static class DocumentCloner
         where T : class
     {
         ArgumentNullException.ThrowIfNull(typeInfo);
-        return document => JsonSerializer.Deserialize(JsonSerializer.SerializeToUtf8Bytes(document, typeInfo), typeInfo)
-            ?? throw new InvalidOperationException($"Failed to clone document of type {typeof(T).Name}.");
+        return document =>
+        {
+            // The JSON goes through a buffer reused per thread: a clone allocates only the new document (D9).
+            var buffer = t_buffer ??= new ArrayBufferWriter<byte>(4096);
+            buffer.ResetWrittenCount();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                JsonSerializer.Serialize(writer, document, typeInfo);
+            }
+
+            var clone = JsonSerializer.Deserialize(buffer.WrittenSpan, typeInfo)
+                ?? throw new InvalidOperationException($"Failed to clone document of type {typeof(T).Name}.");
+            if (buffer.Capacity > 1024 * 1024)
+            {
+                t_buffer = null; // do not keep an unusually large buffer alive
+            }
+
+            return clone;
+        };
     }
+
+    [ThreadStatic]
+    private static ArrayBufferWriter<byte>? t_buffer;
 
     /// <summary>
     /// Returns a trim/AOT-safe fingerprint function (the document's JSON text) for detecting an operation

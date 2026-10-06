@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>LocalQuery-20261006-133622</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, Windows 10 (10.0.19045.6456/22H2/2022Update)
+Intel Core Ultra 7 255H 2.00GHz, 1 CPU, 16 logical and 16 physical cores
+.NET SDK 10.0.401
+  [Host]   : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  ShortRun : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
+WarmupCount=3  
+</code></pre>
+
+<table>
+<thead><tr><th>Method </th><th>Count</th><th>Store</th><th>Mean</th><th>Error</th><th>StdDev</th><th>P95</th><th>Gen0</th><th>Gen1</th><th>Gen2</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>OrderedPage</td><td>10000</td><td>memory</td><td>30.17 ms</td><td>38.619 ms</td><td>2.117 ms</td><td>32.21 ms</td><td>2718.7500</td><td>2593.7500</td><td>750.0000</td><td>23.73 MB</td>
+</tr><tr><td>SelectivePage</td><td>10000</td><td>memory</td><td>13.89 ms</td><td>7.712 ms</td><td>0.423 ms</td><td>14.17 ms</td><td>1281.2500</td><td>765.6250</td><td>-</td><td>15.43 MB</td>
+</tr><tr><td>OrderedPage</td><td>10000</td><td>sqlite-full</td><td>57.92 ms</td><td>49.402 ms</td><td>2.708 ms</td><td>60.57 ms</td><td>4454.5455</td><td>2727.2727</td><td>1000.0000</td><td>43.71 MB</td>
+</tr><tr><td>SelectivePage</td><td>10000</td><td>sqlite-full</td><td>23.50 ms</td><td>54.722 ms</td><td>2.999 ms</td><td>25.60 ms</td><td>1812.5000</td><td>1750.0000</td><td>468.7500</td><td>21.81 MB</td>
+</tr><tr><td>OrderedPage</td><td>50000</td><td>memory</td><td>313.36 ms</td><td>115.030 ms</td><td>6.305 ms</td><td>317.84 ms</td><td>13000.0000</td><td>12500.0000</td><td>3500.0000</td><td>119.06 MB</td>
+</tr><tr><td>SelectivePage</td><td>50000</td><td>memory</td><td>115.57 ms</td><td>58.700 ms</td><td>3.218 ms</td><td>117.76 ms</td><td>666.6667</td><td>-</td><td>-</td><td>34.67 MB</td>
+</tr><tr><td>OrderedPage</td><td>50000</td><td>sqlite-full</td><td>337.10 ms</td><td>573.430 ms</td><td>31.432 ms</td><td>365.32 ms</td><td>22333.3333</td><td>13333.3333</td><td>4333.3333</td><td>218.51 MB</td>
+</tr><tr><td>SelectivePage</td><td>50000</td><td>sqlite-full</td><td>20.28 ms</td><td>39.118 ms</td><td>2.144 ms</td><td>22.34 ms</td><td>1812.5000</td><td>1750.0000</td><td>453.1250</td><td>21.81 MB</td>
+</tr></tbody></table>
+</body>
+</html>

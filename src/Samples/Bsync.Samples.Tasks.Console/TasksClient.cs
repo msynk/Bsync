@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization.Metadata;
 using Bsync.Client;
 using Bsync.Documents;
 using Bsync.Protocol;
@@ -29,45 +30,88 @@ public sealed class TasksClient : IAsyncDisposable
     /// <summary>The tasks, as the app sees them (local reads; never wait for the network).</summary>
     public ISyncCollection<TaskDocument> Tasks => _services.GetRequiredService<ISyncCollection<TaskDocument>>();
 
-    public static TasksClient Create(Uri server, string dataDirectory, string user, string tenant)
+    /// <summary>The intents this user created, with the server's execution state once synced (task F3).</summary>
+    public ISyncCollection<TaskIntent> Intents => _services.GetRequiredService<ISyncCollection<TaskIntent>>();
+
+    /// <param name="server">The sample server.</param>
+    /// <param name="dataDirectory">Where the SQLite replica lives.</param>
+    /// <param name="user">The user to sign in as (development tokens).</param>
+    /// <param name="tenant">The user's team.</param>
+    /// <param name="wrapHandler">Wraps the HTTP handler of the sync transport (diagnostics, tests).</param>
+    public static TasksClient Create(Uri server, string dataDirectory, string user, string tenant, Func<HttpMessageHandler, HttpMessageHandler>? wrapHandler = null)
     {
         Directory.CreateDirectory(dataDirectory);
         var databasePath = Path.Combine(dataDirectory, $"tasks-{user}.db");
         var services = new ServiceCollection();
-        services.AddLocalSyncCollection<TaskDocument>(
-            _ => new SyncSessionOptions<TaskDocument>
-            {
-                Host = "native",
-                Cloner = DocumentCloner.Json(TasksJson.Default.TaskDocument),
-                OpenReplica = async (_, cancellationToken) =>
-                {
-                    var store = await SqliteLocalStore<TaskDocument>.OpenAsync(
-                        new SqliteLocalStoreOptions { DataSource = databasePath, Collection = TasksJson.Collection },
-                        TasksJson.Default.TaskDocument,
-                        cancellationToken);
-                    var identity = await store.GetReplicaIdentityAsync(cancellationToken);
-                    return new LocalReplica<TaskDocument>(store, identity.Incarnation);
-                },
-
-                // A dedicated HttpClient: a shared pipeline that rewrites error responses would hide Retry-After and the
-                // protocol's problem codes from the transport.
-                CreateTransport = _ => new HttpSyncTransport<TaskDocument>(
-                    new HttpClient(new BearerHandler(server, user, tenant) { InnerHandler = new HttpClientHandler() }) { BaseAddress = server },
-                    new HttpSyncTransportOptions { Collection = TasksJson.Collection, SchemaId = TasksJson.SchemaId },
-                    SyncJsonTypes<TaskDocument>.From(TasksJson.Default)),
-                Interval = TimeSpan.FromSeconds(30),
-                MaxBackoff = TimeSpan.FromSeconds(30),
-            },
-            resolveAccount: (_, _) => Task.FromResult(user));
+        Add(services, TasksJson.Collection, TasksJson.Default.TaskDocument);
+        Add(services, TasksJson.IntentCollection, TasksJson.Default.TaskIntent);
         return new TasksClient(services.BuildServiceProvider(), databasePath, user);
+
+        // Both collections share the database file; each has its own rows, cursor and push queue.
+        void Add<TDocument>(ServiceCollection services, string collection, JsonTypeInfo<TDocument> type)
+            where TDocument : class, ISyncEntity
+        {
+            services.AddLocalSyncCollection<TDocument>(
+                _ => new SyncSessionOptions<TDocument>
+                {
+                    Host = "native",
+                    Cloner = DocumentCloner.Json(type),
+                    OpenReplica = async (_, cancellationToken) =>
+                    {
+                        var store = await SqliteLocalStore<TDocument>.OpenAsync(
+                            new SqliteLocalStoreOptions { DataSource = databasePath, Collection = collection },
+                            type,
+                            cancellationToken);
+                        var identity = await store.GetReplicaIdentityAsync(cancellationToken);
+                        return new LocalReplica<TDocument>(store, identity.Incarnation);
+                    },
+
+                    // A dedicated HttpClient: a shared pipeline that rewrites error responses would hide Retry-After and
+                    // the protocol's problem codes from the transport.
+                    CreateTransport = _ =>
+                    {
+                        HttpMessageHandler handler = new BearerHandler(server, user, tenant) { InnerHandler = new HttpClientHandler() };
+                        return new HttpSyncTransport<TDocument>(
+                            new HttpClient(wrapHandler?.Invoke(handler) ?? handler) { BaseAddress = server },
+                            new HttpSyncTransportOptions { Collection = collection, SchemaId = TasksJson.SchemaId },
+                            SyncJsonTypes<TDocument>.From(TasksJson.Default));
+                    },
+                    Interval = TimeSpan.FromSeconds(30),
+                    MaxBackoff = TimeSpan.FromSeconds(30),
+                },
+                resolveAccount: (_, _) => Task.FromResult(user));
+        }
     }
 
-    /// <summary>Synchronizes now (pull, then push) and reports what happened.</summary>
+    /// <summary>Asks the server to mark a task done, if it is still at the revision the user saw.</summary>
+    public async Task<TaskIntent> CompleteAsync(string taskId, CancellationToken cancellationToken = default)
+    {
+        var task = await Tasks.GetAsync(taskId, cancellationToken);
+        var intent = new TaskIntent { Kind = IntentKinds.Complete, TaskId = taskId, TaskRevision = task?.Revision };
+        await Intents.SaveAsync(intent, cancellationToken);
+        return intent;
+    }
+
+    /// <summary>Asks the server to rename a task, if it is still at the revision the user saw.</summary>
+    public async Task<TaskIntent> RenameAsync(string taskId, string title, CancellationToken cancellationToken = default)
+    {
+        var task = await Tasks.GetAsync(taskId, cancellationToken);
+        var intent = new TaskIntent { Kind = IntentKinds.Rename, TaskId = taskId, TaskRevision = task?.Revision, Title = title };
+        await Intents.SaveAsync(intent, cancellationToken);
+        return intent;
+    }
+
+    /// <summary>
+    /// Synchronizes now and reports what happened: tasks first (an intent may name a task created on this device), then
+    /// intents, then tasks again (to receive what the intents changed).
+    /// </summary>
     public async Task<SyncResult> SyncNowAsync(CancellationToken cancellationToken = default)
     {
-        var session = _services.GetRequiredService<SyncSession<TaskDocument>>();
-        var engine = await session.GetEngineAsync(_user, cancellationToken);
-        return await engine.SyncAsync(cancellationToken);
+        var tasks = await _services.GetRequiredService<SyncSession<TaskDocument>>().GetEngineAsync(_user, cancellationToken);
+        var intents = await _services.GetRequiredService<SyncSession<TaskIntent>>().GetEngineAsync(_user, cancellationToken);
+        var result = await tasks.SyncAsync(cancellationToken);
+        result += await intents.SyncAsync(cancellationToken);
+        return result + await tasks.SyncAsync(cancellationToken);
     }
 
     public async ValueTask DisposeAsync()

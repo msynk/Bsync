@@ -191,6 +191,16 @@ public sealed class ServerSyncCollection<TDocument> : ISyncCollection<TDocument>
         Task.FromResult<IReadOnlyList<SyncDocumentConflict<TDocument>>>([]);
 
     /// <inheritdoc />
+    /// <remarks>Reached at once: writes are confirmed by the server before they return, and reads go to the server.</remarks>
+    public Task<SyncGoalResult> SyncAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SyncGoalResult(true, true, 0, [], default));
+
+    /// <inheritdoc />
+    /// <remarks>Always empty: without a local replica nothing waits for a decision.</remarks>
+    public Task<SyncIssuePage> GetIssuesAsync(int offset = 0, int limit = 100, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SyncIssuePage([], 0));
+
+    /// <inheritdoc />
     public Task<SyncWriteResult> ResolveConflictAsync(string id, TDocument resolved, CancellationToken cancellationToken = default) =>
         Task.FromResult(new SyncWriteResult(id, SyncConfirmation.NotFound));
 

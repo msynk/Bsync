@@ -22,4 +22,8 @@ public sealed class BenchDocument : ISyncEntity
     public string Body { get; set; } = string.Empty;
 
     public int Priority { get; set; }
+
+    public int Category { get; set; }
+
+    public DateTimeOffset Due { get; set; }
 }

@@ -77,6 +77,17 @@ public sealed class InMemorySyncServerOptions<TDocument>
     public Func<SyncCallContext, PushOperation<TDocument>, TDocument?, string?>? Validator { get; init; }
 
     /// <summary>
+    /// Optional read membership (ADR-015): the principal keys that may read a document, computed at every write. With it,
+    /// each caller's pull returns only documents it may read, in full pages, and documents that leave its view are listed
+    /// as removals (or, for replicas without that feature, answered with <c>scope-changed</c>). Set together with
+    /// <see cref="PrincipalKey"/>.
+    /// </summary>
+    public Func<TDocument, IEnumerable<string>>? Readers { get; init; }
+
+    /// <summary>The caller's principal key for <see cref="Readers"/> (for example a user id claim); <see langword="null"/> reads nothing.</summary>
+    public Func<SyncCallContext, string?>? PrincipalKey { get; init; }
+
+    /// <summary>
     /// Optional application logic for every write about to be accepted (ADR-014): return a canonical document, a conflict,
     /// a permanent rejection, or <see cref="SyncWriteDecision{TDocument}.RetryLater"/> (no receipt is stored, so the replica
     /// resends the same operation later). This server has no database: the handler gets no connection or transaction,

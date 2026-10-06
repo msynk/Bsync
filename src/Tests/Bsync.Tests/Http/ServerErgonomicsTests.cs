@@ -136,7 +136,7 @@ public sealed class ServerErgonomicsTests
         Assert.All(client.Transport.PushLog, push => Assert.InRange(push.Operations.Count, 1, 3));
         Assert.Equal(50, pulls[0]); // before the server is known, the configured size
         Assert.Contains(2, pulls.Skip(1));
-        Assert.Equal([SyncFeatures.Groups, SyncFeatures.Limits], page.Features);
+        Assert.Equal([SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention], page.Features);
         Assert.Equal(new SyncLimits(3, 2), page.Limits);
     }
 

@@ -72,6 +72,12 @@ public sealed record SyncSessionOptions<TDocument>
     public Func<string, CancellationToken, Task<CredentialRenewal>>? RenewCredentials { get; init; }
 
     /// <summary>
+    /// Joins a <see cref="SyncCoordinator"/>: the coordinator decides when this session may sync (concurrency limit,
+    /// priority, parents first, shared backoff), listens to hints for it, and includes it in its aggregate status.
+    /// </summary>
+    public SyncCoordination? Coordination { get; init; }
+
+    /// <summary>
     /// Receives state changes and failures (category <c>Bsync.SyncSession</c>). Messages carry states, counts and
     /// error codes, never document data or account names. The DI recipes use the container's logger factory.
     /// </summary>

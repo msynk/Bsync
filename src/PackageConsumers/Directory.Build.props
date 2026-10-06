@@ -6,7 +6,7 @@
     and pass the same version, for example:
 
       dotnet pack src/Bsync/Bsync -c Release -o artifacts/packages -p:VersionSuffix=local   (and the other packages)
-      dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.2.0-local
+      dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.3.0-local
 
     This file deliberately does not import src/Directory.Build.props: nothing here is packable.
   -->
@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <Target Name="RequireBsyncPackageVersion" BeforeTargets="CollectPackageReferences" Condition="'$(BsyncPackageVersion)' == ''">
-    <Error Text="Set BsyncPackageVersion to the version packed into artifacts/packages (for example -p:BsyncPackageVersion=0.2.0-local)." />
+    <Error Text="Set BsyncPackageVersion to the version packed into artifacts/packages (for example -p:BsyncPackageVersion=0.3.0-local)." />
   </Target>
 
 </Project>

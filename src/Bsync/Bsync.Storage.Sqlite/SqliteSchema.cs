@@ -6,7 +6,7 @@ namespace Bsync.Storage.Sqlite;
 /// <summary>The SQLite store's schema: creation, forward migration and the version check (ADR-004, I17).</summary>
 internal static class SqliteSchema
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public const string DatabaseScope = "";
 
@@ -21,6 +21,8 @@ internal static class SqliteSchema
 
     /// <summary>The columns schema 3 added.</summary>
     public const string Version3Columns = "group_id, group_members, pending_group, pending_group_size";
+
+    public const string Version4Columns = "base_same";
 
     private const string Version1 = """
         CREATE TABLE bs_meta (
@@ -72,6 +74,11 @@ internal static class SqliteSchema
         """;
 
     // 2 -> 3: dependency groups. Additive only.
+    // Schema 4 (D8): a clean record's base equals its current state; base_same = 1 stores it once (base is NULL).
+    private const string MigrationTo4 = """
+        ALTER TABLE bs_records ADD COLUMN base_same INTEGER NOT NULL DEFAULT 0;
+        """;
+
     private const string MigrationTo3 = """
         ALTER TABLE bs_records ADD COLUMN group_id TEXT;
         ALTER TABLE bs_records ADD COLUMN group_members TEXT;
@@ -115,6 +122,11 @@ internal static class SqliteSchema
         if (version < 3)
         {
             await ExecuteAsync(connection, transaction, MigrationTo3, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (version < 4)
+        {
+            await ExecuteAsync(connection, transaction, MigrationTo4, cancellationToken).ConfigureAwait(false);
         }
 
         await ExecuteAsync(connection, transaction, $"PRAGMA user_version = {CurrentVersion}", cancellationToken).ConfigureAwait(false);

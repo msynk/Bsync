@@ -12,3 +12,8 @@ static class Bsync.Server.AspNetCore.SyncEndpoints
   static Microsoft.AspNetCore.Routing.RouteGroupBuilder MapSyncCollection<TDocument>(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints, System.String collection, Bsync.Server.ISyncAuthority<TDocument> authority, Bsync.Protocol.SyncJsonTypes<TDocument> json, Bsync.Server.AspNetCore.SyncEndpointOptions options, System.String prefix = "sync") where TDocument : class, Bsync.ISyncEntity
   static Microsoft.AspNetCore.Routing.RouteGroupBuilder MapSyncCollections(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints, Bsync.Server.AspNetCore.SyncEndpointOptions options, System.Action<Bsync.Server.AspNetCore.SyncCollectionGroupBuilder> collections, System.String prefix = "sync")
   static System.TimeSpan HintKeepAlive { get; set; }
+sealed class Bsync.Server.AspNetCore.SyncRetentionService : Microsoft.Extensions.Hosting.BackgroundService, Microsoft.Extensions.Hosting.IHostedService, System.IDisposable
+  ctor(Microsoft.Extensions.Options.IOptions<Bsync.Server.SyncRetentionOptions> options, System.Collections.Generic.IEnumerable<Bsync.Server.ISyncRetentionTarget> targets, Microsoft.Extensions.Logging.ILogger<Bsync.Server.AspNetCore.SyncRetentionService> logger)
+  protected virtual System.Threading.Tasks.Task ExecuteAsync(System.Threading.CancellationToken stoppingToken)
+static class Bsync.Server.AspNetCore.SyncRetentionServiceCollectionExtensions
+  static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSyncRetention(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Bsync.Server.SyncRetentionOptions> configure = null)

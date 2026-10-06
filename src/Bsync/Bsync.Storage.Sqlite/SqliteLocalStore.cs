@@ -35,7 +35,7 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
     private const string Columns =
         "id, current, base, base_version, is_dirty, local_revision, pending_id, pending_revision, pending_base_version, " +
         "pending_payload, rejection_revision, rejection_code, rejection_message, observed, observed_version, generation, missing, " +
-        "conflict_server, conflict_server_version, conflict_local, conflict_base, group_id, group_members, pending_group, pending_group_size";
+        "conflict_server, conflict_server_version, conflict_local, conflict_base, group_id, group_members, pending_group, pending_group_size, base_same";
 
     private readonly string _connectionString;
     private readonly string _collection;
@@ -125,16 +125,15 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 throw new InvalidOperationException($"Transform for '{update.Id}' returned a record with id '{next.Current.Id}'.");
             }
 
-            await WriteRecordAsync(connection, transaction, next, cancellationToken).ConfigureAwait(false);
+            var written = await WriteRecordAsync(connection, transaction, next, cancellationToken).ConfigureAwait(false);
             newHighWater = Max(newHighWater, next.Current.UpdatedAt);
             if (next.Pending is { } pending)
             {
                 newHighWater = Max(newHighWater, pending.Payload.UpdatedAt);
             }
 
-            results.Add(new RecordUpdateResult<TDocument>(
-                await ReadRecordAsync(connection, transaction, update.Id, cancellationToken).ConfigureAwait(false),
-                Changed: true));
+            // The committed state, rebuilt from the JSON just written: as independent as a re-read, without the query.
+            results.Add(new RecordUpdateResult<TDocument>(written, Changed: true));
         }
 
         if (newHighWater > highWater)
@@ -199,8 +198,8 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
                     rows++;
-                    lastUpdatedAt = reader.GetString(25);
-                    lastKey = (byte[])reader.GetValue(26);
+                    lastUpdatedAt = reader.GetString(26);
+                    lastKey = (byte[])reader.GetValue(27);
                     var record = ReadRecord(reader);
                     if ((exclude is null || !exclude.Contains(record.Current.Id)) && found.Count < limit)
                     {
@@ -226,6 +225,43 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         command.CommandText = "SELECT COUNT(*) FROM bs_records WHERE collection = $c AND is_dirty = 1";
         command.Parameters.AddWithValue("$c", _collection);
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> PurgeTombstonesAsync(long throughVersion, long generation, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            DELETE FROM bs_records
+            WHERE collection = $c AND deleted = 1 AND is_dirty = 0 AND conflict_local IS NULL AND base_version <= $v AND generation = $g
+            """;
+        command.Parameters.AddWithValue("$c", _collection);
+        command.Parameters.AddWithValue("$v", throughVersion);
+        command.Parameters.AddWithValue("$g", generation);
+        var removed = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return removed;
+    }
+
+    /// <inheritdoc />
+    public async Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                COALESCE(SUM(CASE WHEN conflict_local IS NOT NULL THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN is_dirty = 1 AND rejection_code IS NOT NULL THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN is_dirty = 1 AND rejection_code = 'group-failed' THEN 1 ELSE 0 END), 0)
+            FROM bs_records WHERE collection = $c AND (conflict_local IS NOT NULL OR (is_dirty = 1 AND rejection_code IS NOT NULL))
+            """;
+        command.Parameters.AddWithValue("$c", _collection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return new SyncIssueCounts(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2));
     }
 
     /// <inheritdoc />
@@ -489,8 +525,9 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         var pendingId = NullableString(6);
         var rejectionCode = NullableString(11);
         var observed = NullableString(13);
-        var baseDocument = NullableString(2);
-        return new SyncRecord<TDocument>(Deserialize(reader.GetString(1)), baseDocument is null ? null : Deserialize(baseDocument), reader.GetInt64(4) != 0)
+        var current = reader.GetString(1);
+        var baseDocument = reader.GetInt64(25) != 0 ? current : NullableString(2);
+        return new SyncRecord<TDocument>(Deserialize(current), baseDocument is null ? null : Deserialize(baseDocument), reader.GetInt64(4) != 0)
         {
             BaseVersion = NullableInt64(3),
             LocalRevision = reader.GetInt64(5),
@@ -519,8 +556,15 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         };
     }
 
-    private async Task WriteRecordAsync(SqliteConnection connection, SqliteTransaction transaction, SyncRecord<TDocument> record, CancellationToken cancellationToken)
+    private async Task<SyncRecord<TDocument>> WriteRecordAsync(SqliteConnection connection, SqliteTransaction transaction, SyncRecord<TDocument> record, CancellationToken cancellationToken)
     {
+        // Each distinct document instance is serialized once (current, base and payload are often the same one), and the
+        // returned copy is deserialized from exactly what was written (D9).
+        var texts = new Dictionary<TDocument, string>(4, ReferenceEqualityComparer.Instance);
+        var copies = new Dictionary<string, TDocument>(4, StringComparer.Ordinal);
+        string Text(TDocument document) => texts.TryGetValue(document, out var text) ? text : texts[document] = Serialize(document);
+        TDocument Copy(string text) => copies.TryGetValue(text, out var copy) ? copy : copies[text] = Deserialize(text);
+
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
@@ -529,44 +573,65 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 pending_id, pending_revision, pending_base_version, pending_payload,
                 rejection_revision, rejection_code, rejection_message, observed, observed_version, generation, missing,
                 conflict_server, conflict_server_version, conflict_local, conflict_base,
-                group_id, group_members, pending_group, pending_group_size)
+                group_id, group_members, pending_group, pending_group_size, base_same)
             VALUES ($c, $id, $key, $current, $updated, $deleted, $base, $baseVersion, $dirty, $revision,
                 $pendingId, $pendingRevision, $pendingBase, $pendingPayload,
                 $rejectionRevision, $rejectionCode, $rejectionMessage, $observed, $observedVersion, $generation, $missing,
                 $conflictServer, $conflictServerVersion, $conflictLocal, $conflictBase,
-                $groupId, $groupMembers, $pendingGroup, $pendingGroupSize)
+                $groupId, $groupMembers, $pendingGroup, $pendingGroupSize, $baseSame)
             """;
         var p = command.Parameters;
         p.AddWithValue("$c", _collection);
         p.AddWithValue("$id", record.Current.Id);
         p.AddWithValue("$key", OrdinalKey(record.Current.Id));
-        p.AddWithValue("$current", Serialize(record.Current));
+        var current = Text(record.Current);
+        var baseJson = record.Base is null ? null : Text(record.Base);
+        var baseSame = baseJson is not null && baseJson == current;
+        p.AddWithValue("$current", current);
         p.AddWithValue("$updated", record.Current.UpdatedAt.Encode());
         p.AddWithValue("$deleted", record.Current.Deleted ? 1 : 0);
-        p.AddWithValue("$base", record.Base is null ? DBNull.Value : Serialize(record.Base));
+        p.AddWithValue("$base", baseSame || baseJson is null ? DBNull.Value : baseJson);
+        p.AddWithValue("$baseSame", baseSame ? 1 : 0);
         p.AddWithValue("$baseVersion", (object?)record.BaseVersion ?? DBNull.Value);
         p.AddWithValue("$dirty", record.IsDirty ? 1 : 0);
         p.AddWithValue("$revision", record.LocalRevision);
         p.AddWithValue("$pendingId", (object?)record.Pending?.OperationId ?? DBNull.Value);
         p.AddWithValue("$pendingRevision", (object?)record.Pending?.Revision ?? DBNull.Value);
         p.AddWithValue("$pendingBase", (object?)record.Pending?.BaseVersion ?? DBNull.Value);
-        p.AddWithValue("$pendingPayload", record.Pending is null ? DBNull.Value : Serialize(record.Pending.Payload));
+        var payload = record.Pending is null ? null : Text(record.Pending.Payload);
+        p.AddWithValue("$pendingPayload", (object?)payload ?? DBNull.Value);
         p.AddWithValue("$rejectionRevision", (object?)record.Rejection?.Revision ?? DBNull.Value);
         p.AddWithValue("$rejectionCode", (object?)record.Rejection?.ErrorCode ?? DBNull.Value);
         p.AddWithValue("$rejectionMessage", (object?)record.Rejection?.Message ?? DBNull.Value);
-        p.AddWithValue("$observed", record.Observed is null ? DBNull.Value : Serialize(record.Observed));
+        var observed = record.Observed is null ? null : Text(record.Observed);
+        p.AddWithValue("$observed", (object?)observed ?? DBNull.Value);
         p.AddWithValue("$observedVersion", (object?)record.ObservedVersion ?? DBNull.Value);
         p.AddWithValue("$generation", record.Generation);
         p.AddWithValue("$missing", record.MissingAfterReset ? 1 : 0);
-        p.AddWithValue("$conflictServer", record.Conflict is { } c ? Serialize(c.Server) : DBNull.Value);
+        var conflictServer = record.Conflict is { } c ? Text(c.Server) : null;
+        var conflictLocal = record.Conflict is { } cl ? Text(cl.Local) : null;
+        var conflictBase = record.Conflict?.Base is { } cb ? Text(cb) : null;
+        p.AddWithValue("$conflictServer", (object?)conflictServer ?? DBNull.Value);
         p.AddWithValue("$conflictServerVersion", (object?)record.Conflict?.ServerVersion ?? DBNull.Value);
-        p.AddWithValue("$conflictLocal", record.Conflict is { } cl ? Serialize(cl.Local) : DBNull.Value);
-        p.AddWithValue("$conflictBase", record.Conflict?.Base is { } cb ? Serialize(cb) : DBNull.Value);
+        p.AddWithValue("$conflictLocal", (object?)conflictLocal ?? DBNull.Value);
+        p.AddWithValue("$conflictBase", (object?)conflictBase ?? DBNull.Value);
         p.AddWithValue("$groupId", (object?)record.Group?.Id ?? DBNull.Value);
         p.AddWithValue("$groupMembers", record.Group is { } g ? JsonSerializer.Serialize(g.Members.ToArray(), SqliteJson.Default.StringArray) : DBNull.Value);
         p.AddWithValue("$pendingGroup", (object?)record.Pending?.Group ?? DBNull.Value);
         p.AddWithValue("$pendingGroupSize", record.Pending is { Group: not null } pg ? pg.GroupSize : DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+        return record with
+        {
+            Current = Copy(current),
+            Base = baseJson is null ? null : Copy(baseJson),
+            Pending = record.Pending is { } pending ? pending with { Payload = Copy(payload!) } : null,
+            Observed = observed is null ? null : Copy(observed),
+            Conflict = record.Conflict is { } conflict
+                ? conflict with { Server = Copy(conflictServer!), Local = Copy(conflictLocal!), Base = conflictBase is null ? null : Copy(conflictBase) }
+                : null,
+            Group = record.Group is { } group ? group with { Members = [.. group.Members] } : null,
+        };
     }
 
     private string Serialize(TDocument document) => JsonSerializer.Serialize(document, _typeInfo);

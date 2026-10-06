@@ -11,6 +11,10 @@ public sealed class SqlServerAuthorityConformanceTests(SqlServerFixture fixture)
 {
     protected override IAuthorityConformanceDriver Driver { get; } = new SqlServerDriver(fixture);
 
+    [Theory]
+    [MemberData(nameof(CaseNames))]
+    public Task Conformance(string name) => RunAsync(name);
+
     private sealed class SqlServerDriver(SqlServerFixture fixture) : IAuthorityConformanceDriver
     {
         public AuthorityCapabilities Capabilities => AuthorityCapabilities.All;
@@ -27,6 +31,8 @@ public sealed class SqlServerAuthorityConformanceTests(SqlServerFixture fixture)
                     Validator = options.Validator,
                     CanRead = options.CanRead,
                     ScopeFingerprint = options.ScopeFingerprint,
+                    Readers = options.Readers,
+                    PrincipalKey = options.PrincipalKey,
                 },
                 cancellationToken));
     }

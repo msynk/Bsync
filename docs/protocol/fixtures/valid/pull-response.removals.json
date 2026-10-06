@@ -1,0 +1,7 @@
+{
+  "changes": [],
+  "checkpoint": "cloud-5f0c2d7e9a1b4c3d8e6f7a8b9c0d1e2f~9A3F00C1D2E4B5A6:42",
+  "hasMore": false,
+  "features": ["groups", "limits", "server-time", "removals"],
+  "removals": ["note-17", "note-23"]
+}

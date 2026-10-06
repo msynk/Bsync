@@ -32,7 +32,7 @@ namespace Bsync.Server;
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>
+public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>, ISyncRetentionTarget
     where TDocument : class, ISyncEntity
 {
     private readonly Dictionary<string, Entry> _documents = new(StringComparer.Ordinal);
@@ -43,6 +43,10 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
     private readonly InMemorySyncServerOptions<TDocument> _options;
     private readonly object _gate = new();
     private readonly HybridLogicalClock _publisherClock;
+
+    // ADR-015: per principal, one access row per document it can or could read: the version of the row's last change and
+    // whether the principal can still read it.
+    private readonly Dictionary<string, Dictionary<string, Access>> _access = new(StringComparer.Ordinal);
     private long _sequence;
     private long _purgedThrough;
 
@@ -76,6 +80,10 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxOperationsPerPush, 1, nameof(options.MaxOperationsPerPush));
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPageSize, 1, nameof(options.MaxPageSize));
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxClockSkew, TimeSpan.Zero, nameof(options.MaxClockSkew));
+        if ((options.Readers is null) != (options.PrincipalKey is null))
+        {
+            throw new ArgumentException("Readers and PrincipalKey are set together.", nameof(options));
+        }
 
         _options = options;
         _clone = options.Cloner;
@@ -88,7 +96,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         {
             foreach (var (id, entry) in backup.Documents)
             {
-                _documents[id] = new Entry(_clone(entry.Document), entry.Version);
+                Store(id, _clone(entry.Document), entry.Version);
             }
 
             foreach (var (id, receipt) in backup.Receipts)
@@ -195,6 +203,11 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
                 throw new SyncResetRequiredException("The checkpoint is older than the retention horizon.", ResetReasons.Expired);
             }
 
+            if (_options.PrincipalKey is { } principalKey)
+            {
+                return PullMembership(context, request, principalKey(context), since, limit);
+            }
+
             var candidates = _documents.Values
                 .Where(e => e.Version > since)
                 .OrderBy(static e => e.Version)
@@ -211,8 +224,54 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
                 .ToList();
 
             var position = window.Count > 0 ? window[^1].Version : Math.Max(since, 0);
-            return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize) };
+            return new PullResult<TDocument>(page, FormatCheckpoint(context, position), hasMore) { Features = [SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention], Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize), ServerTime = _physical.NowMilliseconds(), RetentionHorizon = _purgedThrough };
         }
+    }
+
+    /// <summary>
+    /// ADR-015: reads the caller's access rows in version order, so pages are full and cost follows what the caller can
+    /// see. Revoked rows become removals for replicas that asked for them; others must resnapshot (<c>scope-changed</c>).
+    /// </summary>
+    private PullResult<TDocument> PullMembership(SyncCallContext context, PullRequest request, string? key, long since, int limit)
+    {
+        var rows = key is not null && _access.TryGetValue(key, out var mine)
+            ? mine.Where(kv => kv.Value.Version > since).OrderBy(static kv => kv.Value.Version).Take(limit + 1).ToList()
+            : [];
+        var hasMore = rows.Count > limit;
+        var window = rows.Take(limit).ToList();
+        var acceptsRemovals = request.Features?.Contains(SyncFeatures.Removals, StringComparer.Ordinal) == true;
+        var changes = new List<RemoteChange<TDocument>>();
+        var removals = new List<string>();
+        foreach (var (id, access) in window)
+        {
+            if (access.Granted)
+            {
+                var entry = _documents[id];
+                if (_options.CanRead?.Invoke(context, entry.Document) ?? true)
+                {
+                    changes.Add(new RemoteChange<TDocument>(_clone(entry.Document), entry.Version));
+                }
+            }
+            else if (since > 0)
+            {
+                // A snapshot from the start never needs a removal: the replica holds nothing it may not see.
+                if (!acceptsRemovals)
+                {
+                    throw new SyncResetRequiredException("A document left this caller's view.", ResetReasons.ScopeChanged);
+                }
+
+                removals.Add(id);
+            }
+        }
+
+        var position = window.Count > 0 ? window[^1].Value.Version : Math.Max(since, 0);
+        return new PullResult<TDocument>(changes, FormatCheckpoint(context, position), hasMore)
+        {
+            Features = [SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention, SyncFeatures.Removals],
+            Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize),
+            ServerTime = _physical.NowMilliseconds(), RetentionHorizon = _purgedThrough,
+            Removals = acceptsRemovals ? removals : null,
+        };
     }
 
     /// <summary>
@@ -355,7 +414,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         {
             var candidate = _clone(document);
             candidate.UpdatedAt = current.Document.UpdatedAt;
-            if (_fingerprint(candidate) == _fingerprint(current.Document))
+            if (_fingerprint(candidate) == _fingerprint(current.Document) && SameReaders(candidate, current))
             {
                 return new SyncPublishResult(0, 1, 0);
             }
@@ -367,7 +426,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             stored.UpdatedAt = _publisherClock.Now();
         }
 
-        _documents[document.Id] = new Entry(stored, ++_sequence);
+        Store(document.Id, stored, ++_sequence);
         return new SyncPublishResult(1, 0, 0);
     }
 
@@ -381,7 +440,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         var tombstone = _clone(current.Document);
         tombstone.Deleted = true;
         tombstone.UpdatedAt = _publisherClock.Now();
-        _documents[id] = new Entry(tombstone, ++_sequence);
+        Store(id, tombstone, ++_sequence);
         return new SyncPublishResult(0, 0, 1);
     }
 
@@ -443,9 +502,50 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
 
     /// <summary>Never reveals a document the caller may not read, whether the outcome is fresh or replayed.</summary>
     private PushOutcome<TDocument> Visible(SyncCallContext context, PushOutcome<TDocument> outcome) =>
-        outcome.Document is { } document && _options.CanRead is { } canRead && !canRead(context, document)
+        outcome.Document is { } document
+        && ((_options.CanRead is { } canRead && !canRead(context, document)) || !MayRead(context, document.Id))
             ? PushOutcome<TDocument>.Rejected(outcome.OperationId, PushErrorCodes.Forbidden) with { IsDuplicate = outcome.IsDuplicate }
             : outcome;
+
+    /// <summary>With membership, whether the caller is among the current readers of <paramref name="id"/>.</summary>
+    private bool MayRead(SyncCallContext context, string id) =>
+        _options.PrincipalKey is not { } principal
+        || (principal(context) is { } key && _documents.TryGetValue(id, out var entry) && entry.Readers?.Contains(key) == true);
+
+    private bool SameReaders(TDocument candidate, Entry current) =>
+        _options.Readers is not { } readers || (current.Readers ?? EmptyReaders).SetEquals(readers(candidate));
+
+    private static readonly HashSet<string> EmptyReaders = new(StringComparer.Ordinal);
+
+    /// <summary>Stores a document version and, with membership, updates its readers' access rows at the same version.</summary>
+    private void Store(string id, TDocument stored, long version)
+    {
+        HashSet<string>? readers = null;
+        if (_options.Readers is { } compute)
+        {
+            var before = _documents.TryGetValue(id, out var previous) ? previous.Readers ?? EmptyReaders : EmptyReaders;
+
+            // A tombstone goes to everyone who could read the document, so each of them learns about the delete.
+            readers = stored.Deleted ? [.. before] : compute(stored).ToHashSet(StringComparer.Ordinal);
+            foreach (var principal in readers)
+            {
+                Rows(principal)[id] = new Access(version, Granted: true);
+            }
+
+            foreach (var principal in before)
+            {
+                if (!readers.Contains(principal))
+                {
+                    Rows(principal)[id] = new Access(version, Granted: false);
+                }
+            }
+        }
+
+        _documents[id] = new Entry(stored, version, readers);
+    }
+
+    private Dictionary<string, Access> Rows(string principal) =>
+        _access.TryGetValue(principal, out var rows) ? rows : _access[principal] = new Dictionary<string, Access>(StringComparer.Ordinal);
 
     private PushOutcome<TDocument> Apply(SyncCallContext context, PushOperation<TDocument>? operation, HashSet<string> documentsInRequest)
     {
@@ -561,8 +661,17 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
                 : PushOutcome<TDocument>.Rejected(operation.OperationId, PushErrorCodes.OperationIdReused, "The operation id was already used for a different request.")
             : null;
 
+    // Receipts keep their own copy of the outcome's document, except an accepted one, which shares the stored copy:
+    // neither is ever mutated, and a replay returns a fresh clone (D9).
     private void Remember(PushOperation<TDocument> operation, PushOutcome<TDocument> outcome) =>
-        _receipts[operation.OperationId] = new Receipt(Fingerprint(operation), outcome with { Document = outcome.Document is { } doc ? _clone(doc) : null });
+        _receipts[operation.OperationId] = new Receipt(
+            Fingerprint(operation),
+            outcome with
+            {
+                Document = outcome.Document is not { } doc ? null
+                    : outcome.Kind == PushOutcomeKind.Accepted && _documents.TryGetValue(operation.DocumentId, out var stored) && stored.Version == outcome.Version ? stored.Document
+                    : _clone(doc),
+            });
 
     /// <summary>Decides an operation without changing anything: a final outcome, or <see langword="null"/> if it would be accepted.</summary>
     private PushOutcome<TDocument>? Evaluate(SyncCallContext context, PushOperation<TDocument> operation, out TDocument canonical)
@@ -585,7 +694,8 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.BaseExpired, "The document no longer exists on the server.");
         }
 
-        if (_options.CanWrite is { } canWrite && !canWrite(context, operation, current is null ? null : _clone(current.Document)))
+        if ((_options.CanWrite is { } canWrite && !canWrite(context, operation, current is null ? null : _clone(current.Document)))
+            || (current is not null && !MayRead(context, id)))
         {
             return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.Forbidden);
         }
@@ -638,16 +748,30 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
     {
         var version = ++_sequence;
         var stored = _clone(canonical);
-        _documents[operation.DocumentId] = new Entry(stored, version);
+        Store(operation.DocumentId, stored, version);
         return PushOutcome<TDocument>.Accepted(operation.OperationId, version, _clone(stored));
     }
 
     private string Fingerprint(PushOperation<TDocument> operation)
     {
-        var canonical = string.Create(
-            CultureInfo.InvariantCulture,
-            $"{operation.DocumentId.Length}:{operation.DocumentId}|{operation.BaseVersion}|{operation.Group}|{operation.GroupSize}|{_fingerprint(operation.Document)}");
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+        // Same digest as hashing the concatenated text, without building it (D9).
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Append(hash, string.Create(CultureInfo.InvariantCulture, $"{operation.DocumentId.Length}:{operation.DocumentId}|{operation.BaseVersion}|{operation.Group}|{operation.GroupSize}|"));
+        Append(hash, _fingerprint(operation.Document));
+        return Convert.ToHexString(hash.GetHashAndReset());
+
+        static void Append(IncrementalHash hash, string text)
+        {
+            var rented = System.Buffers.ArrayPool<byte>.Shared.Rent(Encoding.UTF8.GetMaxByteCount(text.Length));
+            try
+            {
+                hash.AppendData(rented, 0, Encoding.UTF8.GetBytes(text, rented));
+            }
+            finally
+            {
+                System.Buffers.ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
     }
 
     /// <summary>
@@ -666,12 +790,29 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
             foreach (var id in expired)
             {
                 _documents.Remove(id);
+                foreach (var rows in _access.Values)
+                {
+                    rows.Remove(id);
+                }
             }
 
             _purgedThrough = Math.Max(_purgedThrough, throughVersion);
             return expired.Count;
         }
     }
+
+    /// <inheritdoc />
+    /// <remarks>This server is one feed, reported as scope <c>default</c>.</remarks>
+    Task<IReadOnlyDictionary<string, long>> ISyncRetentionTarget.GetFeedHeadsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<string, long>>(new Dictionary<string, long> { [SyncCallContext.Anonymous.Scope] = HighestVersion });
+
+    /// <inheritdoc />
+    Task<int> ISyncRetentionTarget.PurgeTombstonesAsync(string scope, long throughVersion, CancellationToken cancellationToken) =>
+        Task.FromResult(PurgeTombstones(throughVersion));
+
+    /// <inheritdoc />
+    Task<int> ISyncRetentionTarget.PurgeReceiptsAsync(string scope, long throughVersion, CancellationToken cancellationToken) =>
+        Task.FromResult(PurgeReceipts(throughVersion));
 
     /// <summary>Removes receipts of operations accepted at or below <paramref name="throughVersion"/>.</summary>
     /// <remarks>
@@ -713,10 +854,15 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
     private Checkpoint FormatCheckpoint(SyncCallContext context, long position) =>
         new(string.Create(CultureInfo.InvariantCulture, $"{Epoch}~{ScopeHash(context)}:{position}"));
 
+    // With membership the caller's principal key is bound too: a checkpoint names a position in one principal's view.
     private string ScopeHash(SyncCallContext context) =>
-        _options.ScopeFingerprint is { } fingerprint
-            ? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprint(context))))[..16]
-            : string.Empty;
+        (_options.ScopeFingerprint, _options.PrincipalKey) switch
+        {
+            (null, null) => string.Empty,
+            (var fingerprint, null) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprint!(context))))[..16],
+            (var fingerprint, var principal) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"{fingerprint?.Invoke(context)}\u001f{principal(context)}")))[..16],
+        };
 
     private long ParseCheckpoint(SyncCallContext context, Checkpoint checkpoint)
     {
@@ -753,7 +899,9 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         return position;
     }
 
-    private sealed record Entry(TDocument Document, long Version);
+    private sealed record Entry(TDocument Document, long Version, HashSet<string>? Readers = null);
+
+    private readonly record struct Access(long Version, bool Granted);
 
     private sealed record Receipt(string Fingerprint, PushOutcome<TDocument> Outcome);
 }

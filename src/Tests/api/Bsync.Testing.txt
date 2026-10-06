@@ -1,6 +1,7 @@
 enum Bsync.Testing.AuthorityCapabilities
-  All = 31
+  All = 63
   Groups = 1
+  Membership = 32
   NewEpoch = 8
   None = 0
   Publisher = 16
@@ -23,7 +24,9 @@ sealed class Bsync.Testing.AuthorityConformanceOptions
   Bsync.Clocks.IPhysicalClock Clock { get; init; }
   System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<Bsync.Testing.ConformanceDocument>, Bsync.Testing.ConformanceDocument, System.String> Validator { get; init; }
   System.Func<Bsync.Server.SyncCallContext, Bsync.Testing.ConformanceDocument, System.Boolean> CanRead { get; init; }
+  System.Func<Bsync.Server.SyncCallContext, System.String> PrincipalKey { get; init; }
   System.Func<Bsync.Server.SyncCallContext, System.String> ScopeFingerprint { get; init; }
+  System.Func<Bsync.Testing.ConformanceDocument, System.Collections.Generic.IEnumerable<System.String>> Readers { get; init; }
   System.TimeSpan MaxClockSkew { get; init; }
   ctor()
 abstract class Bsync.Testing.AuthorityUnderTest : System.IAsyncDisposable

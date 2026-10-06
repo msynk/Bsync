@@ -23,7 +23,7 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
         ArgumentNullException.ThrowIfNull(resolveAccount);
         _session = session;
         _resolveAccount = resolveAccount;
-        Capabilities = new SyncCapabilities(session.Host, DurableOfflineWrites: true, WritesConfirmedByServer: false, LiveUpdates: session.LiveHints);
+        Capabilities = new SyncCapabilities(session.Host, DurableOfflineWrites: !session.PullOnly, WritesConfirmedByServer: false, LiveUpdates: session.LiveHints);
     }
 
     /// <inheritdoc />
@@ -125,6 +125,35 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
         var engine = await EngineAsync(cancellationToken).ConfigureAwait(false);
         var records = await engine.GetConflictsAsync(limit, cancellationToken).ConfigureAwait(false);
         return [.. records.Select(r => new SyncDocumentConflict<TDocument>(r.Current.Id, r.Conflict!.Local, r.Conflict.Server, r.Conflict.Base))];
+    }
+
+    /// <inheritdoc />
+    public async Task<SyncGoalResult> SyncAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var account = await _resolveAccount(cancellationToken).ConfigureAwait(false);
+        return await _session.SyncAsync(account, goal, budget, progress, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<SyncIssuePage> GetIssuesAsync(int offset = 0, int limit = 100, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        var engine = await EngineAsync(cancellationToken).ConfigureAwait(false);
+        var counts = await engine.CountIssuesAsync(cancellationToken).ConfigureAwait(false);
+        var wanted = (int)Math.Min((long)offset + limit, int.MaxValue);
+        var conflicts = offset < counts.Conflicts ? await engine.GetConflictsAsync(wanted, cancellationToken).ConfigureAwait(false) : [];
+        var rejected = offset + limit > counts.Conflicts ? await engine.GetRejectedAsync(wanted, cancellationToken).ConfigureAwait(false) : [];
+        var items = conflicts.Select(r => new SyncIssue(r.Current.Id, SyncIssueKind.Conflict))
+            .Concat(rejected.Select(r => new SyncIssue(
+                r.Current.Id,
+                r.Rejection?.ErrorCode == Protocol.PushErrorCodes.GroupFailed ? SyncIssueKind.Blocked : SyncIssueKind.Rejected,
+                r.Rejection?.ErrorCode,
+                r.Rejection?.Message)))
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+        return new SyncIssuePage(items, counts.Total);
     }
 
     /// <inheritdoc />

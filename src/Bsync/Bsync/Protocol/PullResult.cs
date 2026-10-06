@@ -31,4 +31,28 @@ public sealed record PullResult<TDocument>(
     [JsonPropertyName("limits")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SyncLimits? Limits { get; init; }
+
+    /// <summary>The server's time in Unix milliseconds when it served the page (feature <see cref="SyncFeatures.ServerTime"/>).</summary>
+    [JsonPropertyName("serverTime")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(WireNullableInt64JsonConverter))]
+    public long? ServerTime { get; init; }
+
+    /// <summary>
+    /// The version at or below which the server purged tombstones (feature <see cref="SyncFeatures.Retention"/>); 0 when
+    /// nothing was purged.
+    /// </summary>
+    [JsonPropertyName("retentionHorizon")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(WireNullableInt64JsonConverter))]
+    public long? RetentionHorizon { get; init; }
+
+    /// <summary>
+    /// Ids of documents that left the caller's view in this page's range (feature <see cref="SyncFeatures.Removals"/>, sent
+    /// only to replicas that asked for it). Replicas remove clean copies and hide ones with local changes; nothing is
+    /// deleted on the server. A page never lists an id both here and in <see cref="Changes"/>.
+    /// </summary>
+    [JsonPropertyName("removals")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Removals { get; init; }
 }

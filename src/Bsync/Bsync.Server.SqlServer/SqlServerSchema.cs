@@ -7,7 +7,7 @@ namespace Bsync.Server.SqlServer;
 /// <summary>Creates and migrates the authority's tables (ADR-011, ADR-014). Safe to run from several processes at once.</summary>
 internal static partial class SqlServerSchema
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     /// <summary>
     /// Version 1. Keys are <c>varbinary</c> holding UTF-16BE bytes: exact equality (an <c>nvarchar</c> comparison ignores
@@ -60,6 +60,24 @@ internal static partial class SqlServerSchema
         );
 
         CREATE INDEX [receipts_accepted] ON {0}.[receipts] ([feed_id], [version]) WHERE [kind] = 0;
+        """;
+
+    /// <summary>
+    /// Version 2 (ADR-015): one access row per document and principal that can or could read it, at the version of its last
+    /// change. Clustered per principal in version order, so a member's pull reads only its own rows.
+    /// </summary>
+    private const string Version2 = """
+        CREATE TABLE {0}.[document_access] (
+            [feed_id] int NOT NULL,
+            [principal_key] varbinary(512) NOT NULL,
+            [version] bigint NOT NULL,
+            [id_key] varbinary(512) NOT NULL,
+            [id] nvarchar(256) NOT NULL,
+            [granted] bit NOT NULL,
+            CONSTRAINT [document_access_pk] PRIMARY KEY CLUSTERED ([feed_id], [principal_key], [version])
+        );
+
+        CREATE UNIQUE INDEX [document_access_document] ON {0}.[document_access] ([feed_id], [id_key], [principal_key]) INCLUDE ([granted]);
         """;
 
     /// <summary>Validates and quotes a schema name.</summary>
@@ -120,10 +138,22 @@ internal static partial class SqlServerSchema
                 await create.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            await using var meta = new SqlCommand($"INSERT INTO {quoted}.[meta] ([key], [value]) VALUES ('schema_version', @version), ('epoch', @epoch), ('version_floor', '0')", connection, transaction);
-            meta.Parameters.AddWithValue("@version", CurrentVersion.ToString(CultureInfo.InvariantCulture));
+            await using var meta = new SqlCommand($"INSERT INTO {quoted}.[meta] ([key], [value]) VALUES ('schema_version', '1'), ('epoch', @epoch), ('version_floor', '0')", connection, transaction);
             meta.Parameters.AddWithValue("@epoch", NewEpoch());
             await meta.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            version = 1;
+        }
+
+        // Forward, in place, under the lock; existing feeds, documents and receipts are kept.
+        if (version == 1)
+        {
+            await using (var upgrade = new SqlCommand(string.Format(CultureInfo.InvariantCulture, Version2, quoted), connection, transaction))
+            {
+                await upgrade.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            await using var mark = new SqlCommand($"UPDATE {quoted}.[meta] SET [value] = '2' WHERE [key] = 'schema_version'", connection, transaction);
+            await mark.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
         string epoch;

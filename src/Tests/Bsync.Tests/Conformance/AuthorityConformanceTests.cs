@@ -9,10 +9,13 @@ namespace Bsync.Tests.Conformance;
 /// </summary>
 public abstract class AuthorityConformanceTests
 {
-    public static TheoryData<string> CaseNames()
+    public static TheoryData<string> CaseNames() => CaseNamesFor(AuthorityCapabilities.All);
+
+    /// <summary>The cases a driver with <paramref name="capabilities"/> runs.</summary>
+    protected static TheoryData<string> CaseNamesFor(AuthorityCapabilities capabilities)
     {
         var data = new TheoryData<string>();
-        foreach (var conformanceCase in AuthorityConformance.Cases)
+        foreach (var conformanceCase in AuthorityConformance.CasesFor(capabilities))
         {
             data.Add(conformanceCase.Name);
         }
@@ -20,17 +23,16 @@ public abstract class AuthorityConformanceTests
         return data;
     }
 
-    /// <summary>The driver under test. Every in-repository driver supports every capability, so every case runs.</summary>
+    /// <summary>The driver under test.</summary>
     protected abstract IAuthorityConformanceDriver Driver { get; }
 
-    [Theory]
-    [MemberData(nameof(CaseNames))]
-    public Task Conformance(string name)
+    /// <summary>Runs one case. Each provider class declares the theory over the cases its driver supports.</summary>
+    protected Task RunAsync(string name)
     {
         var conformanceCase = AuthorityConformance.Cases.Single(c => c.Name == name);
         Assert.True(
             (conformanceCase.Requires & ~Driver.Capabilities) == 0,
-            $"The driver does not declare {conformanceCase.Requires & ~Driver.Capabilities}; in-repository drivers must run every case.");
+            $"The driver does not declare {conformanceCase.Requires & ~Driver.Capabilities}.");
         return conformanceCase.RunAsync(Driver);
     }
 }

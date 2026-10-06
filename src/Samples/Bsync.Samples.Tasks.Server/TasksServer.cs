@@ -49,6 +49,15 @@ public static class TasksServer
             WriteHandler = new TaskWriteHandler(),
         });
 
+        // Intents (task F3) live in their own collection; their handler changes tasks in the same transaction.
+        var intents = await SqlServerSyncAuthority<TaskIntent>.CreateAsync(new SqlServerSyncAuthorityOptions<TaskIntent>
+        {
+            ConnectionString = connectionString,
+            DocumentType = TasksJson.Default.TaskIntent,
+            Collection = TasksJson.IntentCollection,
+            WriteHandler = new IntentWriteHandler(authority),
+        });
+
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
         app.UseAuthentication();
@@ -87,7 +96,8 @@ public static class TasksServer
             var document = new TaskDocument { Id = request.Id, Title = request.Title, Slug = TaskRules.Slug(request.Title) };
             await using var db = TasksDb.Open(connectionString);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            db.Tasks.Add(new TaskEntity { Tenant = tenant, Id = document.Id, Title = document.Title, Slug = document.Slug, ChangedBy = user.FindFirst("sub")?.Value });
+            document.Revision = 1;
+            db.Tasks.Add(new TaskEntity { Tenant = tenant, Id = document.Id, Title = document.Title, Slug = document.Slug, Revision = 1, ChangedBy = user.FindFirst("sub")?.Value });
             await db.SaveChangesAsync(cancellationToken);
             await authority.UpsertAsync(tenant, document, transaction.GetDbTransaction(), cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -101,11 +111,17 @@ public static class TasksServer
                 SupportedSchemas = new HashSet<string>([TasksJson.SchemaId], StringComparer.Ordinal),
                 ResolveScope = http => http.User.FindFirst("tenant")?.Value,
             },
-            collections => collections.Add(TasksJson.Collection, authority, SyncJsonTypes<TaskDocument>.From(TasksJson.Default)))
+            collections => collections
+                .Add(TasksJson.Collection, authority, SyncJsonTypes<TaskDocument>.From(TasksJson.Default))
+                .Add(TasksJson.IntentCollection, intents, SyncJsonTypes<TaskIntent>.From(TasksJson.Default)))
             .RequireAuthorization();
 
         app.MapFallbackToFile("index.html");
-        app.Lifetime.ApplicationStopping.Register(() => authority.DisposeAsync().AsTask().GetAwaiter().GetResult());
+        app.Lifetime.ApplicationStopping.Register(() =>
+        {
+            intents.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            authority.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        });
         return app;
     }
 }

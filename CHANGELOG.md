@@ -4,7 +4,48 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
 [docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
 
-## Unreleased (0.2.0)
+## Unreleased (0.3.0)
+
+### Added
+
+- Read membership in the feed (ADR-015): with `Readers` and `PrincipalKey`, the in-memory and SQL Server authorities
+  serve each caller only what it may read, in full pages (500 of 100,000 documents in five pages in 0.26 s on SQL
+  Server 2025 LocalDB), and a document leaving a caller's view arrives as a removal instead of a collection reset
+  (protocol feature `removals`). Clean copies leave the device; local drafts are hidden and kept.
+- SQL Server schema 2, upgraded in place from schema 1.
+- Pull-only collections (`SyncOptions.Mode = SyncMode.PullOnly`): one copy per document and no write bookkeeping;
+  local writes throw `SyncReadOnlyException`.
+- `SyncCoordinator` for many collections: concurrency limit, priorities, parents synced before children
+  (`DependsOn`), a shared backoff, one aggregate status that names failing collections, a host hint bridge, and one
+  multiplexed hint stream per account instead of one per collection (feature `hints-multiplex`).
+- Awaitable sync goals: `SyncAsync(SyncGoal.Complete | Background | Accepted(id, revision), budget)` on a collection or
+  the coordinator, with progress; `SyncEngine.SyncForAsync(timeBudget)` for time-limited background tasks.
+- Honest status: `SyncStatus.Conflicts`, `Rejected`, `Blocked`, `LastPulled`, `LastPushed`, `Staleness`, `IsStale`;
+  `ISyncCollection.GetIssuesAsync` pages issues with a total.
+- Local tombstone compaction: pull responses carry the server's retention horizon (feature `retention`), and replicas
+  drop their clean tombstones below it. In a 30-day soak with 7-day server retention a replica kept at most 160.
+- A retention service: `AddSyncRetention` runs `SyncRetention` in an ASP.NET Core host and purges tombstones and
+  receipts older than `MaxOfflineHorizon` (default 45 days) in every in-memory, SQL Server or PostgreSQL authority it
+  is given. A receipt horizon shorter than the offline horizon fails the host at startup.
+- `SyncOptions.KeptConflictView = KeptConflictView.Local` keeps showing the user's own edit while a conflict waits.
+- The Tasks sample executes immutable intents (complete, rename) exactly once in the write handler's transaction,
+  with execution state separate from sync state; documented as a pattern in `docs/patterns/intents.md`. No new
+  package types.
+
+### Changed
+
+- A session never reports `Synced` while conflicts or rejections wait for a decision; it reports `AttentionRequired`.
+- Subscribers are not notified on idle background cycles or for timestamp-only status updates.
+
+- Pull responses carry the server's time (feature `server-time`); a replica whose clock is ahead corrects its clock,
+  so its writes are no longer rejected with `clock-skew` after the first sync (ADR-017, part 1).
+- SQLite schema 4: a record's base copy is not stored when it equals the current state. A 10,000-document replica of
+  ~1 KiB documents shrinks from 41.8 MB to 14.5 MB. Schema 3 databases upgrade on open.
+- Fewer document copies per sync: pushing one document allocates 30.7 KB instead of 66.9 KB with the in-memory store
+  and 62.6 KB instead of 80.6 KB with SQLite; the in-memory server allocates 8.1 KB instead of 16.4 KB per accepted
+  write.
+
+## 0.2.0 (committed as 3009955; not yet on NuGet)
 
 Breaking: two signatures (see Changed). Builds on 0.1.1.
 

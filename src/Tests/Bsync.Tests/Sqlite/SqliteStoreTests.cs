@@ -89,6 +89,50 @@ public sealed class SqliteStoreTests : IDisposable
         Assert.Equal(1L, await count.ExecuteScalarAsync());
     }
 
+    [Fact(DisplayName = "D8 I17: a schema 3 database upgrades in place; records keep their base, and new clean writes store none")]
+    public async Task Schema3Upgrades()
+    {
+        var server = InMemorySyncServerRef.Create();
+        var replica = new TestReplica(server, "a", store: await _database.OpenAsync());
+        await replica.Engine.WriteAsync(new Note { Id = "clean", Title = "synced" });
+        await replica.Engine.SyncAsync();
+        await replica.Engine.WriteAsync(new Note { Id = "clean", Title = "edited" }); // pending, base differs from current
+        SqliteStorePool.Release(_database.Path);
+
+        // Turn the file into what a 0.2.0 store wrote: base stored in full, no base_same column, schema 3.
+        await using (var connection = new SqliteConnection($"Data Source={_database.Path}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE bs_records SET base = current WHERE base_same = 1;
+                ALTER TABLE bs_records DROP COLUMN base_same;
+                PRAGMA user_version = 3;
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        SqliteConnection.ClearAllPools();
+        var reopened = new TestReplica(server, "a", store: await _database.OpenAsync());
+        var record = await reopened.RecordAsync("clean");
+        await reopened.Engine.SyncAsync();
+        await reopened.Engine.WriteAsync(new Note { Id = "fresh" });
+        await reopened.Engine.SyncAsync();
+
+        Assert.Equal("synced", record.Base!.Title);
+        Assert.Equal("edited", record.Current.Title);
+        Assert.Equal("edited", server.Get("clean").Title);
+        Assert.Equal("fresh", (await reopened.RecordAsync("fresh")).Base!.Id); // base read back from base_same
+        await using var check = new SqliteConnection($"Data Source={_database.Path}");
+        await check.OpenAsync();
+        await using var query = check.CreateCommand();
+        query.CommandText = "SELECT (SELECT user_version FROM pragma_user_version), (SELECT COUNT(*) FROM bs_records WHERE base IS NULL AND base_same = 1)";
+        await using var reader = await query.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(SqliteLocalStore<Note>.SchemaVersion, reader.GetInt32(0));
+        Assert.Equal(2, reader.GetInt64(1)); // both clean records, after their pushes were accepted
+    }
+
     [Fact(DisplayName = "I12: the replica id is stable across reopen; a new incarnation changes only the incarnation")]
     public async Task ReplicaIdentity()
     {

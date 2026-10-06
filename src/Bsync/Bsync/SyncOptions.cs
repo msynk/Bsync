@@ -37,6 +37,15 @@ public sealed class SyncOptions<TDocument>
     /// </summary>
     public string DiagnosticsName { get; init; } = typeof(TDocument).Name;
 
+    /// <summary>
+    /// What a record shows while a conflict is kept by the default (<c>Defer</c>) policy: the server's state (default) or
+    /// the local edit (F20). Either way the conflict is listed and nothing is lost.
+    /// </summary>
+    public Conflicts.KeptConflictView KeptConflictView { get; init; } = Conflicts.KeptConflictView.Server;
+
+    /// <summary>Two-way (default) or pull-only (read-only replica that stores only current states).</summary>
+    public SyncMode Mode { get; init; } = SyncMode.TwoWay;
+
     /// <summary>Throws <see cref="ArgumentOutOfRangeException"/> if any value is out of range.</summary>
     public void Validate()
     {
@@ -46,5 +55,9 @@ public sealed class SyncOptions<TDocument>
         ArgumentOutOfRangeException.ThrowIfLessThan(PushBatchSize, 1, nameof(PushBatchSize));
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxPushBatches, 1, nameof(MaxPushBatches));
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxConflictRetries, 1, nameof(MaxConflictRetries));
+        if (!Enum.IsDefined(Mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Mode));
+        }
     }
 }

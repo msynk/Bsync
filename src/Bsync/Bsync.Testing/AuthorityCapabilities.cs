@@ -25,6 +25,12 @@ public enum AuthorityCapabilities
     /// <summary>The authority implements <see cref="Server.ISyncPublisher{TDocument}"/> (server-originated writes, ADR-014).</summary>
     Publisher = 16,
 
+    /// <summary>
+    /// The authority supports read membership (<see cref="AuthorityConformanceOptions.Readers"/>,
+    /// <see cref="AuthorityConformanceOptions.PrincipalKey"/>) and the <c>removals</c> feature (ADR-015).
+    /// </summary>
+    Membership = 32,
+
     /// <summary>Everything above.</summary>
-    All = Groups | ScopeIsolation | Retention | NewEpoch | Publisher,
+    All = Groups | ScopeIsolation | Retention | NewEpoch | Publisher | Membership,
 }

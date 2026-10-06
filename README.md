@@ -3,7 +3,7 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.1.0` is published on NuGet; this branch builds `0.2.0` (unreleased). Pre-1.0: minor versions may
+> **Status:** `0.1.0` is published on NuGet; this branch builds `0.3.0` (unreleased). Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
@@ -12,7 +12,8 @@ This section is the single source of truth for release and verification status; 
 
 - **Packages.** Six packages are at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
   `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. The repository
-  is at `0.2.0` (unreleased) and adds a seventh, `Bsync.Server.SqlServer`; `dotnet pack` builds these seven.
+  is at `0.3.0` (unreleased; `0.1.1` and `0.2.0` are committed but not published) and adds a seventh,
+  `Bsync.Server.SqlServer`; `dotnet pack` builds these seven.
   Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
   ([compatibility policy](docs/compatibility.md#policy)).
@@ -293,6 +294,17 @@ builder.Services.AddBrowserSyncCollection<Note>("notes", AppJson.Default.Note,
 (the samples' `NotesPanel` offers "Keep mine" / "Keep theirs"). See `src/Samples/Bsync.Samples.WebApp` for all
 four render modes side by side.
 
+Apps with many collections give each session a `Coordination` on one `SyncCoordinator`: it limits how many sync at
+once, syncs parents before children (`DependsOn`), shares one hint stream (`HttpSyncHints.Multiplexed`, served by
+`MapSyncCollections`), and reports one aggregate `Status`. To wait for sync, call `SyncAsync` with a goal:
+
+```csharp
+var result = await notes.SyncAsync(SyncGoal.Complete, TimeSpan.FromSeconds(10));    // everything uploaded and pulled
+var receipt = await engine.WriteAsync(order);
+await coordinator.SyncAsync(SyncGoal.Accepted(order.Id, receipt.LocalRevision), TimeSpan.FromSeconds(5), ["orders"]);
+hub.On<string>("changed", coordinator.Hint);                                        // your own real-time hub as hints
+```
+
 Browser sessions sync after each local write, when the browser comes back online or the tab becomes visible,
 when the server announces a change over its Server-Sent Events hint stream, and on an interval as a safety
 net. Hints only make things faster: losing them never loses data. If your app has a service worker, do not
@@ -320,7 +332,16 @@ If the server is restored from a backup, it must start a new epoch and never reu
 Replicas then reset automatically: they keep pending edits and kept conflicts, pull a fresh snapshot, and
 mark local records the restored server no longer has as `MissingAfterReset` (hidden, not deleted).
 
-When what a user may see changes (revoked or granted access, a different filter), the authority's
+With read membership (in-memory and SQL Server authorities, ADR-015), each caller pulls only the documents it may
+read, and a document that leaves its view arrives as a removal: clean copies leave the device, local drafts are kept
+hidden. Nothing else resets:
+
+```csharp
+Readers = note => note.SharedWith,                              // computed at every write; a change is a new version
+PrincipalKey = caller => caller.Principal.FindFirst("sub")?.Value,
+```
+
+Without membership, when what a user may see changes (revoked or granted access, a different filter), the authority's
 `ScopeFingerprint` changes and the old checkpoint is refused with reason `scope-changed`; the replica
 resnapshots and removes documents it may no longer see from the device (never from the server). Documents
 with local changes or kept conflicts are never removed.
@@ -330,6 +351,20 @@ replica offline for longer than the retention horizon resets (`expired`), and an
 document is rejected with `base-expired` rather than resurrecting it; writing it again recreates it.
 `SyncResult.ResetPerformed`, `MissingAfterReset` and `PurgedAfterReset` report what happened. See
 `docs/protocol/v1.md` §4 and §6.1.
+
+To purge on a schedule, register the retention service; it purges what is older than the offline horizon in
+every authority it is given, and refuses (at startup) a receipt horizon shorter than that horizon:
+
+```csharp
+builder.Services.AddSyncRetention(options =>
+{
+    options.MaxOfflineHorizon = TimeSpan.FromDays(45); // the default
+    options.Targets.Add(authority);                    // or register authorities as ISyncRetentionTarget
+});
+```
+
+Replicas drop their own clean tombstones below the server's retention horizon (feature `retention`), so local
+tombstones do not accumulate either.
 
 ## Groups: changes that belong together
 
@@ -407,6 +442,8 @@ authority.NotifyCommitted(new AuthorityCommit(tenant, [price.Id]));   // optiona
 server processes are announced by polling the feed heads (`CommitPollInterval`, default 5 s) or by calling
 `NotifyCommitted` from your own message bus. After a restore call `BeginNewEpochAsync(versionFloor)`.
 A complete example with EF Core, bearer tokens and two kinds of clients: `src/Samples/Bsync.Samples.Tasks.Server`.
+Actions that must run exactly once (complete, approve, send) are modeled as immutable intents executed by a write
+handler; see [the intents pattern](docs/patterns/intents.md), which the Tasks sample implements.
 Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer`.
 
 ## Native apps (WPF, .NET MAUI)
@@ -567,8 +604,8 @@ Consume the packages exactly as a NuGet user would (no project references; `src/
 ```bash
 for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite Bsync.Testing; do
   dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
-dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.2.0-local
-dotnet publish src/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.2.0-local -o artifacts/consumer-web
+dotnet test src/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.3.0-local
+dotnet publish src/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.3.0-local -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
 ```
 
@@ -588,6 +625,7 @@ dotnet test src/Bsync.slnx --filter "DisplayName~I04"
 - [Protocol specification v1](docs/protocol/v1.md).
 - [Compatibility policy and migration notes](docs/compatibility.md).
 - [Disaster recovery and stuck replicas](docs/operations/disaster-recovery.md) and [observability](docs/operations/observability.md).
+- [Pattern: immutable intents](docs/patterns/intents.md).
 - [Benchmarks](docs/benchmarks.md).
 - [Support matrix](docs/support-matrix.md) and [roadmap](docs/roadmap.md).
 

@@ -188,6 +188,11 @@ public static class SqliteStoreRecovery
                 columns = [.. columns, .. SqliteSchema.Version3Columns.Split(", ")];
             }
 
+            if (version >= 4)
+            {
+                columns = [.. columns, .. SqliteSchema.Version4Columns.Split(", ")];
+            }
+
             // Scan the table itself (an index may be the damaged part), in rowid order and in small ranges, so a damaged
             // page loses only the rows on it: after a read error, probe further ahead with growing steps.
             var filter = version >= 2 ? "(is_dirty = 1 OR conflict_local IS NOT NULL)" : "is_dirty = 1";

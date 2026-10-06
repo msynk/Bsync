@@ -488,6 +488,83 @@ public static class AuthorityConformance
             Check.Equal("today", Single(inB.Changes).Document.Title);
             Check.Equal(0, inC.Changes.Count);
         }),
+
+        new("Authority C1 I07 I08: with read membership a caller's pages are full and hold only what it may read", AuthorityCapabilities.Membership, async driver =>
+        {
+            await using var authority = await CreateAsync(driver, membership: true);
+            var writer = authority.Connect(User("writer"));
+            for (var i = 0; i < 30; i++)
+            {
+                await Push(writer, Op($"o{i}", $"d{i:00}", null, i % 3 == 0 ? "x|writer,alice" : "x|writer,bob"));
+            }
+
+            var alice = authority.Connect(User("alice"));
+            var seen = new List<string>();
+            var checkpoint = Checkpoint.Start;
+            PullResult<ConformanceDocument> page;
+            do
+            {
+                page = await alice.PullAsync(WithRemovals(checkpoint, 4));
+                Check.True(page.HasMore ? page.Changes.Count == 4 : page.Changes.Count <= 4);
+                seen.AddRange(page.Changes.Select(c => c.Document.Id));
+                checkpoint = page.Checkpoint;
+            }
+            while (page.HasMore);
+
+            Check.Sequence(Enumerable.Range(0, 30).Where(i => i % 3 == 0).Select(i => $"d{i:00}"), seen.Order(StringComparer.Ordinal));
+        }),
+
+        new("Authority C1 I10 I14: revoking read access is a removal for replicas that ask for it, and scope-changed for others", AuthorityCapabilities.Membership, async driver =>
+        {
+            await using var authority = await CreateAsync(driver, membership: true);
+            var alice = authority.Connect(User("alice"));
+            var bob = authority.Connect(User("bob"));
+            var v1 = (await Push(alice, Op("o1", "shared", null, "x|alice,bob")))[0].Version;
+            var bobs = (await bob.PullAsync(WithRemovals(Checkpoint.Start, 10))).Checkpoint;
+
+            await Push(alice, Op("o2", "shared", v1, "y|alice"));
+            var removal = await bob.PullAsync(WithRemovals(bobs, 10));
+            var legacy = await Catch<SyncResetRequiredException>(() => bob.PullAsync(new PullRequest(bobs, 10)));
+            var alices = await alice.PullAsync(WithRemovals(Checkpoint.Start, 10));
+            var fresh = await bob.PullAsync(WithRemovals(Checkpoint.Start, 10));
+
+            Check.Equal(0, removal.Changes.Count);
+            Check.Sequence(["shared"], removal.Removals ?? []);
+            Check.True(removal.Features?.Contains(SyncFeatures.Removals) == true);
+            Check.Equal(ResetReasons.ScopeChanged, legacy.Reason);
+            Check.Equal("y|alice", Single(alices.Changes).Document.Title);
+            Check.Equal(0, fresh.Changes.Count + (fresh.Removals?.Count ?? 0)); // a snapshot never mentions what bob cannot see
+        }),
+
+        new("Authority C1 I07: a non-reader cannot write or see a document; regranting brings it back", AuthorityCapabilities.Membership, async driver =>
+        {
+            await using var authority = await CreateAsync(driver, membership: true);
+            var alice = authority.Connect(User("alice"));
+            var bob = authority.Connect(User("bob"));
+            var v1 = (await Push(alice, Op("o1", "doc", null, "x|alice")))[0].Version;
+            var bobs = (await bob.PullAsync(WithRemovals(Checkpoint.Start, 10))).Checkpoint;
+
+            var refused = (await Push(bob, Op("b1", "doc", v1, "hijack|bob")))[0];
+            var v2 = (await Push(alice, Op("o2", "doc", v1, "x|alice,bob")))[0].Version;
+            var granted = await bob.PullAsync(WithRemovals(bobs, 10));
+            var edit = (await Push(bob, Op("b2", "doc", v2, "edited by bob|alice,bob")))[0];
+
+            Check.Equal(PushOutcomeKind.Rejected, refused.Kind);
+            Check.Equal(PushErrorCodes.Forbidden, refused.ErrorCode);
+            Check.Null(refused.Document);
+            Check.Equal("x|alice,bob", Single(granted.Changes).Document.Title);
+            Check.Equal(PushOutcomeKind.Accepted, edit.Kind);
+        }),
+
+        new("Authority C1 I07: a checkpoint of one principal is not resumed for another", AuthorityCapabilities.Membership, async driver =>
+        {
+            await using var authority = await CreateAsync(driver, membership: true);
+            var alice = authority.Connect(User("alice"));
+            await Push(alice, Op("o1", "doc", null, "x|alice,bob"));
+            var alices = (await alice.PullAsync(WithRemovals(Checkpoint.Start, 10))).Checkpoint;
+
+            await Check.Throws<SyncResetRequiredException>(() => authority.Connect(User("bob")).PullAsync(WithRemovals(alices, 10)));
+        }),
     ];
 
     /// <summary>The cases a driver with <paramref name="capabilities"/> can run.</summary>
@@ -498,14 +575,26 @@ public static class AuthorityConformance
         IAuthorityConformanceDriver driver,
         Func<SyncCallContext, PushOperation<ConformanceDocument>, ConformanceDocument?, string?>? validator = null,
         Func<SyncCallContext, ConformanceDocument, bool>? canRead = null,
-        Func<SyncCallContext, string>? scopeFingerprint = null) =>
+        Func<SyncCallContext, string>? scopeFingerprint = null,
+        bool membership = false) =>
         driver.CreateAsync(new AuthorityConformanceOptions
         {
             Clock = new FixedClock(Now),
             Validator = validator,
             CanRead = canRead,
             ScopeFingerprint = scopeFingerprint,
+            Readers = membership ? ReadersOf : null,
+            PrincipalKey = membership ? static caller => caller.Principal.FindFirst(ClaimTypes.Name)?.Value : null,
         });
+
+    // Membership cases encode the readers in the title: "text|alice,bob".
+    private static IEnumerable<string> ReadersOf(ConformanceDocument document) =>
+        document.Title.Split('|') is [_, var readers] ? readers.Split(',', StringSplitOptions.RemoveEmptyEntries) : [];
+
+    private static SyncCallContext User(string name, string scope = "default") =>
+        new(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, name)], "conformance")), scope);
+
+    private static PullRequest WithRemovals(Checkpoint since, int limit) => new(since, limit) { Features = [SyncFeatures.Removals] };
 
     private static SyncCallContext Caller(string scope) =>
         new(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "conformance")], "conformance")), scope);

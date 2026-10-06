@@ -36,6 +36,7 @@ public sealed class TasksDb(DbContextOptions<TasksDb> options) : DbContext(optio
                 Slug nvarchar(max) NOT NULL,
                 Done bit NOT NULL,
                 Deleted bit NOT NULL,
+                Revision bigint NOT NULL,
                 ChangedBy nvarchar(256) NULL,
                 CONSTRAINT PK_Tasks PRIMARY KEY (Tenant, Id)
             );
@@ -67,6 +68,12 @@ public sealed class TaskEntity
 
     /// <summary>Soft delete: replicated deletes never remove application rows (ADR-014).</summary>
     public bool Deleted { get; set; }
+
+    /// <summary>Incremented by every change; replicated as <see cref="TaskDocument.Revision"/>.</summary>
+    public long Revision { get; set; }
+
+    /// <summary>The replicated shape of this row.</summary>
+    public TaskDocument ToDocument() => new() { Id = Id, Title = Title, Slug = Slug, Done = Done, Deleted = Deleted, Revision = Revision };
 
     /// <summary>Who changed the task last, from the authenticated caller, never from the document.</summary>
     public string? ChangedBy { get; set; }

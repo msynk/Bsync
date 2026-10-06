@@ -1,0 +1,627 @@
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 8 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+Unable to find .sln or .csproj file. Will use current directory C:\dev\github\msynk\Bsync to search for project file. If you don't use .sln file on purpose it should not be a problem.
+// start dotnet  restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1/" /p:OutDir="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0/" /p:OutputPath="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0/" /p:PublishDir="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\publish/" in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1
+// command took 1.79 sec and exited with 0
+// start dotnet  build -c Release --no-restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1/" /p:OutDir="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0/" /p:OutputPath="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0/" /p:PublishDir="C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\publish/" --output "C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0/" in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1
+// command took 15.58 sec and exited with 0
+// ***** Done, took 00:00:18 (18.05 sec)   *****
+// Found 8 benchmarks:
+//   LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=memory]
+//   LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=memory]
+//   LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=sqlite-full]
+//   LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=sqlite-full]
+//   LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=memory]
+//   LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=memory]
+//   LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=sqlite-full]
+//   LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=sqlite-full]
+
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=memory]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 3188 3440 --benchmarkName "LocalQuery.OrderedPage(Count: 10000, Store: \"memory\")" --job ShortRun --benchmarkId 0 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 214900.00 ns, 214.9000 us/op
+WorkloadJitting  1: 1 op, 72190800.00 ns, 72.1908 ms/op
+
+WorkloadPilot    1: 2 op, 140009700.00 ns, 70.0049 ms/op
+WorkloadPilot    2: 3 op, 195057100.00 ns, 65.0190 ms/op
+WorkloadPilot    3: 4 op, 171286500.00 ns, 42.8216 ms/op
+WorkloadPilot    4: 5 op, 245083300.00 ns, 49.0167 ms/op
+WorkloadPilot    5: 6 op, 307068300.00 ns, 51.1781 ms/op
+WorkloadPilot    6: 7 op, 376852300.00 ns, 53.8360 ms/op
+WorkloadPilot    7: 8 op, 144072400.00 ns, 18.0091 ms/op
+WorkloadPilot    8: 9 op, 168340800.00 ns, 18.7045 ms/op
+WorkloadPilot    9: 10 op, 191375000.00 ns, 19.1375 ms/op
+WorkloadPilot   10: 11 op, 202641300.00 ns, 18.4219 ms/op
+WorkloadPilot   11: 12 op, 238389900.00 ns, 19.8658 ms/op
+WorkloadPilot   12: 13 op, 272187700.00 ns, 20.9375 ms/op
+WorkloadPilot   13: 14 op, 310987800.00 ns, 22.2134 ms/op
+WorkloadPilot   14: 15 op, 341427200.00 ns, 22.7618 ms/op
+WorkloadPilot   15: 16 op, 360534600.00 ns, 22.5334 ms/op
+WorkloadPilot   16: 32 op, 874928000.00 ns, 27.3415 ms/op
+
+WorkloadWarmup   1: 32 op, 898175300.00 ns, 28.0680 ms/op
+WorkloadWarmup   2: 32 op, 895340200.00 ns, 27.9794 ms/op
+WorkloadWarmup   3: 32 op, 967206100.00 ns, 30.2252 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 32 op, 1039687500.00 ns, 32.4902 ms/op
+WorkloadActual   2: 32 op, 949058400.00 ns, 29.6581 ms/op
+WorkloadActual   3: 32 op, 907163500.00 ns, 28.3489 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 32 op, 1039687500.00 ns, 32.4902 ms/op
+WorkloadResult   2: 32 op, 949058400.00 ns, 29.6581 ms/op
+WorkloadResult   3: 32 op, 907163500.00 ns, 28.3489 ms/op
+// GC:  87 83 24 796393728 32
+// Threading:  0 0 32
+
+// AfterAll
+// Benchmark Process 39892 has exited with code 0.
+
+Mean = 30.166 ms, StdErr = 1.222 ms (4.05%), N = 3, StdDev = 2.117 ms
+Min = 28.349 ms, Q1 = 29.003 ms, Median = 29.658 ms, Q3 = 31.074 ms, Max = 32.490 ms
+IQR = 2.071 ms, LowerFence = 25.897 ms, UpperFence = 34.180 ms
+ConfidenceInterval = [-8.453 ms; 68.785 ms] (CI 99.9%), Margin = 38.619 ms (128.02% of Mean)
+Skewness = 0.23, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 7 (87.5%) benchmark(s) to run. Estimated finish 2026-10-06 13:38 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=memory]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 1776 3388 --benchmarkName "LocalQuery.SelectivePage(Count: 10000, Store: \"memory\")" --job ShortRun --benchmarkId 1 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 214600.00 ns, 214.6000 us/op
+WorkloadJitting  1: 1 op, 52409000.00 ns, 52.4090 ms/op
+
+WorkloadPilot    1: 2 op, 95298200.00 ns, 47.6491 ms/op
+WorkloadPilot    2: 3 op, 146292700.00 ns, 48.7642 ms/op
+WorkloadPilot    3: 4 op, 159040700.00 ns, 39.7602 ms/op
+WorkloadPilot    4: 5 op, 200009800.00 ns, 40.0020 ms/op
+WorkloadPilot    5: 6 op, 221347100.00 ns, 36.8912 ms/op
+WorkloadPilot    6: 7 op, 253303100.00 ns, 36.1862 ms/op
+WorkloadPilot    7: 8 op, 337510500.00 ns, 42.1888 ms/op
+WorkloadPilot    8: 9 op, 219539300.00 ns, 24.3933 ms/op
+WorkloadPilot    9: 10 op, 150777600.00 ns, 15.0778 ms/op
+WorkloadPilot   10: 11 op, 160105900.00 ns, 14.5551 ms/op
+WorkloadPilot   11: 12 op, 175181400.00 ns, 14.5985 ms/op
+WorkloadPilot   12: 13 op, 186151200.00 ns, 14.3193 ms/op
+WorkloadPilot   13: 14 op, 198837600.00 ns, 14.2027 ms/op
+WorkloadPilot   14: 15 op, 207375400.00 ns, 13.8250 ms/op
+WorkloadPilot   15: 16 op, 221094300.00 ns, 13.8184 ms/op
+WorkloadPilot   16: 32 op, 420980600.00 ns, 13.1556 ms/op
+WorkloadPilot   17: 64 op, 838830300.00 ns, 13.1067 ms/op
+
+WorkloadWarmup   1: 64 op, 816966000.00 ns, 12.7651 ms/op
+WorkloadWarmup   2: 64 op, 865938400.00 ns, 13.5303 ms/op
+WorkloadWarmup   3: 64 op, 839444500.00 ns, 13.1163 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 902427300.00 ns, 14.1004 ms/op
+WorkloadActual   2: 64 op, 907101500.00 ns, 14.1735 ms/op
+WorkloadActual   3: 64 op, 858082400.00 ns, 13.4075 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 902427300.00 ns, 14.1004 ms/op
+WorkloadResult   2: 64 op, 907101500.00 ns, 14.1735 ms/op
+WorkloadResult   3: 64 op, 858082400.00 ns, 13.4075 ms/op
+// GC:  82 49 0 1035809896 64
+// Threading:  0 0 64
+
+// AfterAll
+// Benchmark Process 39336 has exited with code 0.
+
+Mean = 13.894 ms, StdErr = 0.244 ms (1.76%), N = 3, StdDev = 0.423 ms
+Min = 13.408 ms, Q1 = 13.754 ms, Median = 14.100 ms, Q3 = 14.137 ms, Max = 14.173 ms
+IQR = 0.383 ms, LowerFence = 13.180 ms, UpperFence = 14.711 ms
+ConfidenceInterval = [6.182 ms; 21.605 ms] (CI 99.9%), Margin = 7.712 ms (55.50% of Mean)
+Skewness = -0.37, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 6 (75.0%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 1m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=sqlite-full]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 1932 2116 --benchmarkName "LocalQuery.OrderedPage(Count: 10000, Store: \"sqlite-full\")" --job ShortRun --benchmarkId 2 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 210400.00 ns, 210.4000 us/op
+WorkloadJitting  1: 1 op, 72441900.00 ns, 72.4419 ms/op
+
+WorkloadPilot    1: 2 op, 130355300.00 ns, 65.1777 ms/op
+WorkloadPilot    2: 3 op, 184915100.00 ns, 61.6384 ms/op
+WorkloadPilot    3: 4 op, 317611600.00 ns, 79.4029 ms/op
+WorkloadPilot    4: 5 op, 355275700.00 ns, 71.0551 ms/op
+WorkloadPilot    5: 6 op, 270776800.00 ns, 45.1295 ms/op
+WorkloadPilot    6: 7 op, 357483700.00 ns, 51.0691 ms/op
+WorkloadPilot    7: 8 op, 386160600.00 ns, 48.2701 ms/op
+WorkloadPilot    8: 9 op, 428604800.00 ns, 47.6228 ms/op
+WorkloadPilot    9: 10 op, 495042500.00 ns, 49.5043 ms/op
+WorkloadPilot   10: 11 op, 575726300.00 ns, 52.3388 ms/op
+
+WorkloadWarmup   1: 11 op, 545056400.00 ns, 49.5506 ms/op
+WorkloadWarmup   2: 11 op, 508238300.00 ns, 46.2035 ms/op
+WorkloadWarmup   3: 11 op, 548317900.00 ns, 49.8471 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 11 op, 613949800.00 ns, 55.8136 ms/op
+WorkloadActual   2: 11 op, 626682500.00 ns, 56.9711 ms/op
+WorkloadActual   3: 11 op, 670716700.00 ns, 60.9742 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 11 op, 613949800.00 ns, 55.8136 ms/op
+WorkloadResult   2: 11 op, 626682500.00 ns, 56.9711 ms/op
+WorkloadResult   3: 11 op, 670716700.00 ns, 60.9742 ms/op
+// GC:  49 30 11 504152280 11
+// Threading:  0 0 11
+
+// AfterAll
+// Benchmark Process 41844 has exited with code 0.
+
+Mean = 57.920 ms, StdErr = 1.563 ms (2.70%), N = 3, StdDev = 2.708 ms
+Min = 55.814 ms, Q1 = 56.392 ms, Median = 56.971 ms, Q3 = 58.973 ms, Max = 60.974 ms
+IQR = 2.580 ms, LowerFence = 52.522 ms, UpperFence = 62.843 ms
+ConfidenceInterval = [8.517 ms; 107.322 ms] (CI 99.9%), Margin = 49.402 ms (85.29% of Mean)
+Skewness = 0.31, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 5 (62.5%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=sqlite-full]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 1460 2968 --benchmarkName "LocalQuery.SelectivePage(Count: 10000, Store: \"sqlite-full\")" --job ShortRun --benchmarkId 3 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 306100.00 ns, 306.1000 us/op
+WorkloadJitting  1: 1 op, 50158300.00 ns, 50.1583 ms/op
+
+WorkloadPilot    1: 2 op, 82269200.00 ns, 41.1346 ms/op
+WorkloadPilot    2: 3 op, 114973100.00 ns, 38.3244 ms/op
+WorkloadPilot    3: 4 op, 162387500.00 ns, 40.5969 ms/op
+WorkloadPilot    4: 5 op, 188773700.00 ns, 37.7547 ms/op
+WorkloadPilot    5: 6 op, 163487300.00 ns, 27.2479 ms/op
+WorkloadPilot    6: 7 op, 152014900.00 ns, 21.7164 ms/op
+WorkloadPilot    7: 8 op, 162440800.00 ns, 20.3051 ms/op
+WorkloadPilot    8: 9 op, 171198200.00 ns, 19.0220 ms/op
+WorkloadPilot    9: 10 op, 203794200.00 ns, 20.3794 ms/op
+WorkloadPilot   10: 11 op, 221553300.00 ns, 20.1412 ms/op
+WorkloadPilot   11: 12 op, 235610300.00 ns, 19.6342 ms/op
+WorkloadPilot   12: 13 op, 255475900.00 ns, 19.6520 ms/op
+WorkloadPilot   13: 14 op, 322881600.00 ns, 23.0630 ms/op
+WorkloadPilot   14: 15 op, 354954500.00 ns, 23.6636 ms/op
+WorkloadPilot   15: 16 op, 389572200.00 ns, 24.3483 ms/op
+WorkloadPilot   16: 32 op, 727354900.00 ns, 22.7298 ms/op
+
+WorkloadWarmup   1: 32 op, 708978200.00 ns, 22.1556 ms/op
+WorkloadWarmup   2: 32 op, 650396900.00 ns, 20.3249 ms/op
+WorkloadWarmup   3: 32 op, 608100800.00 ns, 19.0032 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 32 op, 642594400.00 ns, 20.0811 ms/op
+WorkloadActual   2: 32 op, 791198100.00 ns, 24.7249 ms/op
+WorkloadActual   3: 32 op, 822141100.00 ns, 25.6919 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 32 op, 642594400.00 ns, 20.0811 ms/op
+WorkloadResult   2: 32 op, 791198100.00 ns, 24.7249 ms/op
+WorkloadResult   3: 32 op, 822141100.00 ns, 25.6919 ms/op
+// GC:  58 56 15 731852584 32
+// Threading:  0 0 32
+
+// AfterAll
+// Benchmark Process 27408 has exited with code 0.
+
+Mean = 23.499 ms, StdErr = 1.732 ms (7.37%), N = 3, StdDev = 2.999 ms
+Min = 20.081 ms, Q1 = 22.403 ms, Median = 24.725 ms, Q3 = 25.208 ms, Max = 25.692 ms
+IQR = 2.805 ms, LowerFence = 18.195 ms, UpperFence = 29.417 ms
+ConfidenceInterval = [-31.223 ms; 78.221 ms] (CI 99.9%), Margin = 54.722 ms (232.87% of Mean)
+Skewness = -0.34, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 4 (50.0%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=memory]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 3216 1920 --benchmarkName "LocalQuery.OrderedPage(Count: 50000, Store: \"memory\")" --job ShortRun --benchmarkId 4 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 288900.00 ns, 288.9000 us/op
+WorkloadJitting  1: 1 op, 296887600.00 ns, 296.8876 ms/op
+
+WorkloadPilot    1: 2 op, 697231700.00 ns, 348.6159 ms/op
+
+WorkloadWarmup   1: 2 op, 547340700.00 ns, 273.6704 ms/op
+WorkloadWarmup   2: 2 op, 518496300.00 ns, 259.2482 ms/op
+WorkloadWarmup   3: 2 op, 560700400.00 ns, 280.3502 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 2 op, 612393200.00 ns, 306.1966 ms/op
+WorkloadActual   2: 2 op, 631642400.00 ns, 315.8212 ms/op
+WorkloadActual   3: 2 op, 636130500.00 ns, 318.0653 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 2 op, 612393200.00 ns, 306.1966 ms/op
+WorkloadResult   2: 2 op, 631642400.00 ns, 315.8212 ms/op
+WorkloadResult   3: 2 op, 636130500.00 ns, 318.0653 ms/op
+// GC:  26 25 7 249694064 2
+// Threading:  0 0 2
+
+// AfterAll
+// Benchmark Process 45048 has exited with code 0.
+
+Mean = 313.361 ms, StdErr = 3.640 ms (1.16%), N = 3, StdDev = 6.305 ms
+Min = 306.197 ms, Q1 = 311.009 ms, Median = 315.821 ms, Q3 = 316.943 ms, Max = 318.065 ms
+IQR = 5.934 ms, LowerFence = 302.107 ms, UpperFence = 325.845 ms
+ConfidenceInterval = [198.331 ms; 428.391 ms] (CI 99.9%), Margin = 115.030 ms (36.71% of Mean)
+Skewness = -0.33, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 3 (37.5%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=memory]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 1928 1916 --benchmarkName "LocalQuery.SelectivePage(Count: 50000, Store: \"memory\")" --job ShortRun --benchmarkId 5 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 236600.00 ns, 236.6000 us/op
+WorkloadJitting  1: 1 op, 174772000.00 ns, 174.7720 ms/op
+
+WorkloadPilot    1: 2 op, 306072000.00 ns, 153.0360 ms/op
+WorkloadPilot    2: 3 op, 541531100.00 ns, 180.5104 ms/op
+
+WorkloadWarmup   1: 3 op, 348929500.00 ns, 116.3098 ms/op
+WorkloadWarmup   2: 3 op, 350673400.00 ns, 116.8911 ms/op
+WorkloadWarmup   3: 3 op, 353865300.00 ns, 117.9551 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 3 op, 353547500.00 ns, 117.8492 ms/op
+WorkloadActual   2: 3 op, 350896800.00 ns, 116.9656 ms/op
+WorkloadActual   3: 3 op, 335661500.00 ns, 111.8872 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 3 op, 353547500.00 ns, 117.8492 ms/op
+WorkloadResult   2: 3 op, 350896800.00 ns, 116.9656 ms/op
+WorkloadResult   3: 3 op, 335661500.00 ns, 111.8872 ms/op
+// GC:  2 0 0 109074320 3
+// Threading:  0 0 3
+
+// AfterAll
+// Benchmark Process 42964 has exited with code 0.
+
+Mean = 115.567 ms, StdErr = 1.858 ms (1.61%), N = 3, StdDev = 3.218 ms
+Min = 111.887 ms, Q1 = 114.426 ms, Median = 116.966 ms, Q3 = 117.407 ms, Max = 117.849 ms
+IQR = 2.981 ms, LowerFence = 109.955 ms, UpperFence = 121.879 ms
+ConfidenceInterval = [56.867 ms; 174.268 ms] (CI 99.9%), Margin = 58.700 ms (50.79% of Mean)
+Skewness = -0.35, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 2 (25.0%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=sqlite-full]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 1864 1872 --benchmarkName "LocalQuery.OrderedPage(Count: 50000, Store: \"sqlite-full\")" --job ShortRun --benchmarkId 6 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 206000.00 ns, 206.0000 us/op
+WorkloadJitting  1: 1 op, 232638400.00 ns, 232.6384 ms/op
+
+WorkloadPilot    1: 2 op, 497032100.00 ns, 248.5161 ms/op
+WorkloadPilot    2: 3 op, 897454300.00 ns, 299.1514 ms/op
+
+WorkloadWarmup   1: 3 op, 913335300.00 ns, 304.4451 ms/op
+WorkloadWarmup   2: 3 op, 898522500.00 ns, 299.5075 ms/op
+WorkloadWarmup   3: 3 op, 871433000.00 ns, 290.4777 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 3 op, 916704800.00 ns, 305.5683 ms/op
+WorkloadActual   2: 3 op, 1011858100.00 ns, 337.2860 ms/op
+WorkloadActual   3: 3 op, 1105292100.00 ns, 368.4307 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 3 op, 916704800.00 ns, 305.5683 ms/op
+WorkloadResult   2: 3 op, 1011858100.00 ns, 337.2860 ms/op
+WorkloadResult   3: 3 op, 1105292100.00 ns, 368.4307 ms/op
+// GC:  67 40 13 687378920 3
+// Threading:  0 0 3
+
+// AfterAll
+// Benchmark Process 41028 has exited with code 0.
+
+Mean = 337.095 ms, StdErr = 18.147 ms (5.38%), N = 3, StdDev = 31.432 ms
+Min = 305.568 ms, Q1 = 321.427 ms, Median = 337.286 ms, Q3 = 352.858 ms, Max = 368.431 ms
+IQR = 31.431 ms, LowerFence = 274.280 ms, UpperFence = 400.005 ms
+ConfidenceInterval = [-236.335 ms; 910.525 ms] (CI 99.9%), Margin = 573.430 ms (170.11% of Mean)
+Skewness = -0.01, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 1 (12.5%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 0m from now) **
+Setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c FriendlyName: High performance)
+// **************************
+// Benchmark: LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=sqlite-full]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Bsync.Benchmarks-ShortRun-1.dll --anonymousPipes 2356 1300 --benchmarkName "LocalQuery.SelectivePage(Count: 50000, Store: \"sqlite-full\")" --job ShortRun --benchmarkId 7 in C:\dev\github\msynk\Bsync\src\Tests\Bsync.Benchmarks\bin\Release\net10.0\Bsync.Benchmarks-ShortRun-1\bin\Release\net10.0
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
+
+OverheadJitting  1: 1 op, 218400.00 ns, 218.4000 us/op
+WorkloadJitting  1: 1 op, 19060600.00 ns, 19.0606 ms/op
+
+OverheadJitting  2: 16 op, 418200.00 ns, 26.1375 us/op
+WorkloadJitting  2: 16 op, 253211900.00 ns, 15.8257 ms/op
+
+WorkloadPilot    1: 16 op, 245298700.00 ns, 15.3312 ms/op
+WorkloadPilot    2: 32 op, 496772700.00 ns, 15.5241 ms/op
+WorkloadPilot    3: 64 op, 1219376400.00 ns, 19.0528 ms/op
+
+OverheadWarmup   1: 64 op, 12400.00 ns, 193.7500 ns/op
+OverheadWarmup   2: 64 op, 700.00 ns, 10.9375 ns/op
+OverheadWarmup   3: 64 op, 500.00 ns, 7.8125 ns/op
+OverheadWarmup   4: 64 op, 500.00 ns, 7.8125 ns/op
+OverheadWarmup   5: 64 op, 600.00 ns, 9.3750 ns/op
+OverheadWarmup   6: 64 op, 600.00 ns, 9.3750 ns/op
+OverheadWarmup   7: 64 op, 600.00 ns, 9.3750 ns/op
+
+OverheadActual   1: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual   2: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadActual   3: 64 op, 1700.00 ns, 26.5625 ns/op
+OverheadActual   4: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual   5: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadActual   6: 64 op, 600.00 ns, 9.3750 ns/op
+OverheadActual   7: 64 op, 500.00 ns, 7.8125 ns/op
+OverheadActual   8: 64 op, 500.00 ns, 7.8125 ns/op
+OverheadActual   9: 64 op, 800.00 ns, 12.5000 ns/op
+OverheadActual  10: 64 op, 500.00 ns, 7.8125 ns/op
+OverheadActual  11: 64 op, 700.00 ns, 10.9375 ns/op
+OverheadActual  12: 64 op, 1400.00 ns, 21.8750 ns/op
+OverheadActual  13: 64 op, 1200.00 ns, 18.7500 ns/op
+OverheadActual  14: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual  15: 64 op, 600.00 ns, 9.3750 ns/op
+OverheadActual  16: 64 op, 500.00 ns, 7.8125 ns/op
+OverheadActual  17: 64 op, 900.00 ns, 14.0625 ns/op
+OverheadActual  18: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual  19: 64 op, 1300.00 ns, 20.3125 ns/op
+OverheadActual  20: 64 op, 1000.00 ns, 15.6250 ns/op
+
+WorkloadWarmup   1: 64 op, 1433849100.00 ns, 22.4039 ms/op
+WorkloadWarmup   2: 64 op, 1371893200.00 ns, 21.4358 ms/op
+WorkloadWarmup   3: 64 op, 1372033400.00 ns, 21.4380 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 64 op, 1448103000.00 ns, 22.6266 ms/op
+WorkloadActual   2: 64 op, 1266256900.00 ns, 19.7853 ms/op
+WorkloadActual   3: 64 op, 1179155200.00 ns, 18.4243 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 64 op, 1448101900.00 ns, 22.6266 ms/op
+WorkloadResult   2: 64 op, 1266255800.00 ns, 19.7852 ms/op
+WorkloadResult   3: 64 op, 1179154100.00 ns, 18.4243 ms/op
+// GC:  116 112 29 1463683272 64
+// Threading:  0 0 64
+
+// AfterAll
+// Benchmark Process 27572 has exited with code 0.
+
+Mean = 20.279 ms, StdErr = 1.238 ms (6.10%), N = 3, StdDev = 2.144 ms
+Min = 18.424 ms, Q1 = 19.105 ms, Median = 19.785 ms, Q3 = 21.206 ms, Max = 22.627 ms
+IQR = 2.101 ms, LowerFence = 15.953 ms, UpperFence = 24.358 ms
+ConfidenceInterval = [-18.839 ms; 59.396 ms] (CI 99.9%), Margin = 39.118 ms (192.90% of Mean)
+Skewness = 0.22, Kurtosis = 0.67, MValue = 2
+
+// ** Remained 0 (0.0%) benchmark(s) to run. Estimated finish 2026-10-06 13:37 (0h 0m from now) **
+Successfully reverted power plan (GUID: 381b4222-f694-41f0-9685-ff5bb260df2e FriendlyName: Balanced)
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts\results\LocalQuery-report.csv
+  BenchmarkDotNet.Artifacts\results\LocalQuery-report-github.md
+  BenchmarkDotNet.Artifacts\results\LocalQuery-report.html
+
+// * Detailed results *
+LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=memory]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 30.166 ms, StdErr = 1.222 ms (4.05%), N = 3, StdDev = 2.117 ms
+Min = 28.349 ms, Q1 = 29.003 ms, Median = 29.658 ms, Q3 = 31.074 ms, Max = 32.490 ms
+IQR = 2.071 ms, LowerFence = 25.897 ms, UpperFence = 34.180 ms
+ConfidenceInterval = [-8.453 ms; 68.785 ms] (CI 99.9%), Margin = 38.619 ms (128.02% of Mean)
+Skewness = 0.23, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[27.077 ms ; 30.930 ms) | @@
+[30.930 ms ; 34.417 ms) | @
+---------------------------------------------------
+
+LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=memory]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 13.894 ms, StdErr = 0.244 ms (1.76%), N = 3, StdDev = 0.423 ms
+Min = 13.408 ms, Q1 = 13.754 ms, Median = 14.100 ms, Q3 = 14.137 ms, Max = 14.173 ms
+IQR = 0.383 ms, LowerFence = 13.180 ms, UpperFence = 14.711 ms
+ConfidenceInterval = [6.182 ms; 21.605 ms] (CI 99.9%), Margin = 7.712 ms (55.50% of Mean)
+Skewness = -0.37, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[13.406 ms ; 14.175 ms) | @@@
+---------------------------------------------------
+
+LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=sqlite-full]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 57.920 ms, StdErr = 1.563 ms (2.70%), N = 3, StdDev = 2.708 ms
+Min = 55.814 ms, Q1 = 56.392 ms, Median = 56.971 ms, Q3 = 58.973 ms, Max = 60.974 ms
+IQR = 2.580 ms, LowerFence = 52.522 ms, UpperFence = 62.843 ms
+ConfidenceInterval = [8.517 ms; 107.322 ms] (CI 99.9%), Margin = 49.402 ms (85.29% of Mean)
+Skewness = 0.31, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[53.928 ms ; 58.857 ms) | @@
+[58.857 ms ; 63.439 ms) | @
+---------------------------------------------------
+
+LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=10000, Store=sqlite-full]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 23.499 ms, StdErr = 1.732 ms (7.37%), N = 3, StdDev = 2.999 ms
+Min = 20.081 ms, Q1 = 22.403 ms, Median = 24.725 ms, Q3 = 25.208 ms, Max = 25.692 ms
+IQR = 2.805 ms, LowerFence = 18.195 ms, UpperFence = 29.417 ms
+ConfidenceInterval = [-31.223 ms; 78.221 ms] (CI 99.9%), Margin = 54.722 ms (232.87% of Mean)
+Skewness = -0.34, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[17.351 ms ; 22.479 ms) | @
+[22.479 ms ; 28.422 ms) | @@
+---------------------------------------------------
+
+LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=memory]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 313.361 ms, StdErr = 3.640 ms (1.16%), N = 3, StdDev = 6.305 ms
+Min = 306.197 ms, Q1 = 311.009 ms, Median = 315.821 ms, Q3 = 316.943 ms, Max = 318.065 ms
+IQR = 5.934 ms, LowerFence = 302.107 ms, UpperFence = 325.845 ms
+ConfidenceInterval = [198.331 ms; 428.391 ms] (CI 99.9%), Margin = 115.030 ms (36.71% of Mean)
+Skewness = -0.33, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[300.459 ms ; 311.205 ms) | @
+[311.205 ms ; 323.803 ms) | @@
+---------------------------------------------------
+
+LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=memory]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 115.567 ms, StdErr = 1.858 ms (1.61%), N = 3, StdDev = 3.218 ms
+Min = 111.887 ms, Q1 = 114.426 ms, Median = 116.966 ms, Q3 = 117.407 ms, Max = 117.849 ms
+IQR = 2.981 ms, LowerFence = 109.955 ms, UpperFence = 121.879 ms
+ConfidenceInterval = [56.867 ms; 174.268 ms] (CI 99.9%), Margin = 58.700 ms (50.79% of Mean)
+Skewness = -0.35, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[108.959 ms ; 114.479 ms) | @
+[114.479 ms ; 120.777 ms) | @@
+---------------------------------------------------
+
+LocalQuery.OrderedPage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=sqlite-full]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 337.095 ms, StdErr = 18.147 ms (5.38%), N = 3, StdDev = 31.432 ms
+Min = 305.568 ms, Q1 = 321.427 ms, Median = 337.286 ms, Q3 = 352.858 ms, Max = 368.431 ms
+IQR = 31.431 ms, LowerFence = 274.280 ms, UpperFence = 400.005 ms
+ConfidenceInterval = [-236.335 ms; 910.525 ms] (CI 99.9%), Margin = 573.430 ms (170.11% of Mean)
+Skewness = -0.01, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[276.964 ms ; 324.254 ms) | @
+[324.254 ms ; 381.462 ms) | @@
+---------------------------------------------------
+
+LocalQuery.SelectivePage: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3) [Count=50000, Store=sqlite-full]
+Runtime = .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 20.279 ms, StdErr = 1.238 ms (6.10%), N = 3, StdDev = 2.144 ms
+Min = 18.424 ms, Q1 = 19.105 ms, Median = 19.785 ms, Q3 = 21.206 ms, Max = 22.627 ms
+IQR = 2.101 ms, LowerFence = 15.953 ms, UpperFence = 24.358 ms
+ConfidenceInterval = [-18.839 ms; 59.396 ms] (CI 99.9%), Margin = 39.118 ms (192.90% of Mean)
+Skewness = 0.22, Kurtosis = 0.67, MValue = 2
+-------------------- Histogram --------------------
+[17.153 ms ; 21.056 ms) | @@
+[21.056 ms ; 24.578 ms) | @
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.15.8, Windows 10 (10.0.19045.6456/22H2/2022Update)
+Intel Core Ultra 7 255H 2.00GHz, 1 CPU, 16 logical and 16 physical cores
+.NET SDK 10.0.401
+  [Host]   : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  ShortRun : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+
+Job=ShortRun  IterationCount=3  LaunchCount=1  
+WarmupCount=3  
+
+| Method        | Count | Store       | Mean      | Error      | StdDev    | P95       | Gen0       | Gen1       | Gen2      | Allocated |
+|-------------- |------ |------------ |----------:|-----------:|----------:|----------:|-----------:|-----------:|----------:|----------:|
+| OrderedPage   | 10000 | memory      |  30.17 ms |  38.619 ms |  2.117 ms |  32.21 ms |  2718.7500 |  2593.7500 |  750.0000 |  23.73 MB |
+| SelectivePage | 10000 | memory      |  13.89 ms |   7.712 ms |  0.423 ms |  14.17 ms |  1281.2500 |   765.6250 |         - |  15.43 MB |
+| OrderedPage   | 10000 | sqlite-full |  57.92 ms |  49.402 ms |  2.708 ms |  60.57 ms |  4454.5455 |  2727.2727 | 1000.0000 |  43.71 MB |
+| SelectivePage | 10000 | sqlite-full |  23.50 ms |  54.722 ms |  2.999 ms |  25.60 ms |  1812.5000 |  1750.0000 |  468.7500 |  21.81 MB |
+| OrderedPage   | 50000 | memory      | 313.36 ms | 115.030 ms |  6.305 ms | 317.84 ms | 13000.0000 | 12500.0000 | 3500.0000 | 119.06 MB |
+| SelectivePage | 50000 | memory      | 115.57 ms |  58.700 ms |  3.218 ms | 117.76 ms |   666.6667 |          - |         - |  34.67 MB |
+| OrderedPage   | 50000 | sqlite-full | 337.10 ms | 573.430 ms | 31.432 ms | 365.32 ms | 22333.3333 | 13333.3333 | 4333.3333 | 218.51 MB |
+| SelectivePage | 50000 | sqlite-full |  20.28 ms |  39.118 ms |  2.144 ms |  22.34 ms |  1812.5000 |  1750.0000 |  453.1250 |  21.81 MB |
+
+// * Legends *
+  Count     : Value of the 'Count' parameter
+  Store     : Value of the 'Store' parameter
+  Mean      : Arithmetic mean of all measurements
+  Error     : Half of 99.9% confidence interval
+  StdDev    : Standard deviation of all measurements
+  P95       : Percentile 95
+  Gen0      : GC Generation 0 collects per 1000 operations
+  Gen1      : GC Generation 1 collects per 1000 operations
+  Gen2      : GC Generation 2 collects per 1000 operations
+  Allocated : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  1 ms      : 1 Millisecond (0.001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:01:29 (89.93 sec), executed benchmarks: 8
+
+Global total time: 00:01:48 (108.71 sec), executed benchmarks: 8
+// * Artifacts cleanup *
+Artifacts cleanup is finished
