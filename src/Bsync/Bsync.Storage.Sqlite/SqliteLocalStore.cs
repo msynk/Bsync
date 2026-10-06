@@ -129,18 +129,19 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         await using var transaction = connection.BeginTransaction(deferred: false); // BEGIN IMMEDIATE
 
         var results = new List<RecordUpdateResult<TDocument>>(updates.Count);
+        await using var commands = new UpdateCommands(); // prepared once per transaction, not per record (D9)
         var maintainIndexes = await IndexesUsableAsync(connection, transaction, invalidate: true, cancellationToken).ConfigureAwait(false);
         var highWater = await ReadHighWaterAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
         var newHighWater = highWater;
         foreach (var update in updates)
         {
-            var existing = await ReadRecordAsync(connection, transaction, update.Id, cancellationToken).ConfigureAwait(false);
+            var existing = await ReadRecordAsync(connection, transaction, update.Id, cancellationToken, commands).ConfigureAwait(false);
             var next = update.Transform(existing);
             if (next is null)
             {
                 // Re-read so the caller never receives the transform's (possibly mutated) working copy.
                 results.Add(new RecordUpdateResult<TDocument>(
-                    existing is null ? null : await ReadRecordAsync(connection, transaction, update.Id, cancellationToken).ConfigureAwait(false),
+                    existing is null ? null : await ReadRecordAsync(connection, transaction, update.Id, cancellationToken, commands).ConfigureAwait(false),
                     Changed: false));
                 continue;
             }
@@ -150,7 +151,7 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 throw new InvalidOperationException($"Transform for '{update.Id}' returned a record with id '{next.Current.Id}'.");
             }
 
-            var written = await WriteRecordAsync(connection, transaction, next, cancellationToken).ConfigureAwait(false);
+            var written = await WriteRecordAsync(connection, transaction, next, commands, cancellationToken).ConfigureAwait(false);
             if (maintainIndexes && _indexes.Count > 0)
             {
                 await WriteIndexRowsAsync(connection, transaction, written, cancellationToken).ConfigureAwait(false);
@@ -756,15 +757,59 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         return value is null ? HlcTimestamp.MinValue : HlcTimestamp.Parse(value);
     }
 
-    private async Task<SyncRecord<TDocument>?> ReadRecordAsync(SqliteConnection connection, SqliteTransaction? transaction, string id, CancellationToken cancellationToken)
+    private async Task<SyncRecord<TDocument>?> ReadRecordAsync(SqliteConnection connection, SqliteTransaction? transaction, string id, CancellationToken cancellationToken, UpdateCommands? commands = null)
     {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = $"SELECT {Columns} FROM bs_records WHERE collection = $c AND id = $id";
-        command.Parameters.AddWithValue("$c", _collection);
-        command.Parameters.AddWithValue("$id", id);
-        var records = await ReadAllAsync(command, cancellationToken).ConfigureAwait(false);
-        return records.Count == 0 ? null : records[0];
+        var command = commands?.Read;
+        if (command is null)
+        {
+            command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = $"SELECT {Columns} FROM bs_records WHERE collection = $c AND id = $id";
+            command.Parameters.AddWithValue("$c", _collection);
+            command.Parameters.AddWithValue("$id", id);
+            if (commands is not null)
+            {
+                commands.Read = command;
+            }
+        }
+        else
+        {
+            command.Parameters["$id"].Value = id;
+        }
+
+        try
+        {
+            var records = await ReadAllAsync(command, cancellationToken).ConfigureAwait(false);
+            return records.Count == 0 ? null : records[0];
+        }
+        finally
+        {
+            if (commands is null)
+            {
+                await command.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>The commands of one <see cref="UpdateAsync"/> transaction, reused for every record.</summary>
+    private sealed class UpdateCommands : IAsyncDisposable
+    {
+        public SqliteCommand? Read { get; set; }
+
+        public SqliteCommand? Write { get; set; }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Read is not null)
+            {
+                await Read.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (Write is not null)
+            {
+                await Write.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 
     private async Task<IReadOnlyList<SyncRecord<TDocument>>> ReadAllAsync(SqliteCommand command, CancellationToken cancellationToken)
@@ -783,6 +828,11 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
     {
         long? NullableInt64(int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetInt64(ordinal);
         string? NullableString(int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+
+        // Equal texts (a pending payload is usually the current document) share one deserialized copy: documents in
+        // records are never mutated in place (D9).
+        var copies = new Dictionary<string, TDocument>(2, StringComparer.Ordinal);
+        TDocument Deserialize(string text) => copies.TryGetValue(text, out var copy) ? copy : copies[text] = this.Deserialize(text);
 
         var pendingId = NullableString(6);
         var rejectionCode = NullableString(11);
@@ -823,7 +873,7 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         };
     }
 
-    private async Task<SyncRecord<TDocument>> WriteRecordAsync(SqliteConnection connection, SqliteTransaction transaction, SyncRecord<TDocument> record, CancellationToken cancellationToken)
+    private async Task<SyncRecord<TDocument>> WriteRecordAsync(SqliteConnection connection, SqliteTransaction transaction, SyncRecord<TDocument> record, UpdateCommands commands, CancellationToken cancellationToken)
     {
         // Each distinct document instance is serialized once (current, base and payload are often the same one), and the
         // returned copy is deserialized from exactly what was written (D9).
@@ -832,9 +882,10 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         string Text(TDocument document) => texts.TryGetValue(document, out var text) ? text : texts[document] = Serialize(document);
         TDocument Copy(string text) => copies.TryGetValue(text, out var copy) ? copy : copies[text] = Deserialize(text);
 
-        await using var command = connection.CreateCommand();
+        var reused = commands.Write is not null;
+        var command = commands.Write ??= connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
+        command.CommandText = reused ? command.CommandText : """
             INSERT OR REPLACE INTO bs_records (
                 collection, id, id_key, current, updated_at, deleted, base, base_version, is_dirty, local_revision,
                 pending_id, pending_revision, pending_base_version, pending_payload,
@@ -848,49 +899,61 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 $groupId, $groupMembers, $pendingGroup, $pendingGroupSize, $baseSame, $rejectionArguments)
             """;
         var p = command.Parameters;
-        p.AddWithValue("$c", _collection);
-        p.AddWithValue("$id", record.Current.Id);
-        p.AddWithValue("$key", OrdinalKey(record.Current.Id));
+        void Set(string name, object value)
+        {
+            if (reused)
+            {
+                p[name].Value = value;
+            }
+            else
+            {
+                p.AddWithValue(name, value);
+            }
+        }
+
+        Set("$c", _collection);
+        Set("$id", record.Current.Id);
+        Set("$key", OrdinalKey(record.Current.Id));
         var current = Text(record.Current);
         var baseJson = record.Base is null ? null : Text(record.Base);
         var baseSame = baseJson is not null && baseJson == current;
-        p.AddWithValue("$current", current);
-        p.AddWithValue("$updated", record.Current.UpdatedAt.Encode());
-        p.AddWithValue("$deleted", record.Current.Deleted ? 1 : 0);
-        p.AddWithValue("$base", baseSame || baseJson is null ? DBNull.Value : baseJson);
-        p.AddWithValue("$baseSame", baseSame ? 1 : 0);
-        p.AddWithValue("$baseVersion", (object?)record.BaseVersion ?? DBNull.Value);
-        p.AddWithValue("$dirty", record.IsDirty ? 1 : 0);
-        p.AddWithValue("$revision", record.LocalRevision);
-        p.AddWithValue("$pendingId", (object?)record.Pending?.OperationId ?? DBNull.Value);
-        p.AddWithValue("$pendingRevision", (object?)record.Pending?.Revision ?? DBNull.Value);
-        p.AddWithValue("$pendingBase", (object?)record.Pending?.BaseVersion ?? DBNull.Value);
+        Set("$current", current);
+        Set("$updated", record.Current.UpdatedAt.Encode());
+        Set("$deleted", record.Current.Deleted ? 1 : 0);
+        Set("$base", baseSame || baseJson is null ? DBNull.Value : baseJson);
+        Set("$baseSame", baseSame ? 1 : 0);
+        Set("$baseVersion", (object?)record.BaseVersion ?? DBNull.Value);
+        Set("$dirty", record.IsDirty ? 1 : 0);
+        Set("$revision", record.LocalRevision);
+        Set("$pendingId", (object?)record.Pending?.OperationId ?? DBNull.Value);
+        Set("$pendingRevision", (object?)record.Pending?.Revision ?? DBNull.Value);
+        Set("$pendingBase", (object?)record.Pending?.BaseVersion ?? DBNull.Value);
         var payload = record.Pending is null ? null : Text(record.Pending.Payload);
-        p.AddWithValue("$pendingPayload", (object?)payload ?? DBNull.Value);
-        p.AddWithValue("$rejectionRevision", (object?)record.Rejection?.Revision ?? DBNull.Value);
-        p.AddWithValue("$rejectionCode", (object?)record.Rejection?.ErrorCode ?? DBNull.Value);
-        p.AddWithValue("$rejectionMessage", (object?)record.Rejection?.Message ?? DBNull.Value);
-        p.AddWithValue(
+        Set("$pendingPayload", (object?)payload ?? DBNull.Value);
+        Set("$rejectionRevision", (object?)record.Rejection?.Revision ?? DBNull.Value);
+        Set("$rejectionCode", (object?)record.Rejection?.ErrorCode ?? DBNull.Value);
+        Set("$rejectionMessage", (object?)record.Rejection?.Message ?? DBNull.Value);
+        Set(
             "$rejectionArguments",
             record.Rejection?.Arguments is { Count: > 0 } rejectionArguments
                 ? JsonSerializer.Serialize(new Dictionary<string, string>(rejectionArguments, StringComparer.Ordinal), SqliteJson.Default.DictionaryStringString)
                 : DBNull.Value);
         var observed = record.Observed is null ? null : Text(record.Observed);
-        p.AddWithValue("$observed", (object?)observed ?? DBNull.Value);
-        p.AddWithValue("$observedVersion", (object?)record.ObservedVersion ?? DBNull.Value);
-        p.AddWithValue("$generation", record.Generation);
-        p.AddWithValue("$missing", record.MissingAfterReset ? 1 : 0);
+        Set("$observed", (object?)observed ?? DBNull.Value);
+        Set("$observedVersion", (object?)record.ObservedVersion ?? DBNull.Value);
+        Set("$generation", record.Generation);
+        Set("$missing", record.MissingAfterReset ? 1 : 0);
         var conflictServer = record.Conflict is { } c ? Text(c.Server) : null;
         var conflictLocal = record.Conflict is { } cl ? Text(cl.Local) : null;
         var conflictBase = record.Conflict?.Base is { } cb ? Text(cb) : null;
-        p.AddWithValue("$conflictServer", (object?)conflictServer ?? DBNull.Value);
-        p.AddWithValue("$conflictServerVersion", (object?)record.Conflict?.ServerVersion ?? DBNull.Value);
-        p.AddWithValue("$conflictLocal", (object?)conflictLocal ?? DBNull.Value);
-        p.AddWithValue("$conflictBase", (object?)conflictBase ?? DBNull.Value);
-        p.AddWithValue("$groupId", (object?)record.Group?.Id ?? DBNull.Value);
-        p.AddWithValue("$groupMembers", record.Group is { } g ? JsonSerializer.Serialize(g.Members.ToArray(), SqliteJson.Default.StringArray) : DBNull.Value);
-        p.AddWithValue("$pendingGroup", (object?)record.Pending?.Group ?? DBNull.Value);
-        p.AddWithValue("$pendingGroupSize", record.Pending is { Group: not null } pg ? pg.GroupSize : DBNull.Value);
+        Set("$conflictServer", (object?)conflictServer ?? DBNull.Value);
+        Set("$conflictServerVersion", (object?)record.Conflict?.ServerVersion ?? DBNull.Value);
+        Set("$conflictLocal", (object?)conflictLocal ?? DBNull.Value);
+        Set("$conflictBase", (object?)conflictBase ?? DBNull.Value);
+        Set("$groupId", (object?)record.Group?.Id ?? DBNull.Value);
+        Set("$groupMembers", record.Group is { } g ? JsonSerializer.Serialize(g.Members.ToArray(), SqliteJson.Default.StringArray) : DBNull.Value);
+        Set("$pendingGroup", (object?)record.Pending?.Group ?? DBNull.Value);
+        Set("$pendingGroupSize", record.Pending is { Group: not null } pg ? pg.GroupSize : DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
 
         return record with

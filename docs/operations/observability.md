@@ -30,6 +30,8 @@ name. The default is the document type name.
 | `bsync.queue.depth` | observable gauge | documents | `bsync.name` | Documents with unconfirmed local changes, as of the engine's last run. |
 | `bsync.queue.oldest_age` | observable gauge | s | `bsync.name` | Age of the oldest change waiting for upload, by its authoring time, as of the last run. |
 | `bsync.issues` | observable gauge | documents | `bsync.name`, `bsync.issue` (`conflict`, `rejected`, `blocked`) | Documents waiting for a person's decision, as of the last run: kept conflicts, rejected changes, and group members parked because another member failed (disjoint; their sum is the total). |
+| `bsync.blob.bytes` | counter | By | `bsync.direction` (`upload`, `download`) | Attachment bytes sent or received by `HttpBlobTransfer` (task F1), including presigned uploads and redirected downloads. |
+| `bsync.blob.transfers` | counter | transfers | `bsync.direction`, `bsync.result` (`complete`, `failed`, `corrupt`) | Attachment transfers by result. `corrupt` means the bytes did not match the hash and were discarded; `failed` covers network errors and refusals (retried by the caller). |
 
 The queue gauges cost two small store reads per run. They are measured only while a listener subscribes to
 them.
@@ -56,6 +58,10 @@ The DI recipes (`AddLocalSyncCollection`, `AddBrowserSyncCollection`) use the co
 |---|---|---|
 | `bsync.server.requests` | `bsync.collection`, `bsync.endpoint` (`pull`, `push`, `hints`), `bsync.result` (`ok` or a problem code) | Every protocol request. |
 | `bsync.server.push.operations` | `bsync.collection`, `bsync.outcome`, `bsync.duplicate` | Operations decided by the authority. |
+| `bsync.server.blob.bytes` | `bsync.direction` (`upload`, `download`) | Attachment bytes received in chunks and served by the blob routes. Presigned uploads and downloads (object storage) do not pass through the server and are not counted. |
+| `bsync.server.blob.requests` | `bsync.endpoint` (`start`, `append`, `finish`, `read`), `bsync.result` (`ok`, `redirect`, `offset-mismatch`, a code such as `blob-hash-mismatch` or `blob-too-large`, or the status code) | Every blob request. |
+
+Blob metrics carry no hashes, file names or scopes.
 
 Logs:
 
@@ -85,6 +91,8 @@ no id and are not recorded. Tested: `ReplicaAuditTests`, `SqlServerAuthorityTest
 - `bsync.resets` by reason, which is expected after a restore or a permission change and suspicious
   otherwise.
 - `bsync.server.requests{result="unavailable"}` together with `SyncAuthorityFailed` logs.
+- `bsync.blob.transfers{result="corrupt"}` or `bsync.server.blob.requests{result="blob-hash-mismatch"}`: content
+  damaged in transit or on a device's disk.
 
 ## Evidence
 
@@ -93,6 +101,8 @@ no id and are not recorded. Tested: `ReplicaAuditTests`, `SqlServerAuthorityTest
 - `ServerObservabilityTests`: request and operation counters, refusal logs, and the retryable 503 without
   leaked details.
 - `BlazorIntegrationTests.UnexpectedFailureIsReportedAndRecovers` and `RecipeUsesContainerLogging`.
+- `BlobRouteTests.TransfersAreMeasured`: client and server blob bytes and transfers by direction, endpoint and
+  result (including a hash mismatch), with no content hash in any tag.
 
 - `OpenTelemetryExportTests`: the documented `AddSource`/`AddMeter` wiring exports the spans and the client and
   server metrics through the OpenTelemetry SDK (1.18.0, in-memory exporter).

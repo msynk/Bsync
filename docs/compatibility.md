@@ -25,6 +25,18 @@
 
 ## Unreleased
 
+Changes after 0.5.0 (24d5c06).
+
+| Change | Why | Migration |
+|---|---|---|
+| `Bsync`, namespace `Bsync.Blobs`: `BlobReference`, `BlobUploadStatus`, `BlobCodes`, `IBlobSource`, `FileBlobSource`, `BlobCorruptedException`, `IBlobCache`, `FileBlobCache`, `HttpBlobTransfer`, `HttpBlobTransferOptions`. Client meter: `bsync.blob.bytes`, `bsync.blob.transfers`. | Attachments as a library feature (task F1), not only a sample. | Additive. Apps that copied the sample's `BlobReference` can switch to the package type: its JSON shape is the same. |
+| **Binding (additive, optional):** blob routes `POST {blobs}/{sha256}/uploads`, `PUT {blobs}/{sha256}/uploads/{offset}`, `POST {blobs}/{sha256}/uploads/finish`, `GET {blobs}/{sha256}` (protocol section 8), with an optional `uploadUrl` in the start response. `Bsync.Server.AspNetCore`, namespace `Bsync.Server.AspNetCore.Blobs`: `MapSyncBlobs`, `SyncBlobEndpointOptions`, `IBlobStore` (with default `PresignReadAsync`/`PresignWriteAsync`), `FileSystemBlobStore`, `IBlobAccess`, `SyncBlobCollector`. Server meter: `bsync.server.blob.bytes`, `bsync.server.blob.requests`. | Task F1; task H for the metrics. | Additive. The sync protocol is unchanged. |
+| New optional package `Bsync.Server.Blobs.S3`: `S3BlobStore` (`PresignHttp`, `PresignUploads`). | Object storage without making the server packages depend on the AWS SDK. | Additive. |
+| `Bsync.Blazor`: `BrowserBlobStore` implements `IBlobCache` (adds `AppendPartialAsync(string, ReadOnlyMemory<byte>, CancellationToken)` and `OpenReadAsync`); **`ListAsync` returns `IReadOnlyList<string>` instead of `string[]`**. | One cache interface for `HttpBlobTransfer` on every platform. | Recompile; code that used `.Length` on the list uses `.Count`. |
+| **Behaviour:** `DocumentCloner.JsonFingerprint` returns the same values as before; `InMemorySyncServer<T>` hashes them without building the text. The in-memory store and the engine skip copies they do not need, and the SQLite store reuses commands within a transaction (task D9). | Allocations per pushed document. | None. Custom `ILocalStore<T>` implementations: `UpdateAsync` may now receive an accepted document the engine did not copy; copy what you keep (as the contract already required). Custom `ISyncTransport<T>` (or an authority used through `InProcessTransport<T>`): documents in push results must not be kept, reused or changed after they are returned (now stated on `ISyncTransport<T>`). |
+
+## 0.5.0 (committed as 24d5c06; not yet on NuGet)
+
 Changes committed after 0.4.0 (76944e9).
 
 | Change | Why | Migration |

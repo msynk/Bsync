@@ -12,7 +12,6 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
-    <PackageReference Include="AWSSDK.S3" Version="4.0.104.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +19,7 @@
     <ProjectReference Include="..\Bsync.Samples.Tasks.Shared\Bsync.Samples.Tasks.Shared.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.AspNetCore\Bsync.Server.AspNetCore.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.Blobs.S3\Bsync.Server.Blobs.S3.csproj" />
   </ItemGroup>
 
 </Project>

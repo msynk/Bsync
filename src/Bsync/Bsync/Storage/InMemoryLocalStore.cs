@@ -69,7 +69,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         {
             // Compute every new state first so that a throwing transform commits nothing.
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            var staged = new List<(string Id, SyncRecord<TDocument>? Record, bool Changed)>(updates.Count);
+            var staged = new List<(string Id, SyncRecord<TDocument>? Record, bool Changed, bool ResultUnused)>(updates.Count);
             foreach (var update in updates)
             {
                 ArgumentNullException.ThrowIfNull(update);
@@ -79,12 +79,26 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 }
 
                 var owned = new HashSet<TDocument>(ReferenceEqualityComparer.Instance);
-                var existing = _records.TryGetValue(update.Id, out var stored) ? CloneRecord(stored, owned) : null;
+                SyncRecord<TDocument>? existing = null;
+                if (_records.TryGetValue(update.Id, out var stored))
+                {
+                    if (update.Pure)
+                    {
+                        // The transform only reads its input: it gets the stored record, whose documents are this store's.
+                        existing = stored;
+                        Own(stored, owned);
+                    }
+                    else
+                    {
+                        existing = CloneRecord(stored, owned);
+                    }
+                }
+
                 var next = update.Transform(existing);
                 if (next is null)
                 {
                     // Report the committed state, not the transform's working copy (it may have mutated it).
-                    staged.Add((update.Id, stored, false));
+                    staged.Add((update.Id, stored, false, update.ResultUnused));
                     continue;
                 }
 
@@ -95,11 +109,16 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 }
 
                 // Documents the transform took from its input are copies this store made; only the others need copying.
-                staged.Add((update.Id, CloneRecord(next, reuse: owned), true));
+                if (update.Adopt)
+                {
+                    Own(next, owned);
+                }
+
+                staged.Add((update.Id, CloneRecord(next, reuse: owned), true, update.ResultUnused));
             }
 
             var results = new List<RecordUpdateResult<TDocument>>(staged.Count);
-            foreach (var (id, record, changed) in staged)
+            foreach (var (id, record, changed, resultUnused) in staged)
             {
                 if (changed)
                 {
@@ -109,7 +128,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                     ObserveTimestamps(record!);
                 }
 
-                results.Add(new RecordUpdateResult<TDocument>(record is null ? null : CloneRecord(record), changed));
+                results.Add(new RecordUpdateResult<TDocument>(record is null || resultUnused ? null : CloneRecord(record), changed));
             }
 
             if (cursor is { } committed)
@@ -429,6 +448,28 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         if (record.Pending is { } pending && pending.Payload.UpdatedAt > _highWater)
         {
             _highWater = pending.Payload.UpdatedAt;
+        }
+    }
+
+    private static void Own(SyncRecord<TDocument> record, HashSet<TDocument> owned)
+    {
+        owned.Add(record.Current);
+        AddIfAny(record.Base);
+        AddIfAny(record.Observed);
+        AddIfAny(record.Pending?.Payload);
+        if (record.Conflict is { } conflict)
+        {
+            owned.Add(conflict.Server);
+            owned.Add(conflict.Local);
+            AddIfAny(conflict.Base);
+        }
+
+        void AddIfAny(TDocument? document)
+        {
+            if (document is not null)
+            {
+                owned.Add(document);
+            }
         }
     }
 

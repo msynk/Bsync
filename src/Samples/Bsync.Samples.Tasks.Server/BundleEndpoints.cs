@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Bsync.Blobs;
 using Bsync.Server;
 using Bsync.Server.SqlServer;
 using Microsoft.EntityFrameworkCore;

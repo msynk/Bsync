@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <PackageReference Include="Microsoft.Playwright" Version="1.63.0" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\Bsync.Tests.BrowserHost\Bsync.Tests.BrowserHost.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
     <ProjectReference Include="..\..\Samples\Bsync.Samples.Notes.Server\Bsync.Samples.Notes.Server.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
     <ProjectReference Include="..\..\Samples\Bsync.Samples.WebApp\Bsync.Samples.WebApp.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
+    <ProjectReference Include="..\..\Samples\Bsync.Samples.Tasks.Server\Bsync.Samples.Tasks.Server.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" />
     <ProjectReference Include="..\..\Samples\Bsync.Samples.Hybrid.Wpf\Bsync.Samples.Hybrid.Wpf.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" Condition="'$(OS)' == 'Windows_NT'" />
     <!-- Built only where the maui-windows workload is installed: dotnet test -p:BuildMauiSample=true -->
     <ProjectReference Include="..\..\Samples\Bsync.Samples.Hybrid.Maui\Bsync.Samples.Hybrid.Maui.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" Condition="'$(OS)' == 'Windows_NT' And '$(BuildMauiSample)' == 'true'" />
@@ -49,6 +51,9 @@
     <MSBuild Projects="..\..\Samples\Bsync.Samples.WebApp\Bsync.Samples.WebApp.csproj"
              Targets="Publish"
              Properties="Configuration=$(Configuration);PublishDir=$(MSBuildProjectDirectory)\$(OutDir)webapp-sample\" />
+    <MSBuild Projects="..\..\Samples\Bsync.Samples.Tasks.Server\Bsync.Samples.Tasks.Server.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(MSBuildProjectDirectory)\$(OutDir)tasks-sample\" />
   </Target>
 
 </Project>

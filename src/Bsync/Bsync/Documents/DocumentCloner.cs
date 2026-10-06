@@ -43,27 +43,14 @@ public static class DocumentCloner
         ArgumentNullException.ThrowIfNull(typeInfo);
         return document =>
         {
-            // The JSON goes through a buffer reused per thread: a clone allocates only the new document (D9).
-            var buffer = t_buffer ??= new ArrayBufferWriter<byte>(4096);
-            buffer.ResetWrittenCount();
-            using (var writer = new Utf8JsonWriter(buffer))
-            {
-                JsonSerializer.Serialize(writer, document, typeInfo);
-            }
-
+            // The JSON goes through a buffer and writer reused per thread: a clone allocates only the new document (D9).
+            var buffer = ScratchJson.Write(document, typeInfo);
             var clone = JsonSerializer.Deserialize(buffer.WrittenSpan, typeInfo)
                 ?? throw new InvalidOperationException($"Failed to clone document of type {typeof(T).Name}.");
-            if (buffer.Capacity > 1024 * 1024)
-            {
-                t_buffer = null; // do not keep an unusually large buffer alive
-            }
-
+            ScratchJson.Release(buffer);
             return clone;
         };
     }
-
-    [ThreadStatic]
-    private static ArrayBufferWriter<byte>? t_buffer;
 
     /// <summary>
     /// Returns a trim/AOT-safe fingerprint function (the document's JSON text) for detecting an operation
@@ -73,6 +60,59 @@ public static class DocumentCloner
         where T : class
     {
         ArgumentNullException.ThrowIfNull(typeInfo);
-        return document => JsonSerializer.Serialize(document, typeInfo);
+        return new JsonFingerprint<T>(typeInfo).Compute;
+    }
+}
+
+/// <summary>
+/// The function returned by <see cref="DocumentCloner.JsonFingerprint{T}"/>. The in-memory server recognizes it and hashes
+/// the JSON bytes directly instead of building the text (D9); the digest is the same.
+/// </summary>
+internal sealed class JsonFingerprint<T>(JsonTypeInfo<T> typeInfo)
+    where T : class
+{
+    public string Compute(T document) => JsonSerializer.Serialize(document, typeInfo);
+
+    /// <summary>Appends the UTF-8 JSON of <paramref name="document"/> (the bytes of <see cref="Compute"/>'s text) to <paramref name="hash"/>.</summary>
+    public void AppendTo(System.Security.Cryptography.IncrementalHash hash, T document)
+    {
+        var buffer = ScratchJson.Write(document, typeInfo);
+        hash.AppendData(buffer.WrittenSpan);
+        ScratchJson.Release(buffer);
+    }
+}
+
+/// <summary>A JSON buffer and writer reused per thread (D9).</summary>
+internal static class ScratchJson
+{
+    [ThreadStatic]
+    private static ArrayBufferWriter<byte>? t_buffer;
+
+    [ThreadStatic]
+    private static Utf8JsonWriter? t_writer;
+
+    /// <summary>Serializes into the thread's buffer. Call <see cref="Release"/> when done with the bytes.</summary>
+    public static ArrayBufferWriter<byte> Write<T>(T document, JsonTypeInfo<T> typeInfo)
+    {
+        // Taken while in use, so a nested use on the same thread (a converter that clones) gets its own buffer.
+        var buffer = t_buffer ?? new ArrayBufferWriter<byte>(4096);
+        var writer = t_writer ?? new Utf8JsonWriter(buffer);
+        t_buffer = null;
+        t_writer = null;
+        buffer.ResetWrittenCount();
+        writer.Reset(buffer);
+        JsonSerializer.Serialize(writer, document, typeInfo);
+        writer.Reset(); // detaches nothing, but leaves no pending state behind
+        t_writer = writer;
+        return buffer;
+    }
+
+    /// <summary>Returns the buffer for reuse, unless it grew unusually large.</summary>
+    public static void Release(ArrayBufferWriter<byte> buffer)
+    {
+        if (buffer.Capacity <= 1024 * 1024)
+        {
+            t_buffer = buffer;
+        }
     }
 }

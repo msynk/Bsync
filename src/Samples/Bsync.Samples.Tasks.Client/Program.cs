@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Bsync;
 using Bsync.Blazor.IndexedDb;
 using Bsync.Protocol;
 using Bsync.Samples.Tasks;
@@ -15,6 +16,8 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var baseAddress = new Uri(builder.HostEnvironment.BaseAddress);
 var session = new SignIn(baseAddress);
 builder.Services.AddSingleton(session);
+var attachments = new TaskAttachments(session, baseAddress);
+builder.Services.AddSingleton(attachments);
 
 // One IndexedDB replica per signed-in user. The sync HttpClient is dedicated: a shared pipeline that rewrites error
 // responses would hide Retry-After and the protocol's problem codes from the transport.
@@ -26,7 +29,14 @@ builder.Services.AddBrowserSyncCollection<TaskDocument>(
         new HttpSyncTransportOptions { Collection = TasksJson.Collection, SchemaId = TasksJson.SchemaId },
         SyncJsonTypes<TaskDocument>.From(TasksJson.Default)),
     resolveAccount: (_, _) => Task.FromResult(session.User ?? throw new InvalidOperationException("Sign in first.")),
-    configure: options => options with { Interval = TimeSpan.FromSeconds(10), MaxBackoff = TimeSpan.FromSeconds(30) });
+    configure: options => options with
+    {
+        Interval = TimeSpan.FromSeconds(10),
+        MaxBackoff = TimeSpan.FromSeconds(30),
+
+        // A task waits until the server holds its attachments (task F1).
+        EngineOptions = new SyncOptions<TaskDocument> { ReadyToPush = attachments.EnsureUploadedAsync },
+    });
 
 await builder.Build().RunAsync();
 

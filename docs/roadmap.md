@@ -39,8 +39,8 @@ workloads and targets: ADR-012. Explicit non-goals: see the README.
 2. **Mobile and desktop devices.** Build the MAUI sample for Android, iOS and Mac Catalyst (workloads and devices
    needed). Run the browser tests in native Safari and mobile browsers.
 3. **Performance.**
-   - Fewer JSON clones on the sync path (about 64 KB allocated per pushed document; see docs/benchmarks.md).
-   - Indexed queries beyond id order.
+   - Fewer JSON round trips in the SQLite store on the push path (47 KB allocated per pushed document; the
+     in-memory path is at 14.5 KB; see docs/benchmarks.md).
    - A throughput benchmark on PostgreSQL with concurrent sessions.
 4. **Identity.** A sample with real authentication (cookie or token renewal, account switching in the browser).
 5. **Phase 11** — extensions only on evidence from real use (ADR-001): nothing selected yet.

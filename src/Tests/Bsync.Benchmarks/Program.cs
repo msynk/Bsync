@@ -48,4 +48,10 @@ if (args is ["throughput", var provider, var connection, ..] && provider is "sql
     return;
 }
 
+if (args is ["push-alloc", var kind, ..])
+{
+    await PushAllocations.RunAsync(kind, args.Length > 2 ? int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture) : 15);
+    return;
+}
+
 BenchmarkSwitcher.FromAssembly(typeof(Workload).Assembly).Run(args);

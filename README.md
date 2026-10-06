@@ -3,7 +3,7 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.1.0` is published on NuGet; this branch builds `0.3.0` (unreleased). Pre-1.0: minor versions may
+> **Status:** `0.1.0` is published on NuGet; this branch builds `0.5.0` (unreleased). Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
@@ -12,8 +12,9 @@ This section is the single source of truth for release and verification status; 
 
 - **Packages.** Six packages are at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
   `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. The repository
-  is at `0.3.0` (unreleased; `0.1.1` and `0.2.0` are committed but not published) and adds a seventh,
-  `Bsync.Server.SqlServer`; `dotnet pack` builds these seven.
+  is at `0.5.0` (unreleased; `0.1.1` to `0.5.0` are committed but not published) and adds
+  `Bsync.Server.SqlServer`, `Bsync.Storage.Sqlite.Encrypted` (SQLCipher), `Bsync.Server.Blobs.S3` (attachments in
+  object storage) and `Bsync.Maui` (needs the MAUI workload; not packed by CI).
   Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
   ([compatibility policy](docs/compatibility.md#policy)).
@@ -25,9 +26,9 @@ This section is the single source of truth for release and verification status; 
   including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
   Windows machine.
 - **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push: unit tests on Windows, Linux
-  and macOS; the PostgreSQL authority on Linux; browser and WPF tests on Windows; pack, plus a build and test of
-  consumers that reference only the packed packages. Its current state is in the support matrix; it is not yet
-  reliably green.
+  and macOS (with the encrypted SQLite store); the PostgreSQL authority on Linux; the SQL Server authority and the
+  tasks sample on Linux, with an S3-compatible server; browser and WPF tests on Windows; pack, plus a build and test of
+  consumers that reference only the packed packages. Its current state is in the support matrix.
 - **Roadmap.** [docs/roadmap.md](docs/roadmap.md).
 
 ## What it guarantees today

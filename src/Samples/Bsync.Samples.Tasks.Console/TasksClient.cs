@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization.Metadata;
+using Bsync.Blobs;
 using Bsync.Client;
 using Bsync.Documents;
 using Bsync.Protocol;
@@ -21,16 +22,18 @@ public sealed class TasksClient : IAsyncDisposable
     private readonly string _user;
     private readonly LocalBlobStore _blobs;
     private readonly HttpClient _blobHttp;
-    private readonly BlobTransfer _transfer;
+    private readonly HttpClient _directHttp;
+    private readonly HttpBlobTransfer _transfer;
 
-    private TasksClient(ServiceProvider services, string databasePath, string user, LocalBlobStore blobs, HttpClient blobHttp)
+    private TasksClient(ServiceProvider services, string databasePath, string user, LocalBlobStore blobs, HttpClient blobHttp, HttpClient directHttp)
     {
         _services = services;
         _databasePath = databasePath;
         _user = user;
         _blobs = blobs;
         _blobHttp = blobHttp;
-        _transfer = new BlobTransfer(blobHttp);
+        _directHttp = directHttp;
+        _transfer = new HttpBlobTransfer(blobHttp, new HttpBlobTransferOptions { DirectClient = directHttp });
     }
 
     /// <summary>The tasks, as the app sees them (local reads; never wait for the network).</summary>
@@ -67,7 +70,9 @@ public sealed class TasksClient : IAsyncDisposable
         Add(services, TasksJson.BundleCollection, TasksJson.Default.BundleManifest, new SyncOptions<BundleManifest> { Mode = SyncMode.PullOnly });
         HttpMessageHandler blobHandler = new BearerHandler(server, user, tenant) { InnerHandler = new HttpClientHandler() };
         var blobHttp = new HttpClient(wrapHandler?.Invoke(blobHandler) ?? blobHandler) { BaseAddress = server, Timeout = TimeSpan.FromMinutes(10) };
-        return new TasksClient(services.BuildServiceProvider(), databasePath, user, blobs, blobHttp);
+        // Presigned object-store URLs carry their own authorization: no bearer token there.
+        var directHttp = new HttpClient(wrapHandler?.Invoke(new HttpClientHandler()) ?? new HttpClientHandler()) { Timeout = TimeSpan.FromMinutes(10) };
+        return new TasksClient(services.BuildServiceProvider(), databasePath, user, blobs, blobHttp, directHttp);
 
         // Both collections share the database file; each has its own rows, cursor and push queue.
         void Add<TDocument>(ServiceCollection services, string collection, JsonTypeInfo<TDocument> type, SyncOptions<TDocument>? engineOptions)
@@ -152,8 +157,8 @@ public sealed class TasksClient : IAsyncDisposable
             return 0;
         }
 
-        var received = await _transfer.DownloadAsync(attachment.Sha256, attachment.Size, _blobs.PartialPath(attachment), cancellationToken);
-        _blobs.CompleteDownload(attachment);
+        var received = await _transfer.DownloadAsync(_blobs.Content, attachment.Sha256, attachment.Size, cancellationToken);
+        _blobs.MarkUploaded(attachment); // it came from the server
         return received;
     }
 
@@ -166,7 +171,7 @@ public sealed class TasksClient : IAsyncDisposable
         var blob = await _blobs.ImportAsync(content, fileName, contentType, cancellationToken);
         if (!_blobs.IsUploaded(blob))
         {
-            await _transfer.UploadAsync(blob.Sha256, _blobs.Source(blob), cancellationToken);
+            await _transfer.UploadAsync(_blobs.Content, blob.Sha256, cancellationToken);
             _blobs.MarkUploaded(blob);
         }
 
@@ -276,7 +281,7 @@ public sealed class TasksClient : IAsyncDisposable
         {
             if (!_blobs.IsUploaded(blob) && _blobs.Has(blob))
             {
-                sent += await _transfer.UploadAsync(blob.Sha256, _blobs.Source(blob), cancellationToken);
+                sent += await _transfer.UploadAsync(_blobs.Content, blob.Sha256, cancellationToken);
                 _blobs.MarkUploaded(blob);
             }
         }
@@ -302,6 +307,7 @@ public sealed class TasksClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _blobHttp.Dispose();
+        _directHttp.Dispose();
         await _services.DisposeAsync();
         SqliteStorePool.Release(_databasePath);
     }

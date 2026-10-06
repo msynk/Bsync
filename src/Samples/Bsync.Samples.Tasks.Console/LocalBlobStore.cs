@@ -1,18 +1,17 @@
-using System.Security.Cryptography;
+using Bsync.Blobs;
 
 namespace Bsync.Samples.Tasks.Console;
 
 /// <summary>
-/// The device's blob replica next to the SQLite file (task F1), content-addressed:
+/// The device's attachment state next to the SQLite file (task F1): the verified content itself is a
+/// <see cref="FileBlobCache"/> (<c>objects/</c>, <c>partial/</c>); this class adds what the app decides on top of it:
 /// <list type="bullet">
-/// <item><c>objects/ab/&lt;sha256&gt;</c>: verified content only. A file appears here by an atomic rename after its
-/// hash was checked, so a partial or corrupted file is never opened as complete.</item>
-/// <item><c>partial/&lt;sha256&gt;.part</c>: a download in progress, resumed after a crash or network loss.</item>
 /// <item><c>uploaded/&lt;sha256&gt;</c>: a marker that the server holds the verified content for this user's tenant.</item>
 /// <item><c>pins/&lt;task id&gt;</c>: tasks whose attachments are prefetched and never evicted.</item>
 /// <item><c>bundles/&lt;bundle id&gt;.json</c>: the manifest of the bundle revision in use, replaced in one rename once
 /// a newer revision is complete on the device (task F2).</item>
 /// </list>
+/// The sample is synchronous where the file cache completes synchronously anyway.
 /// </summary>
 public sealed class LocalBlobStore
 {
@@ -21,11 +20,15 @@ public sealed class LocalBlobStore
     public LocalBlobStore(string root)
     {
         _root = root;
-        foreach (var folder in new[] { "objects", "partial", "incoming", "uploaded", "pins", "bundles" })
+        Content = new FileBlobCache(root);
+        foreach (var folder in new[] { "uploaded", "pins", "bundles" })
         {
             Directory.CreateDirectory(Path.Combine(root, folder));
         }
     }
+
+    /// <summary>The verified content.</summary>
+    public FileBlobCache Content { get; }
 
     /// <summary>
     /// Copies <paramref name="content"/> into the store, flushed to disk, and returns its reference. The caller saves the
@@ -33,62 +36,24 @@ public sealed class LocalBlobStore
     /// </summary>
     public async Task<BlobReference> ImportAsync(Stream content, string fileName, string contentType, CancellationToken cancellationToken = default)
     {
-        var incoming = Path.Combine(_root, "incoming", Guid.NewGuid().ToString("N"));
-        string sha256;
-        long size;
-        try
-        {
-            await using (var file = new FileStream(incoming, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true))
-            using (var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
-            {
-                var buffer = new byte[81920];
-                int read;
-                while ((read = await content.ReadAsync(buffer, cancellationToken)) > 0)
-                {
-                    hash.AppendData(buffer, 0, read);
-                    await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                }
-
-                await file.FlushAsync(cancellationToken);
-                file.Flush(flushToDisk: true);
-                sha256 = Convert.ToHexStringLower(hash.GetHashAndReset());
-                size = file.Length;
-            }
-
-            Promote(incoming, sha256);
-        }
-        finally
-        {
-            File.Delete(incoming);
-        }
-
+        var (sha256, size) = await Content.ImportAsync(content, cancellationToken);
         return new BlobReference(Guid.CreateVersion7().ToString(), sha256, size, contentType, fileName);
     }
 
     /// <summary>Whether the verified content is on this device.</summary>
-    public bool Has(BlobReference blob) => new FileInfo(ObjectPath(blob.Sha256)) is { Exists: true } file && file.Length == blob.Size;
+    public bool Has(BlobReference blob) => Content.SizeAsync(blob.Sha256).GetAwaiter().GetResult() == blob.Size;
 
     /// <summary>Opens verified content, or returns <see langword="null"/> when it is not on this device (yet).</summary>
-    public Stream? TryOpenRead(BlobReference blob)
-    {
-        if (!Has(blob))
-        {
-            return null;
-        }
-
-        var path = ObjectPath(blob.Sha256);
-        File.SetLastAccessTimeUtc(path, DateTime.UtcNow); // least-recently-used eviction
-        return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
-    }
-
-    /// <summary>A source for uploading verified content.</summary>
-    public IBlobSource Source(BlobReference blob) => new FileBlobSource(ObjectPath(blob.Sha256));
+    public Stream? TryOpenRead(BlobReference blob) => Has(blob) ? Content.OpenReadAsync(blob.Sha256).GetAwaiter().GetResult() : null;
 
     /// <summary>Whether the server is known to hold the content.</summary>
     public bool IsUploaded(BlobReference blob) => File.Exists(Path.Combine(_root, "uploaded", blob.Sha256));
 
     /// <summary>Records that the server holds the content.</summary>
     public void MarkUploaded(BlobReference blob) => File.WriteAllBytes(Path.Combine(_root, "uploaded", blob.Sha256), []);
+
+    /// <summary>How many bytes of an interrupted download of <paramref name="blob"/> are kept.</summary>
+    public long PartialLength(BlobReference blob) => Content.PartialLengthAsync(blob.Sha256).GetAwaiter().GetResult();
 
     /// <summary>Pins a task: its attachments are prefetched and never evicted.</summary>
     public void Pin(string taskId) => File.WriteAllBytes(Path.Combine(_root, "pins", Uri.EscapeDataString(taskId)), []);
@@ -132,57 +97,11 @@ public sealed class LocalBlobStore
         Directory.EnumerateFiles(Path.Combine(_root, "bundles"), "*.json")
             .Select(path => System.Text.Json.JsonSerializer.Deserialize(File.ReadAllBytes(path), TasksJson.Default.BundleManifest)!);
 
-    /// <summary>How many bytes of <paramref name="blob"/> a download has already received.</summary>
-    public long PartialLength(BlobReference blob) => new FileInfo(PartialPath(blob)) is { Exists: true } file ? file.Length : 0;
-
-    /// <summary>Where a download of <paramref name="blob"/> accumulates.</summary>
-    public string PartialPath(BlobReference blob) => Path.Combine(_root, "partial", blob.Sha256 + ".part");
-
-    /// <summary>Makes a downloaded and verified partial file the content.</summary>
-    public void CompleteDownload(BlobReference blob)
-    {
-        var partial = PartialPath(blob);
-        Promote(partial, blob.Sha256);
-        File.Delete(partial);
-        MarkUploaded(blob); // it came from the server
-    }
-
     /// <summary>
     /// Removes least-recently-used content until the store holds at most <paramref name="maxBytes"/>, never removing
     /// content in <paramref name="keep"/> (named by pending documents or pinned). Returns the bytes removed.
     /// </summary>
-    public long Evict(long maxBytes, IReadOnlySet<string> keep)
-    {
-        var files = Directory.EnumerateFiles(Path.Combine(_root, "objects"), "*", SearchOption.AllDirectories)
-            .Select(path => new FileInfo(path))
-            .ToList();
-        var total = files.Sum(f => f.Length);
-        var removed = 0L;
-        foreach (var file in files.Where(f => !keep.Contains(f.Name)).OrderBy(f => f.LastAccessTimeUtc))
-        {
-            if (total - removed <= maxBytes)
-            {
-                break;
-            }
-
-            removed += file.Length;
-            file.Delete();
-        }
-
-        return removed;
-    }
-
-    private void Promote(string verified, string sha256)
-    {
-        var target = ObjectPath(sha256);
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        if (!File.Exists(target))
-        {
-            File.Move(verified, target);
-        }
-    }
-
-    private string ObjectPath(string sha256) => Path.Combine(_root, "objects", sha256[..2], sha256);
+    public long Evict(long maxBytes, IReadOnlySet<string> keep) => Content.Evict(maxBytes, keep);
 
     private string BundlePath(string bundleId) => Path.Combine(_root, "bundles", Uri.EscapeDataString(bundleId) + ".json");
 }

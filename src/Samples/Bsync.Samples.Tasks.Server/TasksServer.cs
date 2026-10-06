@@ -3,6 +3,8 @@ using System.Text;
 using Bsync.Protocol;
 using Bsync.Server;
 using Bsync.Server.AspNetCore;
+using Bsync.Server.AspNetCore.Blobs;
+using Bsync.Server.Blobs.S3;
 using Bsync.Server.SqlServer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -38,6 +40,23 @@ public static class TasksServer
         });
         builder.Services.AddAuthorization();
         builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolverChain.Insert(0, TasksJson.Default));
+
+        // Attachments (task F1): verified content in a directory, or in an S3-compatible bucket when configured.
+        var blobDirectory = builder.Configuration["Tasks:BlobDirectory"] ?? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "blobs");
+        IBlobStore blobStore = builder.Configuration["Tasks:S3:ServiceUrl"] is { Length: > 0 } serviceUrl
+            ? new S3BlobStore(
+                new Amazon.S3.AmazonS3Client(
+                    new Amazon.Runtime.BasicAWSCredentials(builder.Configuration["Tasks:S3:AccessKey"], builder.Configuration["Tasks:S3:SecretKey"]),
+                    new Amazon.S3.AmazonS3Config { ServiceURL = serviceUrl, ForcePathStyle = true, AuthenticationRegion = builder.Configuration["Tasks:S3:Region"] ?? "us-east-1" }),
+                builder.Configuration["Tasks:S3:Bucket"] ?? throw new InvalidOperationException("Set Tasks:S3:Bucket."),
+                new FileSystemBlobStore(blobDirectory))
+            {
+                PresignHttp = serviceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
+                PresignUploads = true,
+            }
+            : new FileSystemBlobStore(blobDirectory);
+        builder.Services.AddSingleton(blobStore);
+        builder.Services.AddSingleton(new BlobJanitor(connectionString, blobStore, TimeProvider.System));
 
         var app = builder.Build();
         await TasksDb.EnsureTablesAsync(connectionString);
@@ -116,24 +135,15 @@ public static class TasksServer
         BundleEndpoints.Map(app, connectionString, bundles);
 
         // Attachments (task F1): resumable uploads and range downloads next to the sync routes.
-        var blobDirectory = app.Configuration["Tasks:BlobDirectory"] ?? Path.Combine(app.Environment.ContentRootPath, "App_Data", "blobs");
-        IBlobStore blobStore = app.Configuration["Tasks:S3:ServiceUrl"] is { Length: > 0 } serviceUrl
-            ? new S3BlobStore(
-                new Amazon.S3.AmazonS3Client(
-                    new Amazon.Runtime.BasicAWSCredentials(app.Configuration["Tasks:S3:AccessKey"], app.Configuration["Tasks:S3:SecretKey"]),
-                    new Amazon.S3.AmazonS3Config { ServiceURL = serviceUrl, ForcePathStyle = true, AuthenticationRegion = app.Configuration["Tasks:S3:Region"] ?? "us-east-1" }),
-                app.Configuration["Tasks:S3:Bucket"] ?? throw new InvalidOperationException("Set Tasks:S3:Bucket."),
-                new FileSystemBlobStore(blobDirectory),
-                useHttp: serviceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            : new FileSystemBlobStore(blobDirectory);
-        BlobEndpoints.Map(app, connectionString, blobStore);
+        var syncOptions = new SyncEndpointOptions
+        {
+            SupportedSchemas = new HashSet<string>([TasksJson.SchemaId], StringComparer.Ordinal),
+            ResolveScope = http => http.User.FindFirst("tenant")?.Value,
+        };
+        app.MapSyncBlobs(blobStore, new TasksBlobAccess(connectionString), syncOptions).RequireAuthorization();
 
         app.MapSyncCollections(
-            new SyncEndpointOptions
-            {
-                SupportedSchemas = new HashSet<string>([TasksJson.SchemaId], StringComparer.Ordinal),
-                ResolveScope = http => http.User.FindFirst("tenant")?.Value,
-            },
+            syncOptions,
             collections => collections
                 .Add(TasksJson.Collection, authority, SyncJsonTypes<TaskDocument>.From(TasksJson.Default))
                 .Add(TasksJson.IntentCollection, intents, SyncJsonTypes<TaskIntent>.From(TasksJson.Default))

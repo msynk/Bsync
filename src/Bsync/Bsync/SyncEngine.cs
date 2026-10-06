@@ -1117,14 +1117,23 @@ public sealed class SyncEngine<TDocument>
                         _clock.Update(outcome.Document!.UpdatedAt);
                         acknowledgements.Add(new RecordUpdate<TDocument>(
                             operation.DocumentId,
-                            existing => ApplyAccepted(existing, operation.OperationId, outcome, generation)));
+                            existing => ApplyAccepted(existing, operation.OperationId, outcome, generation))
+                        {
+                            Pure = true,
+                            ResultUnused = true,
+                            Adopt = true,
+                        });
                         pushed++;
                         break;
 
                     case PushOutcomeKind.Rejected:
                         acknowledgements.Add(new RecordUpdate<TDocument>(
                             operation.DocumentId,
-                            existing => ApplyRejected(existing, operation.OperationId, outcome)));
+                            existing => ApplyRejected(existing, operation.OperationId, outcome))
+                        {
+                            Pure = true,
+                            ResultUnused = true,
+                        });
                         excluded.Add(operation.DocumentId);
                         rejected++;
                         skewed += outcome.ErrorCode == PushErrorCodes.ClockSkew ? 1 : 0;
@@ -1415,7 +1424,10 @@ public sealed class SyncEngine<TDocument>
                     {
                         Pending = new PendingOperation<TDocument>(operationId, existing.LocalRevision, existing.BaseVersion, existing.Current) { Group = group, GroupSize = size },
                     }
-                    : null));
+                    : null)
+            {
+                Pure = true,
+            });
         }
 
         var results = await CommitAsync(SyncChangeKind.Sync, updates, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -1481,8 +1493,9 @@ public sealed class SyncEngine<TDocument>
             return null;
         }
 
-        // Base and current share one copy: documents in records are never mutated in place.
-        var confirmed = _clone(outcome.Document!);
+        // Base and current share one document: documents in records are never mutated in place. The outcome's document
+        // is this engine's alone (the transport deserialized or copied it), and the store copies what it keeps (D9).
+        var confirmed = outcome.Document!;
         var rebased = existing with
         {
             Base = confirmed,

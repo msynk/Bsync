@@ -2,6 +2,7 @@
   <Folder Name="/Bsync/">
     <Project Path="Bsync/Bsync.Blazor/Bsync.Blazor.csproj" />
     <Project Path="Bsync/Bsync.Server.AspNetCore/Bsync.Server.AspNetCore.csproj" />
+    <Project Path="Bsync/Bsync.Server.Blobs.S3/Bsync.Server.Blobs.S3.csproj" />
     <Project Path="Bsync/Bsync.Server.PostgreSql/Bsync.Server.PostgreSql.csproj" />
     <Project Path="Bsync/Bsync.Server.SqlServer/Bsync.Server.SqlServer.csproj" />
     <Project Path="Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" />

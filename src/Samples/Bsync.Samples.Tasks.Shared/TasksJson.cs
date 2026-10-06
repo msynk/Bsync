@@ -14,7 +14,6 @@ namespace Bsync.Samples.Tasks;
 [JsonSerializable(typeof(TokenResponse))]
 [JsonSerializable(typeof(NewTask))]
 [JsonSerializable(typeof(TaskIntent))]
-[JsonSerializable(typeof(BlobUploadStatus))]
 [JsonSerializable(typeof(BundleManifest))]
 [JsonSerializable(typeof(PullResult<BundleManifest>))]
 [JsonSerializable(typeof(PushRequest<BundleManifest>))]

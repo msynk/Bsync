@@ -12,6 +12,15 @@
 </head>
 <body>
     <div id="app">Loading…</div>
+    <script>
+        // Saves an attachment's bytes as a file (the app passes a .NET stream).
+        window.bsyncSaveFile = async (name, type, stream) => {
+            const url = URL.createObjectURL(new Blob([await stream.arrayBuffer()], { type }));
+            const link = Object.assign(document.createElement("a"), { href: url, download: name });
+            link.click();
+            URL.revokeObjectURL(url);
+        };
+    </script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 </html>

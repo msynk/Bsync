@@ -171,7 +171,7 @@ public static class Harness
         steps.Add($"corrupt:{await store.CompletePartialAsync(claimed)}|{await store.SizeAsync(claimed) is null}|{await store.PartialLengthAsync(claimed)}");
         steps.Add($"list:{string.Join(",", await store.ListAsync()) == sha}");
         await Bsync.Blazor.Blobs.BrowserBlobStore.DeleteAllAsync(_js, name);
-        steps.Add($"wiped:{(await store.ListAsync()).Length}");
+        steps.Add($"wiped:{(await store.ListAsync()).Count}");
         return string.Join(" ;; ", steps);
     }
 

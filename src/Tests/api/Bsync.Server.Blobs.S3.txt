@@ -1,0 +1,14 @@
+sealed class Bsync.Server.Blobs.S3.S3BlobStore : Bsync.Server.AspNetCore.Blobs.IBlobStore
+  System.Boolean PresignHttp { get; init; }
+  System.Boolean PresignUploads { get; init; }
+  System.Collections.Generic.IAsyncEnumerable<System.ValueTuple<System.String, System.DateTimeOffset>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> CompleteAsync(System.String upload, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> ExistsAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> PurgePartialsAsync(System.DateTimeOffset before, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> GetReceivedAsync(System.String upload, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64?> AppendAsync(System.String upload, System.Int64 offset, System.IO.Stream content, System.Int64 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Uri> PresignReadAsync(System.String sha256, System.TimeSpan validity, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Uri> PresignWriteAsync(System.String upload, System.Int64 size, System.TimeSpan validity, System.Threading.CancellationToken cancellationToken = default)
+  ctor(Amazon.S3.IAmazonS3 s3, System.String bucket, Bsync.Server.AspNetCore.Blobs.FileSystemBlobStore partials, System.String prefix = "")

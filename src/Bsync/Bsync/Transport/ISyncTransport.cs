@@ -7,6 +7,11 @@ namespace Bsync.Transport;
 /// messages over a wire (HTTP for pull/push, SignalR or SSE for the live stream) or, in tests, call
 /// an in-process server directly. The engine depends only on this abstraction.
 /// </summary>
+/// <remarks>
+/// Documents in push results belong to the caller: the engine may keep them without copying, so an implementation
+/// must not keep, reuse or change them afterwards. Wire transports deserialize new ones; an in-process transport
+/// passes on what its authority returns, and the included authorities return copies.
+/// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
 public interface ISyncTransport<TDocument>
     where TDocument : class, ISyncEntity

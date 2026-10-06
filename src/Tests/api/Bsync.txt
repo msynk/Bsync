@@ -1,3 +1,71 @@
+static class Bsync.Blobs.BlobCodes
+  const System.String HashMismatch = "blob-hash-mismatch"
+  const System.String TooLarge = "blob-too-large"
+sealed class Bsync.Blobs.BlobCorruptedException : System.IO.IOException, System.Runtime.Serialization.ISerializable
+  ctor(System.String message)
+record Bsync.Blobs.BlobReference
+  System.Boolean Equals(Bsync.Blobs.BlobReference other)
+  System.Int64 Size { get; init; }
+  System.String ContentType { get; init; }
+  System.String FileName { get; init; }
+  System.String Id { get; init; }
+  System.String Sha256 { get; init; }
+  System.Void Deconstruct(out System.String Id, out System.String Sha256, out System.Int64 Size, out System.String ContentType, out System.String FileName)
+  ctor(System.String Id, System.String Sha256, System.Int64 Size, System.String ContentType, System.String FileName)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Blobs.BlobUploadStatus
+  System.Boolean Complete { get; init; }
+  System.Boolean Equals(Bsync.Blobs.BlobUploadStatus other)
+  System.Int64 Received { get; init; }
+  System.Uri UploadUrl { get; init; }
+  System.Void Deconstruct(out System.Int64 Received, out System.Boolean Complete, out System.Uri UploadUrl)
+  ctor(System.Int64 Received, System.Boolean Complete, System.Uri UploadUrl = null)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+sealed class Bsync.Blobs.FileBlobCache : Bsync.Blobs.IBlobCache
+  System.Int64 Evict(System.Int64 maxBytes, System.Collections.Generic.IReadOnlySet<System.String> keep)
+  System.String Directory { get; }
+  System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> PartialLengthAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.ValueTuple<System.String, System.Int64>> ImportAsync(System.IO.Stream content, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String directory)
+sealed class Bsync.Blobs.FileBlobSource : Bsync.Blobs.IBlobSource
+  System.Int64 Length { get; }
+  System.Threading.Tasks.ValueTask<System.IO.Stream> OpenAsync(System.Int64 offset, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String path)
+sealed class Bsync.Blobs.HttpBlobTransfer
+  System.Threading.Tasks.Task<System.Int64> DownloadAsync(Bsync.Blobs.IBlobCache cache, System.String sha256, System.Int64 size, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> UploadAsync(Bsync.Blobs.IBlobCache cache, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> UploadAsync(System.String sha256, Bsync.Blobs.IBlobSource source, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.Net.Http.HttpClient http, Bsync.Blobs.HttpBlobTransferOptions options = null)
+sealed class Bsync.Blobs.HttpBlobTransferOptions
+  System.Boolean DirectUploads { get; init; }
+  System.Int32 ChunkSize { get; init; }
+  System.Net.Http.HttpClient DirectClient { get; init; }
+  System.String BasePath { get; init; }
+  ctor()
+interface Bsync.Blobs.IBlobCache
+  abstract System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Int64> PartialLengthAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.ValueTuple<System.String, System.Int64>> ImportAsync(System.IO.Stream content, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Blobs.IBlobSource
+  System.Int64 Length { get; }
+  abstract System.Threading.Tasks.ValueTask<System.IO.Stream> OpenAsync(System.Int64 offset, System.Threading.CancellationToken cancellationToken = default)
 struct Bsync.Checkpoint
   System.Boolean Equals(Bsync.Checkpoint other)
   System.Boolean IsStart { get; }

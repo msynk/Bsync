@@ -1,3 +1,4 @@
+using Bsync.Blobs;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -57,6 +58,7 @@ public sealed class TasksDb(DbContextOptions<TasksDb> options) : DbContext(optio
                 Tenant nvarchar(256) NOT NULL,
                 Sha256 char(64) NOT NULL,
                 Size bigint NOT NULL,
+                UploadedAt datetimeoffset NOT NULL,
                 CONSTRAINT PK_TenantBlobs PRIMARY KEY (Tenant, Sha256)
             );
             IF OBJECT_ID(N'dbo.TaskAttachments', N'U') IS NULL
@@ -148,6 +150,8 @@ public sealed class TenantBlob
     public string Sha256 { get; set; } = string.Empty;
 
     public long Size { get; set; }
+
+    public DateTimeOffset UploadedAt { get; set; }
 }
 
 /// <summary>A task's attachment (the reference; the bytes are in the blob store).</summary>

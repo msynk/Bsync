@@ -18,3 +18,6 @@ artifacts/
 *.db
 *.db-shm
 *.db-wal
+
+# Test fixtures written by released versions (for example the 0.1.0 replica), kept on purpose.
+!src/Tests/Bsync.Tests/Fixtures/*.db

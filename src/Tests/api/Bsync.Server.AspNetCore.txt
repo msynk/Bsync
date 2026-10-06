@@ -1,3 +1,40 @@
+sealed class Bsync.Server.AspNetCore.Blobs.FileSystemBlobStore : Bsync.Server.AspNetCore.Blobs.IBlobStore
+  System.Collections.Generic.IAsyncEnumerable<System.ValueTuple<System.String, System.DateTimeOffset>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.String UploadFile(System.String upload)
+  System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> CompleteAsync(System.String upload, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> ExistsAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> PurgePartialsAsync(System.DateTimeOffset before, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> GetReceivedAsync(System.String upload, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64?> AppendAsync(System.String upload, System.Int64 offset, System.IO.Stream content, System.Int64 limit, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String directory)
+  static System.String UploadKey(System.String scope, System.String sha256)
+  static System.Threading.Tasks.Task<System.Boolean> VerifyAsync(System.String path, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Server.AspNetCore.Blobs.IBlobAccess
+  abstract System.Threading.Tasks.Task RecordAsync(Bsync.Server.SyncCallContext caller, System.String sha256, System.Int64 size, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Boolean> CanReadAsync(Bsync.Server.SyncCallContext caller, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Boolean> HoldsAsync(Bsync.Server.SyncCallContext caller, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Server.AspNetCore.Blobs.IBlobStore
+  abstract System.Collections.Generic.IAsyncEnumerable<System.ValueTuple<System.String, System.DateTimeOffset>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Boolean> CompleteAsync(System.String upload, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Boolean> ExistsAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Int32> PurgePartialsAsync(System.DateTimeOffset before, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Int64> GetReceivedAsync(System.String upload, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Int64?> AppendAsync(System.String upload, System.Int64 offset, System.IO.Stream content, System.Int64 limit, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.Task<System.Uri> PresignReadAsync(System.String sha256, System.TimeSpan validity, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.Task<System.Uri> PresignWriteAsync(System.String upload, System.Int64 size, System.TimeSpan validity, System.Threading.CancellationToken cancellationToken = default)
+static class Bsync.Server.AspNetCore.Blobs.SyncBlobCollector
+  static System.Threading.Tasks.Task<System.ValueTuple<System.Int32, System.Int32>> CollectAsync(Bsync.Server.AspNetCore.Blobs.IBlobStore store, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlySet<System.String>>> referenced, System.TimeSpan minimumAge, System.TimeProvider time = null, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Server.AspNetCore.Blobs.SyncBlobEndpointOptions
+  System.Int64 MaxSize { get; init; }
+  System.TimeSpan PresignedReadValidity { get; init; }
+  System.TimeSpan PresignedWriteValidity { get; init; }
+  ctor()
+static class Bsync.Server.AspNetCore.Blobs.SyncBlobEndpoints
+  static Microsoft.AspNetCore.Routing.RouteGroupBuilder MapSyncBlobs(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder endpoints, Bsync.Server.AspNetCore.Blobs.IBlobStore store, Bsync.Server.AspNetCore.Blobs.IBlobAccess access, Bsync.Server.AspNetCore.SyncEndpointOptions options, Bsync.Server.AspNetCore.Blobs.SyncBlobEndpointOptions blobOptions = null, System.String prefix = "sync/blobs")
 sealed class Bsync.Server.AspNetCore.SyncCollectionGroupBuilder
   Bsync.Server.AspNetCore.SyncCollectionGroupBuilder Add<TDocument>(System.String collection) where TDocument : class, Bsync.ISyncEntity
   Bsync.Server.AspNetCore.SyncCollectionGroupBuilder Add<TDocument>(System.String collection, Bsync.Server.ISyncAuthority<TDocument> authority, Bsync.Protocol.SyncJsonTypes<TDocument> json) where TDocument : class, Bsync.ISyncEntity

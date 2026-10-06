@@ -757,7 +757,14 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         // Same digest as hashing the concatenated text, without building it (D9).
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         Append(hash, string.Create(CultureInfo.InvariantCulture, $"{operation.DocumentId.Length}:{operation.DocumentId}|{operation.BaseVersion}|{operation.Group}|{operation.GroupSize}|"));
-        Append(hash, _fingerprint(operation.Document));
+        if (_fingerprint.Target is Documents.JsonFingerprint<TDocument> json)
+        {
+            json.AppendTo(hash, operation.Document);
+        }
+        else
+        {
+            Append(hash, _fingerprint(operation.Document));
+        }
         return Convert.ToHexString(hash.GetHashAndReset());
 
         static void Append(IncrementalHash hash, string text)

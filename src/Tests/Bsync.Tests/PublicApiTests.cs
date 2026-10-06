@@ -20,6 +20,7 @@ public sealed class PublicApiTests
         "Bsync",
         "Bsync.Blazor",
         "Bsync.Server.AspNetCore",
+        "Bsync.Server.Blobs.S3",
         "Bsync.Server.PostgreSql",
         "Bsync.Server.SqlServer",
         "Bsync.Storage.Sqlite",

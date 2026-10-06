@@ -3,12 +3,14 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using Bsync.Blobs;
 using Bsync.Client;
 using Bsync.Samples.Tasks;
 using Bsync.Samples.Tasks.Console;
 using Bsync.Samples.Tasks.Server;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
@@ -289,13 +291,13 @@ public sealed class TasksSampleTests : IAsyncLifetime
         using var http = new HttpClient { BaseAddress = address };
         var token = await (await http.PostAsJsonAsync("api/token", new TokenRequest("eve", "team-2"), TasksJson.Default.TokenRequest)).Content.ReadFromJsonAsync(TasksJson.Default.TokenResponse);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.Token);
-        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"api/blobs/{sha256}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"sync/blobs/{sha256}")).StatusCode);
 
         await eve.Tasks.SaveAsync(new TaskDocument { Id = "e1", Title = "Same file" });
         await eve.AttachAsync("e1", new MemoryStream(content), "copy.bin", "application/octet-stream");
         Assert.Equal(Size, await eve.UploadAttachmentsAsync());
         await eve.SyncNowAsync();
-        Assert.Equal(HttpStatusCode.OK, (await http.GetAsync($"api/blobs/{sha256}", HttpCompletionOption.ResponseHeadersRead)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await http.GetAsync($"sync/blobs/{sha256}", HttpCompletionOption.ResponseHeadersRead)).StatusCode);
         Assert.Single(Directory.EnumerateFiles(objects, "*", SearchOption.AllDirectories));
         Assert.Equal(2, await _database.ScalarAsync("SELECT count(*) FROM dbo.TenantBlobs"));
 
@@ -379,7 +381,7 @@ public sealed class TasksSampleTests : IAsyncLifetime
         // Replicas cannot write bundles, and another team cannot read their content.
         await Assert.ThrowsAsync<SyncReadOnlyException>(() => bob.Bundles.SaveAsync(new BundleManifest { Id = "forged" }));
         using var eve = await SignedInAsync(address, "eve", "team-2");
-        Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"api/blobs/{active.Items.Single(i => i.FileName == "c.bin").Sha256}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"sync/blobs/{active.Items.Single(i => i.FileName == "c.bin").Sha256}")).StatusCode);
     }
 
     private static async Task<HttpClient> SignedInAsync(Uri address, string user, string tenant)
@@ -394,6 +396,33 @@ public sealed class TasksSampleTests : IAsyncLifetime
     {
         await using var stream = client.OpenAttachment(manifest.Items.Single(i => i.FileName == name))!;
         return await new StreamReader(stream).ReadToEndAsync();
+    }
+
+    [Fact(DisplayName = "F1: the janitor removes content nothing references after the grace period, with its upload records; referenced content stays")]
+    public async Task UnreferencedContentIsCollected()
+    {
+        var address = FreeAddress();
+        await using var server = await StartServerAsync(address);
+        await server.StartAsync();
+        await using var alice = TasksClient.Create(address, Path.Combine(_data, "alice"), "alice", "team-1");
+        await alice.Tasks.SaveAsync(new TaskDocument { Id = "kept", Title = "Kept" });
+        await alice.Tasks.SaveAsync(new TaskDocument { Id = "gone", Title = "Gone" });
+        await alice.AttachAsync("kept", new MemoryStream([1, 2, 3]), "kept.bin", "application/octet-stream");
+        var dropped = await alice.AttachAsync("gone", new MemoryStream([4, 5, 6]), "gone.bin", "application/octet-stream");
+        await alice.SyncNowAsync();
+        await alice.Tasks.DeleteAsync("gone"); // its attachment row goes with it
+        await alice.SyncNowAsync();
+        var objects = Path.Combine(_data, "server-blobs", "objects");
+        var janitor = server.Services.GetRequiredService<BlobJanitor>();
+
+        var early = await janitor.CollectAsync(TimeSpan.FromHours(1)); // within the grace period: nothing goes
+        var late = await janitor.CollectAsync(TimeSpan.Zero);
+
+        Assert.Equal((0, 0, 0), early);
+        Assert.Equal((1, 0, 1), late);
+        Assert.Single(Directory.EnumerateFiles(objects, "*", SearchOption.AllDirectories));
+        Assert.False(File.Exists(Path.Combine(objects, dropped.Sha256[..2], dropped.Sha256)));
+        Assert.Equal(1, await _database.ScalarAsync("SELECT count(*) FROM dbo.TenantBlobs"));
     }
 
     [S3Fact(DisplayName = "F1 I01: with an S3-compatible store, attachments land in the bucket once and downloads resume from presigned URLs")]
@@ -418,13 +447,18 @@ public sealed class TasksSampleTests : IAsyncLifetime
         });
         await server.StartAsync();
 
-        await using var alice = TasksClient.Create(address, Path.Combine(_data, "alice"), "alice", "team-1");
+        var sent = new Faults { CutUploadAfter = content.Length / 2 };
+        await using var alice = TasksClient.Create(address, Path.Combine(_data, "alice"), "alice", "team-1", inner => new FaultyHandler(sent) { InnerHandler = inner });
         await alice.Tasks.SaveAsync(new TaskDocument { Id = "t1", Title = "Report" });
         var blob = await alice.AttachAsync("t1", new MemoryStream(content), "report.bin", "application/octet-stream");
-        await alice.SyncNowAsync();
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => alice.SyncNowAsync()); // the upload is cut off
+        await alice.SyncNowAsync(); // and sent again, whole, before the task
 
         var stored = await s3.GetObjectMetadataAsync(bucket, $"objects/{sha256[..2]}/{sha256}");
         Assert.Equal(content.Length, stored.ContentLength);
+        Assert.Equal(2, sent.UploadedElsewhere); // both attempts went straight to the bucket, not through the application server
+        Assert.Equal(content.Length + (content.Length / 2), sent.UploadBytes); // a presigned upload restarts from the beginning
+        Assert.Empty((await s3.ListObjectsV2Async(new Amazon.S3.Model.ListObjectsV2Request { BucketName = bucket, Prefix = "uploads/" })).S3Objects ?? []);
         Assert.Empty(Directory.EnumerateFiles(Path.Combine(_data, "server-blobs"), "*", SearchOption.AllDirectories)); // nothing kept on the server
 
         var faults = new Faults { CutDownloadAfter = content.Length / 2 };
@@ -441,7 +475,7 @@ public sealed class TasksSampleTests : IAsyncLifetime
         }
 
         using var eve = await SignedInAsync(address, "eve", "team-2");
-        Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"api/blobs/{sha256}")).StatusCode); // no URL for others
+        Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"sync/blobs/{sha256}")).StatusCode); // no URL for others
     }
 
     /// <summary>Faults injected into one client's HTTP traffic, and what crossed the network.</summary>
@@ -460,6 +494,8 @@ public sealed class TasksSampleTests : IAsyncLifetime
         public long DownloadBytes;
 
         public int ServedElsewhere;
+
+        public int UploadedElsewhere;
     }
 
     /// <summary>Drops connections part-way through blob transfers, loses a response, or fails everything (offline).</summary>
@@ -477,6 +513,11 @@ public sealed class TasksSampleTests : IAsyncLifetime
             if (request.Method == HttpMethod.Put && path.Contains("/uploads/", StringComparison.Ordinal) && request.Content is { } body)
             {
                 var bytes = await body.ReadAsByteArrayAsync(cancellationToken);
+                if (!path.StartsWith("/sync/", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref faults.UploadedElsewhere); // a presigned object-store URL
+                }
+
                 var before = Interlocked.Add(ref faults.UploadBytes, bytes.Length) - bytes.Length;
                 if (before + bytes.Length > Interlocked.Read(ref faults.CutUploadAfter))
                 {
@@ -500,7 +541,7 @@ public sealed class TasksSampleTests : IAsyncLifetime
                 throw new HttpRequestException("The response was lost (test).");
             }
 
-            if (request.Method == HttpMethod.Get && path.StartsWith("/api/blobs/", StringComparison.Ordinal) && response.IsSuccessStatusCode)
+            if (request.Method == HttpMethod.Get && path.StartsWith("/sync/blobs/", StringComparison.Ordinal) && response.IsSuccessStatusCode)
             {
                 if (response.RequestMessage?.RequestUri is { } final && final.Port != port)
                 {

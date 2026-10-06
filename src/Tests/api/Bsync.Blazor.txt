@@ -1,13 +1,15 @@
-sealed class Bsync.Blazor.Blobs.BrowserBlobStore
+sealed class Bsync.Blazor.Blobs.BrowserBlobStore : Bsync.Blobs.IBlobCache
   System.IO.Stream OpenRead(System.String sha256, System.Int64 size)
   System.String Name { get; }
   System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.Byte[] chunk, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64> PartialLengthAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
-  System.Threading.Tasks.Task<System.String[]> ListAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.ValueTuple<System.String, System.Int64>> ImportAsync(System.IO.Stream content, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task DeleteAllAsync(Microsoft.JSInterop.IJSRuntime js, System.String name, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Blazor.Blobs.BrowserBlobStore> OpenAsync(Microsoft.JSInterop.IJSRuntime js, System.String name, System.Threading.CancellationToken cancellationToken = default)

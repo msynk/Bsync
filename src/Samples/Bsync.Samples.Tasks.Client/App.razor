@@ -1,4 +1,6 @@
 @inject SignIn Session
+@inject TaskAttachments Attachments
+@inject IJSRuntime JS
 @inject IServiceProvider Services
 @implements IDisposable
 
@@ -7,30 +9,56 @@
     @if (_tasks is null)
     {
         <form @onsubmit="SignInAsync">
-            <input @bind="_user" placeholder="user" />
-            <input @bind="_tenant" placeholder="team" />
-            <button type="submit">Sign in</button>
+            <input @bind="_user" placeholder="user" data-testid="user" />
+            <input @bind="_tenant" placeholder="team" data-testid="tenant" />
+            <button type="submit" data-testid="sign-in">Sign in</button>
         </form>
     }
     else
     {
-        <p>@_tasks.Status.State, @_tasks.Status.Pending unsynced</p>
+        <p data-testid="status">@_tasks.Status.State, <span data-testid="pending">@_tasks.Status.Pending</span> unsynced</p>
         <form @onsubmit="AddAsync">
-            <input @bind="_title" placeholder="What needs doing?" />
-            <button type="submit">Add</button>
+            <input @bind="_title" placeholder="What needs doing?" data-testid="new-title" />
+            <button type="submit" data-testid="add">Add</button>
         </form>
         <ul>
             @foreach (var (task, status) in _items)
             {
-                <li class="@(status?.State == SyncItemState.Rejected ? "rejected" : null)">
-                    @task.Title <small>@task.Slug</small>
+                <li data-testid="task" class="@(status?.State == SyncItemState.Rejected ? "rejected" : null)">
+                    <span data-testid="task-title">@task.Title</span> <small>@task.Slug</small>
                     @if (status?.State == SyncItemState.Rejected)
                     {
                         <span> rejected: @status.Detail</span>
                     }
+                    <ul>
+                        @foreach (var attachment in task.Attachments)
+                        {
+                            <li data-testid="attachment">
+                                <span data-testid="attachment-name">@attachment.FileName</span>
+                                <small>@attachment.Size bytes</small>
+                                @if (_local.Contains(attachment.Sha256))
+                                {
+                                    <button data-testid="attachment-open" @onclick="() => OpenAsync(attachment)">Open</button>
+                                }
+                                else
+                                {
+                                    <button data-testid="attachment-download" @onclick="() => DownloadAsync(attachment)">Download</button>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    <label>Attach <InputFile data-testid="attach" OnChange="e => AttachAsync(task.Id, e)" /></label>
                 </li>
             }
         </ul>
+        @if (_message is not null)
+        {
+            <p data-testid="message">@_message</p>
+        }
+        @if (_preview is not null)
+        {
+            <pre data-testid="attachment-preview">@_preview</pre>
+        }
     }
 </main>
 
@@ -38,13 +66,17 @@
     private ISyncCollection<TaskDocument>? _tasks;
     private IDisposable? _subscription;
     private List<(TaskDocument Task, SyncItemStatus? Status)> _items = [];
+    private HashSet<string> _local = new(StringComparer.Ordinal);
     private string _user = "alice";
     private string _tenant = "team-1";
     private string _title = string.Empty;
+    private string? _message;
+    private string? _preview;
 
     private async Task SignInAsync()
     {
         await Session.SignInAsync(_user, _tenant);
+        await Attachments.OpenAsync(JS);
         _tasks = (ISyncCollection<TaskDocument>)Services.GetService(typeof(ISyncCollection<TaskDocument>))!;
         _subscription = _tasks.Subscribe(() => InvokeAsync(ReloadAsync));
         await ReloadAsync();
@@ -58,15 +90,71 @@
         await ReloadAsync();
     }
 
+    private async Task AttachAsync(string taskId, InputFileChangeEventArgs e)
+    {
+        // The bytes are stored and verified on this device first; the task is saved after, and is sent once the server
+        // holds the bytes.
+        await using var content = e.File.OpenReadStream(TaskAttachments.MaxSize);
+        var attachment = await Attachments.ImportAsync(content, e.File.Name, string.IsNullOrEmpty(e.File.ContentType) ? "application/octet-stream" : e.File.ContentType);
+        var task = await _tasks!.GetAsync(taskId) ?? throw new InvalidOperationException($"No task '{taskId}'.");
+        task.Attachments.Add(attachment);
+        await _tasks.SaveAsync(task);
+        await ReloadAsync();
+    }
+
+    private async Task DownloadAsync(BlobReference attachment)
+    {
+        try
+        {
+            await Attachments.DownloadAsync(attachment);
+            _message = null;
+        }
+        catch (Exception error) when (error is HttpRequestException or IOException)
+        {
+            _message = $"{attachment.FileName} is not available now; try again later.";
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task OpenAsync(BlobReference attachment)
+    {
+        await using var content = await Attachments.OpenReadAsync(attachment);
+        if (content is null)
+        {
+            return;
+        }
+
+        if (attachment.ContentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+        {
+            using var reader = new StreamReader(content);
+            _preview = await reader.ReadToEndAsync();
+        }
+        else
+        {
+            using var stream = new DotNetStreamReference(content, leaveOpen: true);
+            await JS.InvokeVoidAsync("bsyncSaveFile", attachment.FileName, attachment.ContentType, stream);
+        }
+    }
+
     private async Task ReloadAsync()
     {
         var items = new List<(TaskDocument, SyncItemStatus?)>();
+        var local = new HashSet<string>(StringComparer.Ordinal);
         foreach (var task in await _tasks!.QueryAsync())
         {
             items.Add((task, await _tasks.GetItemStatusAsync(task.Id)));
+            foreach (var attachment in task.Attachments)
+            {
+                if (await Attachments.IsLocalAsync(attachment))
+                {
+                    local.Add(attachment.Sha256);
+                }
+            }
         }
 
         _items = items;
+        _local = local;
         StateHasChanged();
     }
 

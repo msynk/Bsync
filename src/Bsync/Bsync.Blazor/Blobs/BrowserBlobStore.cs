@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Bsync.Blazor.IndexedDb;
+using Bsync.Blobs;
 using Microsoft.JSInterop;
 
 namespace Bsync.Blazor.Blobs;
@@ -11,7 +12,7 @@ namespace Bsync.Blazor.Blobs;
 /// a reload. Quota and availability failures surface as <see cref="Storage.LocalStoreUnavailableException"/> (reasons
 /// <c>quota</c>, <c>unavailable</c>), never as silent success. Use one store per account and delete it on sign-out.
 /// </summary>
-public sealed class BrowserBlobStore
+public sealed class BrowserBlobStore : IBlobCache
 {
     private const string ModulePath = "./_content/Bsync.Blazor/bsync-blobs.js";
     private const int ReadChunk = 1024 * 1024;
@@ -58,6 +59,14 @@ public sealed class BrowserBlobStore
         ArgumentNullException.ThrowIfNull(chunk);
         return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("appendPartial", cancellationToken, Name, sha256, chunk));
     }
+
+    /// <inheritdoc />
+    public Task AppendPartialAsync(string sha256, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken = default) =>
+        AppendPartialAsync(sha256, bytes.ToArray(), cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<Stream?> OpenReadAsync(string sha256, CancellationToken cancellationToken = default) =>
+        await SizeAsync(sha256, cancellationToken).ConfigureAwait(false) is { } size ? OpenRead(sha256, size) : null;
 
     /// <summary>
     /// Verifies the unfinished transfer against <paramref name="sha256"/> and makes it the content. Returns
@@ -112,8 +121,8 @@ public sealed class BrowserBlobStore
         IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("remove", cancellationToken, Name, sha256));
 
     /// <summary>The hashes of the content on this device.</summary>
-    public Task<string[]> ListAsync(CancellationToken cancellationToken = default) =>
-        IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<string[]>("list", cancellationToken, Name));
+    public async Task<IReadOnlyList<string>> ListAsync(CancellationToken cancellationToken = default) =>
+        await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<string[]>("list", cancellationToken, Name)).ConfigureAwait(false);
 
     private Task<byte[]> ReadRangeAsync(string sha256, long offset, int count, CancellationToken cancellationToken) =>
         IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<byte[]>("readRange", cancellationToken, Name, sha256, offset, count));

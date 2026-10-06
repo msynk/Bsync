@@ -82,9 +82,39 @@ the run.
 | Allocated per accepted write, in-memory server (D9) | 16.4 KB | 8.1 KB |
 | Allocated per pushed document, SQLite store (D9) | 80.6 KB | 62.6 KB |
 
-The plan's target of under 16 KB per pushed document is not met. The remaining copies are required by isolation
-(I02): a caller's document is copied on write, the store's copies are never handed out, and the SQLite store
-serializes and deserializes each distinct state once.
+At that point the plan's target of under 16 KB per pushed document was not met; see below.
+
+## Push allocations (task D9, 2026-10-06)
+
+```bash
+dotnet run -c Release --project src/Tests/Bsync.Benchmarks -- push-alloc memory
+dotnet run -c Release --project src/Tests/Bsync.Benchmarks -- push-alloc sqlite-full
+```
+
+`push-alloc` runs the `Reconnect` workload (10,000 queued writes of ~1 KiB pushed to the in-process in-memory server in
+batches of 500) once to warm up, then measures one more run with `GC.GetTotalAllocatedBytes`, and lists the types the
+runtime's allocation ticks sampled most. The client and the in-process server are both counted. Same machine as above.
+
+| Store | Before | After |
+|---|---:|---:|
+| In-memory | 31.0 KB | 14.5 KB |
+| SQLite, `synchronous=FULL` | 63.1 KB | 47.2 KB |
+
+What changed, all without giving up isolation (I02):
+
+- The engine marks its own record transforms as pure (they never change their input) and says when it does not read
+  the resulting record; the in-memory store then hands such a transform its stored record instead of a copy, and
+  returns no copy of the result. These hints are internal to `Bsync`.
+- An accepted document from the server is no longer copied by the engine before the store copies it, and the
+  in-memory store keeps that answer instead of copying it again (nothing else references it).
+- The server's operation fingerprint hashes the JSON bytes of `DocumentCloner.JsonFingerprint` directly instead of
+  building the text (same digest), and JSON clones reuse a writer per thread.
+- The SQLite store reuses its read and write commands within one update transaction, and deserializes equal JSON texts
+  in a row (a pending payload is usually the current document) once.
+
+Per pushed document the in-memory path now makes four copies of the document: one when reading the pending queue
+(handed to `ReadyToPush`), one sent to the server, and the server's own two (its stored copy and the copy it answers
+with). The SQLite store still reads and writes each state as JSON text twice per push; its target was not set.
 
 ## Local queries (task E1, 2026-10-06)
 

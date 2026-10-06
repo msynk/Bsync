@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Bsync.Blobs;
 using Bsync.Clocks;
 
 namespace Bsync.Samples.Tasks;

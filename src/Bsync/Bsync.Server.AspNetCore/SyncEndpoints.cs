@@ -43,7 +43,7 @@ public static class SyncEndpoints
 
     private const string Ok = "ok";
 
-    private static readonly Meter ServerMeter = new(MeterName, typeof(SyncEndpoints).Assembly.GetName().Version?.ToString());
+    internal static readonly Meter ServerMeter = new(MeterName, typeof(SyncEndpoints).Assembly.GetName().Version?.ToString());
 
     private static readonly Counter<long> Requests = ServerMeter.CreateCounter<long>(
         "bsync.server.requests", "{request}", "Protocol requests, by collection, endpoint and result (ok or a problem code).");

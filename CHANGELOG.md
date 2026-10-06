@@ -6,6 +6,34 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 
 ## Unreleased
 
+Work after 0.5.0 (24d5c06).
+
+### Added
+
+- Attachments in the packages (task F1). `Bsync`: `BlobReference`, `IBlobCache`, `FileBlobCache` and the resumable
+  `HttpBlobTransfer` (namespace `Bsync.Blobs`). `Bsync.Server.AspNetCore`: `MapSyncBlobs` (resumable chunked uploads,
+  verified finish, range and redirect downloads, 404 for callers who may not read), `IBlobStore`,
+  `FileSystemBlobStore`, `IBlobAccess` and `SyncBlobCollector` for garbage collection. New optional package
+  `Bsync.Server.Blobs.S3`: `S3BlobStore` with presigned downloads and, optionally, presigned uploads that bypass the
+  application server.
+- Blob metrics: `bsync.blob.bytes` and `bsync.blob.transfers` (client), `bsync.server.blob.bytes` and
+  `bsync.server.blob.requests` (server).
+- The browser Tasks sample attaches files: bytes in `BrowserBlobStore`, uploaded before their task, downloaded on demand,
+  readable offline; tested in Chromium, Firefox and WebKit.
+- `Bsync.Benchmarks push-alloc` measures allocations per pushed document.
+- A migration test from a replica database written by the published 0.1.0 SQLite package (pending, conflict,
+  rejection, group and unknown members kept through the upgrade to schema 5).
+
+### Changed
+
+- Fewer allocations when pushing (task D9): 14.5 KB instead of 31.0 KB per pushed document with the in-memory store
+  and server, 47.2 KB instead of 63.1 KB with SQLite (docs/benchmarks.md).
+- `BrowserBlobStore` implements `IBlobCache`; its `ListAsync` returns `IReadOnlyList<string>` (was `string[]`).
+- The Tasks sample uses the package blob routes (`sync/blobs/...` instead of `api/blobs/...`) and records when a tenant
+  uploaded content (`dbo.TenantBlobs.UploadedAt`), so a job can collect content nothing references.
+
+## 0.5.0 (committed as 24d5c06; not yet on NuGet)
+
 Work committed after 0.4.0 (76944e9).
 
 ### Added
