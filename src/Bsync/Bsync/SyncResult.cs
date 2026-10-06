@@ -16,7 +16,8 @@ public readonly record struct SyncResult(int Pulled, int Pushed, int Conflicts)
 
     /// <summary>
     /// Number of operations left pending in this run: a retryable server outcome, an outcome missing
-    /// from the response, or a document that exhausted its conflict budget.
+    /// from the response, a document that exhausted its conflict budget, or a document held back by
+    /// <see cref="SyncOptions{TDocument}.ReadyToPush"/>.
     /// </summary>
     public int Deferred { get; init; }
 

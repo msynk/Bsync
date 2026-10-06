@@ -105,6 +105,20 @@ public static class TasksServer
             return Results.Created($"/api/tasks/{document.Id}", document);
         }).RequireAuthorization();
 
+        // Bundles (task F2): published by the server through an API endpoint, read by replicas.
+        var bundles = await SqlServerSyncAuthority<BundleManifest>.CreateAsync(new SqlServerSyncAuthorityOptions<BundleManifest>
+        {
+            ConnectionString = connectionString,
+            DocumentType = TasksJson.Default.BundleManifest,
+            Collection = TasksJson.BundleCollection,
+            WriteHandler = new ReadOnlyWriteHandler<BundleManifest>(),
+        });
+        BundleEndpoints.Map(app, connectionString, bundles);
+
+        // Attachments (task F1): resumable uploads and range downloads next to the sync routes.
+        BlobEndpoints.Map(app, connectionString, new FileSystemBlobStore(
+            app.Configuration["Tasks:BlobDirectory"] ?? Path.Combine(app.Environment.ContentRootPath, "App_Data", "blobs")));
+
         app.MapSyncCollections(
             new SyncEndpointOptions
             {
@@ -113,12 +127,14 @@ public static class TasksServer
             },
             collections => collections
                 .Add(TasksJson.Collection, authority, SyncJsonTypes<TaskDocument>.From(TasksJson.Default))
-                .Add(TasksJson.IntentCollection, intents, SyncJsonTypes<TaskIntent>.From(TasksJson.Default)))
+                .Add(TasksJson.IntentCollection, intents, SyncJsonTypes<TaskIntent>.From(TasksJson.Default))
+                .Add(TasksJson.BundleCollection, bundles, SyncJsonTypes<BundleManifest>.From(TasksJson.Default)))
             .RequireAuthorization();
 
         app.MapFallbackToFile("index.html");
         app.Lifetime.ApplicationStopping.Register(() =>
         {
+            bundles.DisposeAsync().AsTask().GetAwaiter().GetResult();
             intents.DisposeAsync().AsTask().GetAwaiter().GetResult();
             authority.DisposeAsync().AsTask().GetAwaiter().GetResult();
         });

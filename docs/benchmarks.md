@@ -124,6 +124,30 @@ needed; its design needs a store schema change and is proposed in
 Not measured for E1: a mid-range Android device and an iPad (none available), IndexedDB in any browser, and first
 sync at 50,000 documents (100,000 is under "Scale" above).
 
+## Authority throughput with concurrent sessions (task H, 2026-10-06)
+
+```bash
+dotnet src/Tests/Bsync.Benchmarks/bin/Release/net10.0/Bsync.Benchmarks.dll throughput sqlserver "<connection to master>" 16 500
+dotnet src/Tests/Bsync.Benchmarks/bin/Release/net10.0/Bsync.Benchmarks.dll throughput postgres "<connection to postgres>" 16 500
+```
+
+Each run creates a database, runs, and drops it. Sessions are engines on in-memory stores that call the authority
+in-process (no HTTP), with push batches of 100 and pull pages of 500, documents of about 1 KiB. "Push" uploads every
+session's documents concurrently; "pull" lets as many new replicas pull everything they can see concurrently. Same
+machine as above, SQL Server 2025 LocalDB (Express) on the same disk, two runs each:
+
+| Sessions × documents | Feeds | Push (operations/s) | Pull (changes/s) |
+|---|---|---:|---:|
+| 16 × 500 | one shared feed | 1,359 / 1,302 | 20,232 / 24,335 (16 replicas × 8,000) |
+| 16 × 500 | one feed per session | 5,123 / 5,552 | 32,781 / 33,782 |
+| 4 × 2,000 | one shared feed | 2,042 | 44,590 (4 replicas × 8,000) |
+| 4 × 2,000 | one feed per session | 5,640 | 40,014 |
+
+Writes to one feed are serialized by its feed lock (ADR-005), so a shared feed's push throughput falls as sessions
+contend for it; separate feeds (tenants) commit in parallel. Pulls take no feed lock. LocalDB is a development
+edition; a production SQL Server on separate storage will differ. **PostgreSQL was not measured** (no server
+available on this machine); the same command runs against one.
+
 ## Observations
 
 - A durable SQLite write stays around a millisecond on this machine, far inside the 50 ms target. A

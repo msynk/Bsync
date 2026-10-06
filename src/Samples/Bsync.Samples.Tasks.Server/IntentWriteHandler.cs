@@ -69,7 +69,8 @@ public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> task
         row.Revision++;
         row.ChangedBy = write.Caller.Principal.FindFirst("sub")?.Value;
         await db.SaveChangesAsync(cancellationToken);
-        await tasks.UpsertAsync(tenant, row.ToDocument(), write.Transaction, cancellationToken);
+        var attachments = await db.TaskAttachments.Where(a => a.Tenant == tenant && a.TaskId == row.Id).ToListAsync(cancellationToken);
+        await tasks.UpsertAsync(tenant, row.ToDocument(attachments), write.Transaction, cancellationToken);
 
         intent.State = IntentStates.Executed;
         intent.ExecutedBy = row.ChangedBy;

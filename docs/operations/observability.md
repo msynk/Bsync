@@ -29,6 +29,7 @@ name. The default is the document type name.
 | `bsync.run.duration` | histogram | s | `bsync.name`, `bsync.operation` (`sync`, `pull`, `push`), `bsync.result` (`complete`, `incomplete`, `error`), `error.type` | Duration of replication runs. |
 | `bsync.queue.depth` | observable gauge | documents | `bsync.name` | Documents with unconfirmed local changes, as of the engine's last run. |
 | `bsync.queue.oldest_age` | observable gauge | s | `bsync.name` | Age of the oldest change waiting for upload, by its authoring time, as of the last run. |
+| `bsync.issues` | observable gauge | documents | `bsync.name`, `bsync.issue` (`conflict`, `rejected`, `blocked`) | Documents waiting for a person's decision, as of the last run: kept conflicts, rejected changes, and group members parked because another member failed (disjoint; their sum is the total). |
 
 The queue gauges cost two small store reads per run. They are measured only while a listener subscribes to
 them.
@@ -64,6 +65,16 @@ Logs:
   client receives only a generic `503 unavailable`, which it retries.
 
 ASP.NET Core's own `http.server.*` metrics and request logs cover transport-level details.
+
+## Replica acknowledgements (optional audit)
+
+With `SyncEndpointOptions.ReplicaAudit` set, the endpoints record, for every pull that leaves nothing more to fetch,
+which checkpoint a replica reached: replica (its clock node id, sent as the optional `replica` member of pull requests
+by 0.3.0 replicas), caller name, collection, scope, checkpoint and time. A repeated checkpoint is recorded once.
+`InMemorySyncReplicaAudit` keeps them in memory; `SqlServerReplicaAudit` in the table
+`bsync.replica_acknowledgements` (created on first use; purge it by age like any log table). Query with
+`GetAsync(replica)`. This proves which revision of the content a device held, and when. Replicas older than 0.3.0 send
+no id and are not recorded. Tested: `ReplicaAuditTests`, `SqlServerAuthorityTests.ReplicaAudit`.
 
 ## What to alert on
 

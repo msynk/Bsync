@@ -90,6 +90,30 @@ public static class SyncEndpoints
                 return result with { Features = [.. result.Features ?? [], SyncFeatures.HintsMultiplex] };
             }
             : authority.PullAsync;
+        if (options.ReplicaAudit is { } audit)
+        {
+            var unaudited = pull;
+            pull = async (context, request, cancellationToken) =>
+            {
+                var result = await unaudited(context, request, cancellationToken).ConfigureAwait(false);
+                if (!result.HasMore && request.Replica is { Length: > 0 and <= 256 } replica)
+                {
+                    try
+                    {
+                        await audit.RecordAsync(
+                            new ReplicaAcknowledgement(replica, context.Principal.Identity?.Name, collection, context.Scope, result.Checkpoint.Value ?? string.Empty, options.TimeProvider.GetUtcNow()),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception error) when (error is not OperationCanceledException)
+                    {
+                        logger.LogWarning(error, "Recording a replica acknowledgement for {Collection} failed.", collection);
+                    }
+                }
+
+                return result;
+            };
+        }
+
         Func<SyncCallContext, PushRequest<TDocument>, CancellationToken, Task<PushResult<TDocument>>> push = authority.PushAsync;
         Func<PullRequest, string?> validatePull = static request => request.BatchSize < 1 ? "The pull limit must be at least 1." : null;
         Func<PushRequest<TDocument>, string?> validatePush = request => request.Operations is null

@@ -1,3 +1,8 @@
+sealed class Bsync.Server.SqlServer.SqlServerReplicaAudit : Bsync.Server.ISyncReplicaAudit
+  System.String Schema { get; }
+  System.Threading.Tasks.Task RecordAsync(Bsync.Server.ReplicaAcknowledgement acknowledgement, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Server.ReplicaAcknowledgement>> GetAsync(System.String replica, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String connectionString, System.String schema = "bsync")
 sealed class Bsync.Server.SqlServer.SqlServerSchemaException : System.NotSupportedException, System.Runtime.Serialization.ISerializable
   ctor(System.String message)
 sealed class Bsync.Server.SqlServer.SqlServerSyncAuthorityOptions<TDocument> where TDocument : class, Bsync.ISyncEntity

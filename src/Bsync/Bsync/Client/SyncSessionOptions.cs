@@ -78,6 +78,13 @@ public sealed record SyncSessionOptions<TDocument>
     public SyncCoordination? Coordination { get; init; }
 
     /// <summary>
+    /// Deletes everything this device holds for an account: database files, blob content, keys (task G3). Called by
+    /// <see cref="SyncSession{TDocument}.DeleteReplicaAsync"/> after the account's replica is closed. Must succeed when
+    /// there is nothing to delete. Without it, <c>DeleteReplicaAsync</c> throws.
+    /// </summary>
+    public Func<string, CancellationToken, Task>? DeleteReplica { get; init; }
+
+    /// <summary>
     /// Receives state changes and failures (category <c>Bsync.SyncSession</c>). Messages carry states, counts and
     /// error codes, never document data or account names. The DI recipes use the container's logger factory.
     /// </summary>

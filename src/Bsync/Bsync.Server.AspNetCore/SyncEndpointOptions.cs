@@ -29,4 +29,14 @@ public sealed class SyncEndpointOptions
 
     /// <summary>Maximum request body size in bytes. Larger bodies get <c>payload-too-large</c>. Default 4 MiB.</summary>
     public long MaxRequestBodyBytes { get; init; } = 4 * 1024 * 1024;
+
+    /// <summary>
+    /// Records which content each replica reached (task H, optional): after a pull that leaves nothing more to fetch,
+    /// from a replica that sends its id, an acknowledgement goes to this store. A failure to record is logged and does
+    /// not fail the pull.
+    /// </summary>
+    public ISyncReplicaAudit? ReplicaAudit { get; init; }
+
+    /// <summary>The clock of <see cref="ReplicaAudit"/> timestamps (tests).</summary>
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 }

@@ -87,6 +87,26 @@ public sealed class SyncCoordinator : IAsyncDisposable
         return SyncGoalResult.Combine(results);
     }
 
+    /// <summary>
+    /// Deletes <paramref name="account"/>'s replicas of every coordinated collection (task G3): first every collection's
+    /// replica of that account is closed, so none still has a shared database open, then each collection's
+    /// <see cref="SyncSessionOptions{TDocument}.DeleteReplica"/> runs. Collections without it are only closed.
+    /// </summary>
+    public async Task DeleteReplicasAsync(string account, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(account);
+        var members = Snapshot();
+        foreach (var member in members)
+        {
+            await member.Session.CloseAsync(account).ConfigureAwait(false);
+        }
+
+        foreach (var member in members.Where(m => m.Session.CanDeleteReplica))
+        {
+            await member.Session.DeleteReplicaAsync(account, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Asks every collection to sync soon (for example when the network returns).</summary>
     public void RequestSync()
     {
@@ -478,4 +498,13 @@ internal interface ICoordinatedSession
 
     /// <summary>Waits for a goal on the open replica.</summary>
     Task<SyncGoalResult> SyncActiveAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress, CancellationToken cancellationToken);
+
+    /// <summary>Whether the session can delete replicas.</summary>
+    bool CanDeleteReplica { get; }
+
+    /// <summary>Closes the replica if <paramref name="account"/>'s is open.</summary>
+    Task CloseAsync(string account);
+
+    /// <summary>Closes and deletes <paramref name="account"/>'s replica.</summary>
+    Task DeleteReplicaAsync(string account, CancellationToken cancellationToken);
 }

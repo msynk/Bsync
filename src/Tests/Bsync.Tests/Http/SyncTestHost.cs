@@ -28,7 +28,8 @@ public sealed class SyncTestHost : IAsyncDisposable
         bool requireAuthentication = false,
         long maxRequestBodyBytes = 4 * 1024 * 1024,
         IReadOnlyCollection<string>? supportedSchemas = null,
-        ILoggerProvider? logs = null)
+        ILoggerProvider? logs = null,
+        ISyncReplicaAudit? replicaAudit = null)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
@@ -48,6 +49,7 @@ public sealed class SyncTestHost : IAsyncDisposable
             SupportedSchemas = new HashSet<string>(supportedSchemas ?? [SchemaId], StringComparer.Ordinal),
             ResolveScope = requireAuthentication ? http => http.User.FindFirst("tenant")?.Value : static _ => "default",
             MaxRequestBodyBytes = maxRequestBodyBytes,
+            ReplicaAudit = replicaAudit,
         });
         if (requireAuthentication)
         {

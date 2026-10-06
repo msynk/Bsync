@@ -115,6 +115,33 @@ public sealed class DiagnosticsTests
         Assert.DoesNotContain(values, v => v is "shared" or "ok" or "no" or "mine" or "fine" or "bad" or "theirs");
     }
 
+    [Fact(DisplayName = "H C5: documents waiting for a decision are observable by kind (conflict, rejected, blocked)")]
+    public async Task IssueGauges()
+    {
+        var name = $"diag-{Guid.NewGuid():N}";
+        using var recorder = new Recorder(name);
+        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (_, op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
+        var other = new TestReplica(server, "other");
+        var client = Replica(server, "client", name);
+        await other.Engine.WriteAsync(new Note { Id = "shared", Title = "base" });
+        await other.Engine.SyncAsync();
+        await client.Engine.SyncAsync();
+        await other.Engine.WriteAsync(new Note { Id = "shared", Title = "theirs" });
+        await other.Engine.SyncAsync();
+        await client.Engine.WriteAsync(new Note { Id = "shared", Title = "mine" });
+        await client.Engine.WriteAsync(new Note { Id = "no", Title = "bad" });
+        await client.Engine.SyncAsync();
+
+        recorder.Collect();
+        double Last(string kind) => recorder.Measurements.Last(m => m.Instrument == "bsync.issues" && Equals(m.Tags["bsync.issue"], kind)).Value;
+        Assert.Equal((1, 1, 0), (Last("conflict"), Last("rejected"), Last("blocked")));
+
+        await client.Engine.RevertAsync("no");
+        await client.Engine.SyncAsync();
+        recorder.Collect();
+        Assert.Equal((1, 0), (Last("conflict"), Last("rejected")));
+    }
+
     [Fact(DisplayName = "Queue depth and oldest pending age are observable; a failed run is tagged with its error code")]
     public async Task QueueGaugesAndErrors()
     {

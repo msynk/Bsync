@@ -31,6 +31,9 @@ public sealed class TaskDocument : ISyncEntity
     /// <summary>Set by the server: incremented by every accepted change. Intents name the revision the user saw.</summary>
     public long Revision { get; set; }
 
+    /// <summary>Attachments (task F1): references only; the bytes are transferred separately, before the task uploads.</summary>
+    public List<BlobReference> Attachments { get; set; } = [];
+
     /// <summary>Members added by newer versions of the app, kept so this version never erases them (I17).</summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }

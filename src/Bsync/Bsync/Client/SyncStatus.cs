@@ -25,6 +25,14 @@ public sealed record SyncStatus(SyncState State, int Pending, string? Detail, Da
     /// <summary>When local changes were last pushed successfully (or found nothing to push) in this session.</summary>
     public DateTimeOffset? LastPushed { get; init; }
 
+    /// <summary>
+    /// Whether the replica's storage is protected from eviction by the platform: <see langword="true"/> when a browser
+    /// granted persistent storage, <see langword="false"/> when it refused (the browser may delete the replica under
+    /// storage pressure, so unsynced changes could be lost), <see langword="null"/> when unknown or not applicable
+    /// (native files). Taken from <see cref="LocalReplica{TDocument}.PersistentStorage"/>.
+    /// </summary>
+    public bool? PersistentStorage { get; init; }
+
     /// <summary>How old the replica's view of the server is at <paramref name="now"/>; <see langword="null"/> if it never pulled.</summary>
     public TimeSpan? Staleness(DateTimeOffset now) => LastPulled is { } pulled ? now - pulled : null;
 

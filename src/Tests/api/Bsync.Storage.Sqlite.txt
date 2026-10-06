@@ -39,6 +39,7 @@ record Bsync.Storage.Sqlite.SqliteRebuildReport
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
 static class Bsync.Storage.Sqlite.SqliteStorePool
+  static System.Threading.Tasks.Task DeleteDatabaseAsync(System.String dataSource, System.Threading.CancellationToken cancellationToken = default)
   static System.Void Release(System.String dataSource)
 static class Bsync.Storage.Sqlite.SqliteStoreRecovery
   static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteRebuildReport> RebuildAsync(System.String dataSource, System.Threading.CancellationToken cancellationToken = default)

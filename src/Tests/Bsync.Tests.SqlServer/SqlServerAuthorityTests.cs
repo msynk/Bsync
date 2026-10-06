@@ -24,6 +24,25 @@ public sealed class SqlServerAuthorityTests : IAsyncLifetime
     private static TestReplica Replica(ISyncAuthority<Note> authority, string node, IConflictHandler<Note>? handler = null, SyncCallContext? context = null, SyncOptions<Note>? options = null) =>
         new(InMemorySyncServerRef.Create(), node, handler, options, SystemPhysicalClock.Instance, transport: _ => new InProcessTransport<Note>(authority, context));
 
+    [Fact(DisplayName = "H: replica acknowledgements are stored per replica in order; a repeated checkpoint is stored once")]
+    public async Task ReplicaAudit()
+    {
+        var audit = new SqlServerReplicaAudit(_database.ConnectionString);
+        var at = new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.FromHours(2));
+        await audit.RecordAsync(new ReplicaAcknowledgement("tablet-7", "alice", "notes", "tenant-a", "cp:1", at));
+        await audit.RecordAsync(new ReplicaAcknowledgement("tablet-7", "alice", "notes", "tenant-a", "cp:1", at.AddMinutes(1)));
+        await audit.RecordAsync(new ReplicaAcknowledgement("tablet-7", null, "tasks", "tenant-a", "cp:1", at.AddMinutes(2)));
+        await audit.RecordAsync(new ReplicaAcknowledgement("tablet-7", "alice", "notes", "tenant-a", "cp:9", at.AddMinutes(3)));
+        await audit.RecordAsync(new ReplicaAcknowledgement("phone-2", "bob", "notes", "tenant-a", "cp:9", at.AddMinutes(4)));
+
+        var tablet = await new SqlServerReplicaAudit(_database.ConnectionString).GetAsync("tablet-7");
+
+        Assert.Equal(
+            [("notes", "cp:1", (string?)"alice", at), ("tasks", "cp:1", null, at.AddMinutes(2)), ("notes", "cp:9", "alice", at.AddMinutes(3))],
+            tablet.Select(a => (a.Collection, a.Checkpoint, a.Account, a.At)));
+        Assert.Single(await audit.GetAsync("phone-2"));
+    }
+
     [Fact(DisplayName = "D5 F18: the retention service reads every feed's head and purges each scope by age")]
     public async Task RetentionPurgesEachScope()
     {

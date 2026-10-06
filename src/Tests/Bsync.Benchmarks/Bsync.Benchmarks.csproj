@@ -16,6 +16,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite\Bsync.Storage.Sqlite.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.PostgreSql\Bsync.Server.PostgreSql.csproj" />
   </ItemGroup>
 
 </Project>

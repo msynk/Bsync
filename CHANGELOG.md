@@ -28,6 +28,21 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
   receipts older than `MaxOfflineHorizon` (default 45 days) in every in-memory, SQL Server or PostgreSQL authority it
   is given. A receipt horizon shorter than the offline horizon fails the host at startup.
 - `SyncOptions.KeptConflictView = KeptConflictView.Local` keeps showing the user's own edit while a conflict waits.
+- Operations: the `bsync.issues` gauge (conflicts, rejections, blocked group members per collection); an optional
+  replica acknowledgement audit (`SyncEndpointOptions.ReplicaAudit`, `SqlServerReplicaAudit`) recording which
+  checkpoint each replica reached and when; a SQL Server restore drill, retention service and capacity guidance in
+  the runbook; an authority throughput benchmark with concurrent sessions (`docs/benchmarks.md`).
+- Wipe on sign-out: `SyncSession.DeleteReplicaAsync(account)` and `SyncCoordinator.DeleteReplicasAsync(account)` close
+  an account's replicas and delete them from the device (`SqliteStorePool.DeleteDatabaseAsync`; the browser recipe
+  deletes the IndexedDB database). The browser recipe requests persistent storage and reports it in
+  `SyncStatus.PersistentStorage`. Encryption at rest is proposed in ADR-016, not implemented.
+- `SyncOptions.ReadyToPush` holds a pending document back until something it names has reached the server.
+- The Tasks sample attaches files to tasks: content-addressed blob stores on the device and the server, resumable
+  chunked uploads and range downloads verified by SHA-256, uploads before the task, reads limited to callers who can
+  read a referencing task, pinning and eviction (`docs/patterns/attachments.md`). Browser clients, presigned URLs and an
+  S3 adapter are not done yet.
+- The Tasks sample distributes bundles: a server-published manifest that devices switch to in one step once every
+  item is downloaded and verified, keeping the previous revision in use meanwhile (`docs/patterns/bundles.md`).
 - The Tasks sample executes immutable intents (complete, rename) exactly once in the write handler's transaction,
   with execution state separate from sync state; documented as a pattern in `docs/patterns/intents.md`. No new
   package types.

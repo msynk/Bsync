@@ -38,4 +38,14 @@ if (args is ["peak-query", var path])
     return;
 }
 
+if (args is ["throughput", var provider, var connection, ..] && provider is "sqlserver" or "postgres")
+{
+    await ServerThroughput.RunAsync(
+        provider,
+        connection,
+        args.Length > 3 ? int.Parse(args[3], System.Globalization.CultureInfo.InvariantCulture) : 16,
+        args.Length > 4 ? int.Parse(args[4], System.Globalization.CultureInfo.InvariantCulture) : 500);
+    return;
+}
+
 BenchmarkSwitcher.FromAssembly(typeof(Workload).Assembly).Run(args);

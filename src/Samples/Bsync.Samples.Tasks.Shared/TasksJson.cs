@@ -14,6 +14,12 @@ namespace Bsync.Samples.Tasks;
 [JsonSerializable(typeof(TokenResponse))]
 [JsonSerializable(typeof(NewTask))]
 [JsonSerializable(typeof(TaskIntent))]
+[JsonSerializable(typeof(BlobUploadStatus))]
+[JsonSerializable(typeof(BundleManifest))]
+[JsonSerializable(typeof(PullResult<BundleManifest>))]
+[JsonSerializable(typeof(PushRequest<BundleManifest>))]
+[JsonSerializable(typeof(PushResult<BundleManifest>))]
+[JsonSerializable(typeof(PublishBundle))]
 [JsonSerializable(typeof(PullResult<TaskIntent>))]
 [JsonSerializable(typeof(PushRequest<TaskIntent>))]
 [JsonSerializable(typeof(PushResult<TaskIntent>))]
@@ -24,6 +30,9 @@ public sealed partial class TasksJson : JsonSerializerContext
 
     /// <summary>The intents collection (task F3).</summary>
     public const string IntentCollection = "task-intents";
+
+    /// <summary>The bundles collection (task F2), published by the server only.</summary>
+    public const string BundleCollection = "bundles";
 
     /// <summary>The application schema id sent with every sync request.</summary>
     public const string SchemaId = "tasks-v1";

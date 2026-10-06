@@ -643,13 +643,18 @@ public sealed class SyncEngine<TDocument>
     /// <summary>Refreshes the queue gauges, only while someone listens to them.</summary>
     private async Task MeasureQueueAsync()
     {
-        if (!SyncDiagnostics.QueueDepth.Enabled && !SyncDiagnostics.QueueOldestAge.Enabled)
+        if (!SyncDiagnostics.QueueDepth.Enabled && !SyncDiagnostics.QueueOldestAge.Enabled && !SyncDiagnostics.Issues.Enabled)
         {
             return;
         }
 
         try
         {
+            if (SyncDiagnostics.Issues.Enabled)
+            {
+                _queue.Issues = await _store.CountIssuesAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+
             var depth = await _store.CountDirtyAsync(CancellationToken.None).ConfigureAwait(false);
             var oldest = await _store.GetPendingAsync(1, cancellationToken: CancellationToken.None).ConfigureAwait(false);
             _queue.Update(depth, oldest.Count == 0 ? null : oldest[0].Current.UpdatedAt.WallTime);
@@ -709,7 +714,7 @@ public sealed class SyncEngine<TDocument>
             try
             {
                 result = await _transport
-                    .PullAsync(new PullRequest(cursor.Checkpoint, PullBatchSize) { Features = ReplicaFeatures }, cancellationToken)
+                    .PullAsync(new PullRequest(cursor.Checkpoint, PullBatchSize) { Features = ReplicaFeatures, Replica = _clock.Node }, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (SyncResetRequiredException required) when (!cursor.Checkpoint.IsStart)
@@ -1040,6 +1045,13 @@ public sealed class SyncEngine<TDocument>
             }
 
             candidates = await ExpandGroupsAsync(candidates, excluded, cancellationToken).ConfigureAwait(false);
+            if (_options.ReadyToPush is { } ready && candidates.Count > 0)
+            {
+                var before = candidates.Count;
+                candidates = await HoldBackAsync(candidates, ready, excluded, cancellationToken).ConfigureAwait(false);
+                deferred += before - candidates.Count;
+            }
+
             if (candidates.Count == 0)
             {
                 continue;
@@ -1166,6 +1178,38 @@ public sealed class SyncEngine<TDocument>
             Deferred = deferred,
             HasRemainingWork = remaining.Count > 0,
         };
+    }
+
+    /// <summary>
+    /// Removes candidates that <see cref="SyncOptions{TDocument}.ReadyToPush"/> holds back, with every member of their
+    /// dependency groups, and excludes them from the rest of this run.
+    /// </summary>
+    private static async Task<IReadOnlyList<SyncRecord<TDocument>>> HoldBackAsync(
+        IReadOnlyList<SyncRecord<TDocument>> candidates,
+        Func<TDocument, CancellationToken, ValueTask<bool>> ready,
+        HashSet<string> excluded,
+        CancellationToken cancellationToken)
+    {
+        var held = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var candidate in candidates)
+        {
+            if (!await ready(candidate.Current, cancellationToken).ConfigureAwait(false))
+            {
+                held.Add(candidate.Current.Id);
+                if (candidate.Group is { } group)
+                {
+                    held.UnionWith(group.Members);
+                }
+            }
+        }
+
+        if (held.Count == 0)
+        {
+            return candidates;
+        }
+
+        excluded.UnionWith(held);
+        return candidates.Where(c => !held.Contains(c.Current.Id)).ToList();
     }
 
     /// <summary>

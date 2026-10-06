@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization.Metadata;
 using Bsync.Client;
 using Bsync.Documents;
+using Bsync.Storage;
 using Bsync.Transport;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
@@ -58,8 +59,25 @@ public static class IndexedDbSyncServiceCollectionExtensions
                             documentType,
                             cancellationToken).ConfigureAwait(false);
                         var identity = await store.GetReplicaIdentityAsync(cancellationToken).ConfigureAwait(false);
-                        return new LocalReplica<TDocument>(store, identity.Incarnation);
+
+                        // Ask the browser not to evict the replica under storage pressure; the answer is reported in
+                        // SyncStatus.PersistentStorage (task G3). Browsers may refuse, grant only to installed apps, or
+                        // ask the user (Firefox): opening never waits for a person, so an unanswered request is "unknown".
+                        bool? persistent;
+                        try
+                        {
+                            persistent = await store.RequestPersistenceAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (Exception error) when (error is TimeoutException or LocalStoreUnavailableException)
+                        {
+                            persistent = null;
+                        }
+
+                        return new LocalReplica<TDocument>(store, identity.Incarnation) { PersistentStorage = persistent };
                     },
+
+                    // Sign-out on a shared device: removes the account's database (every collection in it).
+                    DeleteReplica = (account, cancellationToken) => IndexedDbLocalStore<TDocument>.DeleteDatabaseAsync(js, $"bsync-{account}", cancellationToken),
                     AcquireLease = async (account, cancellationToken) =>
                         await IndexedDbReplicaLease.TryAcquireAsync(js, $"bsync-{account}-{collection}", cancellationToken).ConfigureAwait(false),
 

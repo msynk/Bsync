@@ -53,6 +53,12 @@ public static class SyncDiagnostics
         "s",
         "Age of the oldest change waiting to be uploaded (by its authoring time), as of the engine's last run.");
 
+    internal static readonly ObservableGauge<long> Issues = Meter.CreateObservableGauge(
+        "bsync.issues",
+        ObserveIssues,
+        "{document}",
+        "Documents waiting for a person's decision, by kind (conflict, rejected, blocked), as of the engine's last run.");
+
     internal static QueueState Track(object engine, string name)
     {
         var state = new QueueState(name);
@@ -71,6 +77,20 @@ public static class SyncDiagnostics
         }
     }
 
+    private static IEnumerable<Measurement<long>> ObserveIssues()
+    {
+        foreach (var (_, state) in (IEnumerable<KeyValuePair<object, QueueState>>)Queues)
+        {
+            if (state.Issues is { } issues)
+            {
+                var name = new KeyValuePair<string, object?>(NameTag, state.Name);
+                yield return new Measurement<long>(issues.Conflicts, name, new KeyValuePair<string, object?>("bsync.issue", "conflict"));
+                yield return new Measurement<long>(issues.Rejected - issues.Blocked, name, new KeyValuePair<string, object?>("bsync.issue", "rejected"));
+                yield return new Measurement<long>(issues.Blocked, name, new KeyValuePair<string, object?>("bsync.issue", "blocked"));
+            }
+        }
+    }
+
     /// <summary>The last measured queue of one engine; read by the observable gauges.</summary>
     internal sealed class QueueState(string name)
     {
@@ -83,6 +103,9 @@ public static class SyncDiagnostics
         public bool Measured => Volatile.Read(ref _measured) == 1;
 
         public double Depth => Volatile.Read(ref _depth);
+
+        /// <summary>The last measured issue counts, or <see langword="null"/> before the first measurement.</summary>
+        public Storage.SyncIssueCounts? Issues { get; set; }
 
         public void Update(long depth, long? oldestWallTimeMs)
         {

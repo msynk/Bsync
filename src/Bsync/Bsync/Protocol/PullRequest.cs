@@ -19,4 +19,12 @@ public readonly record struct PullRequest(
     [JsonPropertyName("features")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? Features { get; init; }
+
+    /// <summary>
+    /// Identifies the replica (its clock node id), so a server can record which content each replica reached
+    /// (optional, task H). Servers that do not audit ignore it.
+    /// </summary>
+    [JsonPropertyName("replica")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Replica { get; init; }
 }

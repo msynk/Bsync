@@ -45,6 +45,20 @@ var floor = /* at or above anything issued before the incident, e.g. GetHighestV
 await authority.BeginNewEpochAsync(floor);   // new epoch, and every feed (also feeds created later) continues above it
 ```
 
+A restore drill for SQL Server, step by step:
+
+1. Before the incident, monitoring records `GetHighestVersionAsync(scope)` per feed (or the `bsync.feeds` table's
+   `sequence` column) at least as often as backups are taken.
+2. Stop the application's server processes (or put them in maintenance mode), so no replica writes to the database
+   while it is restored.
+3. `RESTORE DATABASE` (or a point-in-time restore) of the application database. The `bsync` schema and the
+   application's tables come back to the same point in time.
+4. Before serving requests again, call `BeginNewEpochAsync(floor)` once, with `floor` above every version recorded in
+   step 1 plus a margin. Every feed, including feeds created later, continues above it.
+5. Start the processes. Replicas reset on their next sync (below); pending local work is kept and uploaded again.
+6. Watch `bsync.resets{reason="epoch"}` (client) and `bsync.server.push.operations{outcome="Conflict"}` (server) for
+   the following hours; a spike of conflicts means edits the restore lost are being re-decided.
+
 Restoring the application database restores the application's rows and the replication projection to the same
 point in time. Tested: `SqlServerAuthorityTests.RestoreDrill` (tables restored from a copy, new epoch, replicas reset
 and keep pending edits, no version reused) and `NewFeedStartsAboveFloor`.
@@ -74,9 +88,17 @@ tables from a copy taken earlier and checks that replicas reset, keep pending ed
   longest time a device may stay offline with unsent work. A resend after its receipt was purged is never
   applied twice, but it comes back as a conflict. With the default policy it is then kept for the user,
   although the write had in fact succeeded.
-- Neither purge runs automatically. With PostgreSQL or SQL Server, schedule `PurgeTombstonesAsync(scope, version)`
-  and `PurgeReceiptsAsync(scope, version)` per scope, for example from a background job. They are tested by the
-  public authority conformance suite on both, and in `PostgreSqlAuthorityTests.Retention`.
+- `AddSyncRetention` (in `Bsync.Server.AspNetCore`) runs both on a schedule for every in-memory, PostgreSQL or SQL
+  Server authority it is given: it samples each feed's head every `Interval` (default one hour) and purges what is
+  older than `MaxOfflineHorizon` (default 45 days; receipts: `ReceiptHorizon`, never shorter). A receipt horizon
+  shorter than the offline horizon fails the host at startup. Samples live in memory, so after a restart nothing is
+  purged until one horizon has passed again; run it in one process (several only repeat the same purge). Tested:
+  `RetentionServiceTests`, `SqlServerAuthorityTests.RetentionPurgesEachScope`.
+- Without the service, schedule `PurgeTombstonesAsync(scope, version)` and `PurgeReceiptsAsync(scope, version)` per
+  scope yourself. They are tested by the public authority conformance suite on both durable authorities, and in
+  `PostgreSqlAuthorityTests.Retention`.
+- Replicas drop their own clean tombstones below the server's horizon (feature `retention`), so device storage does
+  not grow with deletions either.
 
 ## 3. Access changes
 
@@ -165,7 +187,20 @@ members. To change a shape, let the document upgrade itself on read: `IJsonOnDes
 `DocumentUpgrade.TryTake` moves old members found in the extension data (ADR-013, `DocumentUpgradeTests`). Let
 upload queues drain first: an operation in flight across the change is answered `operation-id-reused`.
 
-## 8. Checklist before going to production
+## 8. Capacity (SQL Server)
+
+- **Writes to one feed are serialized** by the feed lock (ADR-005). Measured on a development machine with LocalDB
+  (`docs/benchmarks.md`): about 1,300 operations per second for one shared feed with 16 concurrent sessions, about
+  5,500 with one feed per session. Plan for the busiest feed (tenant), not the total.
+- **Pulls take no feed lock** and scale with readers: 20,000 to 45,000 changes per second in the same runs.
+- **Storage:** each document is stored once in `bsync.documents` (JSON plus a few dozen bytes of metadata), each
+  accepted operation leaves a receipt until it is purged, and tombstones stay until purged. With read membership
+  (ADR-015), `bsync.document_access` holds one row per principal per document.
+- **Indexes** are created with the tables; nothing needs tuning for the measured volumes. Monitor page latch waits on
+  `bsync.feeds` if one feed receives most writes.
+- **Replica audit** rows (if enabled) grow with replicas × collections × new checkpoints; purge them by age.
+
+## 9. Checklist before going to production
 
 With the PostgreSQL or SQL Server authority:
 

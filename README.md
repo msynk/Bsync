@@ -326,6 +326,21 @@ tabs are safe: every update commits in one IndexedDB transaction and only if no 
 records first. Failures (IndexedDB missing, quota, an upgrade from another tab) surface as
 `LocalStoreUnavailableException`. See `src/Samples/Bsync.Samples.Notes.Client` for a complete offline PWA.
 
+The browser recipe asks for persistent storage when it opens a replica and reports the answer in
+`SyncStatus.PersistentStorage`; without it, a browser may delete the replica under storage pressure.
+
+### Signing out on a shared device
+
+```csharp
+if (session.Status.Pending > 0) { /* warn: unsynced changes will be lost */ }
+await coordinator.DeleteReplicasAsync(account);   // or session.DeleteReplicaAsync(account) for one collection
+```
+
+Replication of the account stops, its replicas are closed, and `SyncSessionOptions.DeleteReplica` removes the files
+(the browser recipe deletes the account's IndexedDB database; native apps call `SqliteStorePool.DeleteDatabaseAsync`
+and delete their own blob files). Nothing is deleted on the server. Encryption at rest is not available yet
+([ADR-016](docs/architecture/adr-016-encryption-at-rest.md) proposes it).
+
 ## Server restores, access changes and retention
 
 If the server is restored from a backup, it must start a new epoch and never reuse a version number.
@@ -443,7 +458,9 @@ server processes are announced by polling the feed heads (`CommitPollInterval`, 
 `NotifyCommitted` from your own message bus. After a restore call `BeginNewEpochAsync(versionFloor)`.
 A complete example with EF Core, bearer tokens and two kinds of clients: `src/Samples/Bsync.Samples.Tasks.Server`.
 Actions that must run exactly once (complete, approve, send) are modeled as immutable intents executed by a write
-handler; see [the intents pattern](docs/patterns/intents.md), which the Tasks sample implements.
+handler; see [the intents pattern](docs/patterns/intents.md), which the Tasks sample implements. Files attached to
+documents are uploaded before the document and transferred resumably; see [the attachments pattern](docs/patterns/attachments.md).
+Sets of files that must switch version together are [bundles](docs/patterns/bundles.md).
 Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer`.
 
 ## Native apps (WPF, .NET MAUI)
@@ -625,7 +642,7 @@ dotnet test src/Bsync.slnx --filter "DisplayName~I04"
 - [Protocol specification v1](docs/protocol/v1.md).
 - [Compatibility policy and migration notes](docs/compatibility.md).
 - [Disaster recovery and stuck replicas](docs/operations/disaster-recovery.md) and [observability](docs/operations/observability.md).
-- [Pattern: immutable intents](docs/patterns/intents.md).
+- Patterns: [immutable intents](docs/patterns/intents.md), [attachments](docs/patterns/attachments.md) and [bundles](docs/patterns/bundles.md).
 - [Benchmarks](docs/benchmarks.md).
 - [Support matrix](docs/support-matrix.md) and [roadmap](docs/roadmap.md).
 

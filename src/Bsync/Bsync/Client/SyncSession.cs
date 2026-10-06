@@ -236,6 +236,58 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
         RequestSync();
     }
 
+    /// <summary>
+    /// Deletes <paramref name="account"/>'s replica from this device (task G3), for example when the user signs out of a
+    /// shared device: replication of that account stops, its replica is closed and its lease released, then
+    /// <see cref="SyncSessionOptions{TDocument}.DeleteReplica"/> removes the files. Unsynced changes are lost; check
+    /// <see cref="SyncStatus.Pending"/> first if that matters. Safe to call while the session runs: a later
+    /// <see cref="GetEngineAsync"/> for the account opens a new, empty replica. When several collections share one
+    /// database, use <see cref="SyncCoordinator.DeleteReplicasAsync"/> so all of them are closed first.
+    /// </summary>
+    public async Task DeleteReplicaAsync(string account, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(account);
+        var delete = _options.DeleteReplica
+            ?? throw new InvalidOperationException("Set SyncSessionOptions.DeleteReplica to delete replicas.");
+        await _lifecycle.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_active?.Account == account)
+            {
+                await StopActiveAsync().ConfigureAwait(false);
+            }
+
+            await delete(account, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    async Task ICoordinatedSession.CloseAsync(string account)
+    {
+        await _lifecycle.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_active?.Account == account)
+            {
+                await StopActiveAsync().ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    bool ICoordinatedSession.CanDeleteReplica => _options.DeleteReplica is not null;
+
+    /// <inheritdoc />
+    Task ICoordinatedSession.DeleteReplicaAsync(string account, CancellationToken cancellationToken) => DeleteReplicaAsync(account, cancellationToken);
+
     /// <summary>Stops replication and closes the current replica (for example on sign-out).</summary>
     public async Task StopAsync()
     {
@@ -671,6 +723,7 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
 
     private void SetStatus(SyncStatus status)
     {
+        status = status with { PersistentStorage = _active?.Replica.PersistentStorage };
         var previous = _status;
         _status = status;
 

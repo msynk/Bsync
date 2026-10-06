@@ -46,6 +46,15 @@ public sealed class SyncOptions<TDocument>
     /// <summary>Two-way (default) or pull-only (read-only replica that stores only current states).</summary>
     public SyncMode Mode { get; init; } = SyncMode.TwoWay;
 
+    /// <summary>
+    /// Decides, before each push, whether a pending document may be sent now. Return <see langword="false"/> to hold it
+    /// back: it stays pending and is offered again on the next run, and it counts in <see cref="SyncResult.Deferred"/>,
+    /// so a session backs off instead of retrying at once. A held member holds its whole dependency group. Use it when a
+    /// document must not reach the server before something else does, for example the bytes of an attachment it names
+    /// (task F1). Default: every pending document is ready.
+    /// </summary>
+    public Func<TDocument, CancellationToken, ValueTask<bool>>? ReadyToPush { get; init; }
+
     /// <summary>Throws <see cref="ArgumentOutOfRangeException"/> if any value is out of range.</summary>
     public void Validate()
     {
