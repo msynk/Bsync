@@ -1,6 +1,7 @@
 # ADR-018: Declared secondary indexes in the local stores
 
-- **Status:** **Proposed**, not implemented. Needs a maintainer decision before task E2 starts.
+- **Status:** Accepted (2026-10-06) and implemented: in-memory, SQLite (schema 5) and IndexedDB (schema 4) stores,
+  with shared conformance cases (`LocalStoreIndexConformance`) run in .NET and in Chromium, Firefox and WebKit.
 - **Invariants:** I01 (local writes are durable), I02 (isolation), I07 (collections are isolated), I17 (schema
   upgrades keep pending work)
 - **Related:** improvement plan tasks E1 and E2, ADR-004 (store operations), ADR-008 (browser storage),
@@ -79,7 +80,17 @@ transaction with the record.
 - **One IndexedDB index per declared index.** Rejected: each new declaration would need a database version change,
   which closes other tabs.
 
-## Decision needed
+## Implementation notes
 
-Accept, amend or reject this proposal. Until then E2 is not implemented, and sorted views of large collections stay
-in memory (`docs/benchmarks.md`).
+- The query API is `SyncQuery.Index` (built with `SyncIndex<T, TValue>`: `All`, `Equal`, `Between`, `From`, `Before`,
+  then `Descending()`), `SyncQuery.Skip`, and `ISyncCollection.CountAsync`. `Order` and `Index` cannot be combined.
+- Stores take their indexes when they are opened (`InMemoryLocalStore` constructor, `SqliteLocalStore.OpenAsync`,
+  `IndexedDbLocalStore.OpenAsync`, `AddBrowserSyncCollection(indexes:)`). `bs_meta`/`meta` key `indexes` records the
+  set (names and versions) the stored keys were built for. A store that declares another set rebuilds them when it
+  opens; a writer with another set marks them unusable (`!`), and queries are then evaluated in memory until a store
+  with the right set opens. In IndexedDB, a rebuild holds a token naming its target set, so writers with the same set
+  keep keys during the rebuild, and a writer with another set cancels it.
+- SQLite walks `bs_index` first (`CROSS JOIN`), so a page stops at its limit; index rows exist exactly for live,
+  visible records (purges delete them too), so counts read `bs_index` alone.
+- Measured (desktop, 50,000 documents): a 50-item ordered page in 0.35 ms (in-memory) and 0.45 ms (SQLite) instead
+  of 313 ms and 337 ms; see `docs/benchmarks.md`. IndexedDB timings in browsers were not measured.

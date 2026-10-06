@@ -54,6 +54,7 @@ public sealed class SyncEngine<TDocument>
     private volatile IReadOnlyList<string>? _serverFeatures;
     private volatile SyncLimits? _serverLimits;
     private long _compactedThrough;
+    private volatile bool _serverTimeKnown;
 
     /// <summary>
     /// Creates an engine for one collection that clones documents with reflection-based JSON. Not
@@ -124,6 +125,14 @@ public sealed class SyncEngine<TDocument>
     /// <summary>Returns up to <paramref name="limit"/> app-visible documents after <paramref name="afterId"/>, in ordinal id order (bounded paging).</summary>
     public Task<IReadOnlyList<TDocument>> QueryPageAsync(string? afterId, int limit, bool includeDeleted = false, CancellationToken cancellationToken = default) =>
         _store.QueryPageAsync(afterId, limit, includeDeleted, cancellationToken);
+
+    /// <summary>Returns up to <paramref name="limit"/> live documents of an index range after <paramref name="after"/> (ADR-018).</summary>
+    public Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default) =>
+        _store.QueryIndexAsync(query, after, limit, cancellationToken);
+
+    /// <summary>Counts the live documents of an index range (ADR-018).</summary>
+    public Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default) =>
+        _store.CountIndexAsync(query, cancellationToken);
 
     /// <summary>Returns the stored record (including sync metadata) for <paramref name="id"/>.</summary>
     public Task<SyncRecord<TDocument>?> GetAsync(string id, CancellationToken cancellationToken = default) =>
@@ -884,6 +893,7 @@ public sealed class SyncEngine<TDocument>
     /// </summary>
     private void CorrectClock(long serverTime, long sent, long received)
     {
+        _serverTimeKnown = true;
         var offset = serverTime - (sent + ((received - sent) / 2));
         _clock.PhysicalOffset = offset <= -1_000 ? TimeSpan.FromMilliseconds(offset) : TimeSpan.Zero;
     }
@@ -1024,8 +1034,9 @@ public sealed class SyncEngine<TDocument>
             };
     }
 
-    private async Task<SyncResult> PushCoreAsync(CancellationToken cancellationToken)
+    private async Task<SyncResult> PushCoreAsync(CancellationToken cancellationToken, bool afterRestamp = false)
     {
+        var skewed = 0;
         var pushed = 0;
         var conflicts = 0;
         var rejected = 0;
@@ -1116,6 +1127,7 @@ public sealed class SyncEngine<TDocument>
                             existing => ApplyRejected(existing, operation.OperationId, outcome)));
                         excluded.Add(operation.DocumentId);
                         rejected++;
+                        skewed += outcome.ErrorCode == PushErrorCodes.ClockSkew ? 1 : 0;
                         if (operation.Group is not null)
                         {
                             failedGroups.Add(operation.DocumentId);
@@ -1171,6 +1183,23 @@ public sealed class SyncEngine<TDocument>
             }
         }
 
+        // ADR-017 part 2: writes rejected only because this device's clock ran ahead get new timestamps and go again at once.
+        if (skewed > 0 && !afterRestamp && _options.RestampSkewedWrites && _serverTimeKnown)
+        {
+            var restamped = await RestampSkewedAsync(cancellationToken).ConfigureAwait(false);
+            if (restamped > 0)
+            {
+                var again = await PushCoreAsync(cancellationToken, afterRestamp: true).ConfigureAwait(false);
+                return again with
+                {
+                    Pushed = pushed + again.Pushed,
+                    Conflicts = conflicts + again.Conflicts,
+                    Rejected = rejected - restamped + again.Rejected,
+                    Deferred = deferred + again.Deferred,
+                };
+            }
+        }
+
         var remaining = await _store.GetPendingAsync(1, cancellationToken: cancellationToken).ConfigureAwait(false);
         return new SyncResult(0, pushed, conflicts)
         {
@@ -1179,6 +1208,79 @@ public sealed class SyncEngine<TDocument>
             HasRemainingWork = remaining.Count > 0,
         };
     }
+
+    /// <summary>
+    /// ADR-017 part 2. A write rejected with <c>clock-skew</c> carries a timestamp above anything the server accepted, so
+    /// no peer has seen it. Moves the clock back to the newest timestamp this replica holds that is not above the server's
+    /// time (plus the default allowance), gives the skew-rejected writes (and group members parked with them) new
+    /// timestamps in their original order as new operations, and lowers the stored high-water mark so a restart does not
+    /// jump ahead again. Returns the number of records re-stamped.
+    /// </summary>
+    private async Task<int> RestampSkewedAsync(CancellationToken cancellationToken)
+    {
+        var rejected = await _store.GetRejectedAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        var groups = rejected.Where(static r => r.Rejection?.ErrorCode == PushErrorCodes.ClockSkew && r.Group is not null)
+            .Select(static r => r.Group!.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var targets = rejected
+            .Where(r => r.Rejection?.ErrorCode == PushErrorCodes.ClockSkew
+                || (r.Rejection?.ErrorCode == PushErrorCodes.GroupFailed && r.Group is { } g && groups.Contains(g.Id)))
+            .OrderBy(static r => r.Current.UpdatedAt)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            return 0;
+        }
+
+        var ids = targets.Select(static r => r.Current.Id).ToHashSet(StringComparer.Ordinal);
+        var bound = _clock.PhysicalMilliseconds() + (long)_clock.PhysicalOffset.TotalMilliseconds + (long)SkewAllowance.TotalMilliseconds;
+        var floor = HlcTimestamp.MinValue;
+        foreach (var document in await _store.QueryAsync(includeDeleted: true, cancellationToken).ConfigureAwait(false))
+        {
+            if (!ids.Contains(document.Id) && document.UpdatedAt.WallTime <= bound && document.UpdatedAt > floor)
+            {
+                floor = document.UpdatedAt;
+            }
+        }
+
+        _clock.Rewind(floor);
+        var updates = targets.Select(target => new RecordUpdate<TDocument>(target.Current.Id, existing =>
+        {
+            if (existing is not { IsDirty: true, Rejection: { } rejection } || existing.LocalRevision != target.LocalRevision
+                || rejection.ErrorCode is not (PushErrorCodes.ClockSkew or PushErrorCodes.GroupFailed))
+            {
+                return null; // changed meanwhile: a new edit already has a new timestamp
+            }
+
+            var current = _clone(existing.Current);
+            current.UpdatedAt = _clock.Now();
+            return existing with { Current = current, Rejection = null, Pending = null };
+        })).ToList();
+        var results = await CommitAsync(SyncChangeKind.Sync, updates, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var highWater = floor;
+        foreach (var document in await _store.QueryAsync(includeDeleted: true, cancellationToken).ConfigureAwait(false))
+        {
+            if (document.UpdatedAt > highWater)
+            {
+                highWater = document.UpdatedAt;
+            }
+        }
+
+        try
+        {
+            await _store.ResetClockHighWaterAsync(highWater > _clock.Last ? highWater : _clock.Last, cancellationToken).ConfigureAwait(false);
+        }
+        catch (NotSupportedException)
+        {
+            // The store keeps its higher mark; only a restart before real time catches up is affected.
+        }
+
+        return results.Count(static r => r.Changed);
+    }
+
+    /// <summary>The servers' default <c>MaxClockSkew</c>: timestamps up to this far ahead were acceptable.</summary>
+    private static readonly TimeSpan SkewAllowance = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Removes candidates that <see cref="SyncOptions{TDocument}.ReadyToPush"/> holds back, with every member of their
@@ -1409,7 +1511,7 @@ public sealed class SyncEngine<TDocument>
             ? existing with { Pending = null, Base = null, BaseVersion = null, Observed = null, ObservedVersion = null }
             : existing with { Pending = null };
         return existing.LocalRevision == pending.Revision
-            ? forgotten with { Rejection = new SyncRejection(pending.Revision, outcome.ErrorCode ?? "rejected", outcome.Message) }
+            ? forgotten with { Rejection = new SyncRejection(pending.Revision, outcome.ErrorCode ?? "rejected", outcome.Message) { Arguments = outcome.Arguments } }
             : forgotten;
     }
 

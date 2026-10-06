@@ -8,7 +8,7 @@ namespace Bsync.Storage.Sqlite;
 /// (docs/operations/disaster-recovery.md).
 /// </summary>
 /// <remarks>
-/// Close every engine and store that uses the file before calling <see cref="RebuildAsync"/>. The damaged file is
+/// Close every engine and store that uses the file before calling <see cref="RebuildAsync(string, CancellationToken)"/>. The damaged file is
 /// never deleted: it is renamed so it can be inspected or sent for support.
 /// </remarks>
 public static class SqliteStoreRecovery
@@ -17,7 +17,24 @@ public static class SqliteStoreRecovery
     /// Runs SQLite's <c>quick_check</c> on the database. Returns the problems found; an empty list means the file
     /// is structurally sound. A file that cannot be opened as a database is reported, not thrown.
     /// </summary>
-    public static async Task<IReadOnlyList<string>> CheckAsync(string dataSource, CancellationToken cancellationToken = default)
+    public static Task<IReadOnlyList<string>> CheckAsync(string dataSource, CancellationToken cancellationToken = default) =>
+        CheckCoreAsync(dataSource, null, cancellationToken);
+
+    /// <inheritdoc cref="RebuildCoreAsync"/>
+    public static Task<SqliteRebuildReport> RebuildAsync(string dataSource, CancellationToken cancellationToken = default) =>
+        RebuildCoreAsync(dataSource, null, cancellationToken);
+#if BSYNC_SQLCIPHER
+
+    /// <summary>Runs <c>quick_check</c> on a database encrypted with <paramref name="encryptionKey"/>.</summary>
+    public static Task<IReadOnlyList<string>> CheckAsync(string dataSource, byte[] encryptionKey, CancellationToken cancellationToken = default) =>
+        CheckCoreAsync(dataSource, encryptionKey ?? throw new ArgumentNullException(nameof(encryptionKey)), cancellationToken);
+
+    /// <summary>Rebuilds a database encrypted with <paramref name="encryptionKey"/>; the new database uses the same key.</summary>
+    public static Task<SqliteRebuildReport> RebuildAsync(string dataSource, byte[] encryptionKey, CancellationToken cancellationToken = default) =>
+        RebuildCoreAsync(dataSource, encryptionKey ?? throw new ArgumentNullException(nameof(encryptionKey)), cancellationToken);
+#endif
+
+    private static async Task<IReadOnlyList<string>> CheckCoreAsync(string dataSource, byte[]? key, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(dataSource);
         if (!File.Exists(dataSource))
@@ -27,7 +44,7 @@ public static class SqliteStoreRecovery
 
         try
         {
-            await using var connection = new SqliteConnection(ReadOnly(dataSource));
+            await using var connection = new SqliteConnection(ReadOnly(dataSource, key));
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA quick_check";
@@ -61,7 +78,7 @@ public static class SqliteStoreRecovery
     /// hidden after the first complete sync (protocol §6.1). Clean records are not copied; the server has them.
     /// </remarks>
     /// <exception cref="IOException">The file is still in use.</exception>
-    public static async Task<SqliteRebuildReport> RebuildAsync(string dataSource, CancellationToken cancellationToken = default)
+    private static async Task<SqliteRebuildReport> RebuildCoreAsync(string dataSource, byte[]? key, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(dataSource);
         SqliteStorePool.Release(dataSource);
@@ -75,9 +92,9 @@ public static class SqliteStoreRecovery
             }
         }
 
-        var salvage = await SalvageAsync(damaged, cancellationToken).ConfigureAwait(false);
+        var salvage = await SalvageAsync(damaged, key, cancellationToken).ConfigureAwait(false);
 
-        await using var connection = new SqliteConnection(SqliteStorePool.ConnectionString(dataSource));
+        await using var connection = new SqliteConnection(SqliteStorePool.ConnectionString(dataSource, key));
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await SqliteSchema.EnsureAsync(connection, cancellationToken).ConfigureAwait(false);
         await using var transaction = connection.BeginTransaction(deferred: false);
@@ -163,14 +180,14 @@ public static class SqliteStoreRecovery
         }
     }
 
-    private static async Task<Salvage> SalvageAsync(string damaged, CancellationToken cancellationToken)
+    private static async Task<Salvage> SalvageAsync(string damaged, byte[]? key, CancellationToken cancellationToken)
     {
         var columns = SqliteSchema.Version1Columns.Split(", ");
         var rows = new List<object[]>();
         var highWater = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            await using var connection = new SqliteConnection(ReadOnly(damaged));
+            await using var connection = new SqliteConnection(ReadOnly(damaged, key));
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             var version = await SqliteSchema.ReadVersionAsync(connection, null, cancellationToken).ConfigureAwait(false);
             if (version is < 1 or > SqliteSchema.CurrentVersion)
@@ -191,6 +208,11 @@ public static class SqliteStoreRecovery
             if (version >= 4)
             {
                 columns = [.. columns, .. SqliteSchema.Version4Columns.Split(", ")];
+            }
+
+            if (version >= 5)
+            {
+                columns = [.. columns, .. SqliteSchema.Version5Columns.Split(", ")];
             }
 
             // Scan the table itself (an index may be the damaged part), in rowid order and in small ranges, so a damaged
@@ -265,10 +287,11 @@ public static class SqliteStoreRecovery
         }
     }
 
-    private static string ReadOnly(string dataSource) => new SqliteConnectionStringBuilder
+    private static string ReadOnly(string dataSource, byte[]? key) => new SqliteConnectionStringBuilder
     {
         DataSource = dataSource,
         Mode = SqliteOpenMode.ReadOnly,
         Pooling = false,
+        Password = key is null ? string.Empty : SqliteStorePool.Passphrase(key),
     }.ToString();
 }

@@ -24,4 +24,13 @@ public sealed class IndexedDbStoreOptions
 
     /// <summary>Maximum optimistic commit attempts when another tab writes the same records concurrently. Default 20.</summary>
     public int MaxCommitAttempts { get; init; } = 20;
+
+    /// <summary>
+    /// A 32-byte key: documents are encrypted with AES-GCM (WebCrypto) before they are stored (ADR-016). The key is kept in
+    /// memory only; supply it from somewhere an attacker with the browser profile does not have (for example fetched from
+    /// your server after sign-in). Ids, timestamps, flags and declared index values stay readable. Opening an encrypted
+    /// database without the key, or with another one, fails with <see cref="Storage.LocalStoreUnavailableException"/>
+    /// (reason <c>key</c>). <see langword="null"/>: not encrypted.
+    /// </summary>
+    public byte[]? EncryptionKey { get; init; }
 }

@@ -107,6 +107,8 @@ public sealed class SqliteStoreTests : IDisposable
             command.CommandText = """
                 UPDATE bs_records SET base = current WHERE base_same = 1;
                 ALTER TABLE bs_records DROP COLUMN base_same;
+                DROP TABLE bs_index;
+                ALTER TABLE bs_records DROP COLUMN rejection_arguments;
                 PRAGMA user_version = 3;
                 """;
             await command.ExecuteNonQueryAsync();

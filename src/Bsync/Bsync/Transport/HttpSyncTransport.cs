@@ -32,6 +32,7 @@ public sealed class HttpSyncTransport<TDocument> : ISyncTransport<TDocument>
     private readonly string _pullPath;
     private readonly string _pushPath;
     private readonly string _hintsPath;
+    private volatile bool _batchOffered;
 
     /// <summary>Creates the transport.</summary>
     public HttpSyncTransport(HttpClient http, HttpSyncTransportOptions options, SyncJsonTypes<TDocument> json)
@@ -55,8 +56,35 @@ public sealed class HttpSyncTransport<TDocument> : ISyncTransport<TDocument>
     }
 
     /// <inheritdoc />
-    public Task<PullResult<TDocument>> PullAsync(PullRequest request, CancellationToken cancellationToken = default) =>
-        SendAsync(_pullPath, request, _json.PullRequest, _json.PullResult, cancellationToken);
+    public async Task<PullResult<TDocument>> PullAsync(PullRequest request, CancellationToken cancellationToken = default)
+    {
+        if (_options.PullBatch is { } batch && _batchOffered)
+        {
+            try
+            {
+                var (status, body) = await batch.PullAsync(_options.Collection, request, _json.PullRequest, cancellationToken).ConfigureAwait(false);
+                if (status != 200)
+                {
+                    var (code, detail, reason) = HttpProblems.ReadProblem(body);
+                    throw HttpProblems.ToException(status, code, detail, reason, retryAfter: null);
+                }
+
+                return body.Deserialize(_json.PullResult) ?? throw new SyncProtocolException("The server returned an empty pull result.");
+            }
+            catch (NotSupportedException)
+            {
+                _batchOffered = false; // the server stopped offering batches (for example after a downgrade)
+            }
+            catch (JsonException error)
+            {
+                throw new SyncProtocolException("The server returned a malformed pull result.", error);
+            }
+        }
+
+        var result = await SendAsync(_pullPath, request, _json.PullRequest, _json.PullResult, cancellationToken).ConfigureAwait(false);
+        _batchOffered = result.Features?.Contains(SyncFeatures.PullBatch, StringComparer.Ordinal) == true;
+        return result;
+    }
 
     /// <inheritdoc />
     public Task<PushResult<TDocument>> PushAsync(PushRequest<TDocument> request, CancellationToken cancellationToken = default) =>
@@ -98,7 +126,7 @@ public sealed class HttpSyncTransport<TDocument> : ISyncTransport<TDocument>
 
             if (!response.IsSuccessStatusCode)
             {
-                throw await ToExceptionAsync(response, cancellationToken).ConfigureAwait(false);
+                throw await HttpProblems.ToExceptionAsync(response, cancellationToken).ConfigureAwait(false);
             }
 
             using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false));
@@ -172,7 +200,7 @@ public sealed class HttpSyncTransport<TDocument> : ISyncTransport<TDocument>
         {
             if (!response.IsSuccessStatusCode)
             {
-                throw await ToExceptionAsync(response, timeout.Token).ConfigureAwait(false);
+                throw await HttpProblems.ToExceptionAsync(response, timeout.Token).ConfigureAwait(false);
             }
 
             try
@@ -188,64 +216,6 @@ public sealed class HttpSyncTransport<TDocument> : ISyncTransport<TDocument>
             {
                 throw new SyncTransportException(SyncErrorCodes.Unavailable, "The response timed out.", isTransient: true);
             }
-        }
-    }
-
-    private static async Task<Exception> ToExceptionAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        var status = (int)response.StatusCode;
-        var (code, detail, reason) = await ReadProblemAsync(response, cancellationToken).ConfigureAwait(false);
-        var retryAfter = response.Headers.RetryAfter switch
-        {
-            { Delta: { } delta } => delta,
-            { Date: { } date } => date - DateTimeOffset.UtcNow is var wait && wait > TimeSpan.Zero ? wait : TimeSpan.Zero,
-            _ => (TimeSpan?)null,
-        };
-
-        code ??= response.StatusCode switch
-        {
-            HttpStatusCode.Unauthorized => SyncErrorCodes.Unauthorized,
-            HttpStatusCode.Forbidden => SyncErrorCodes.Forbidden,
-            HttpStatusCode.RequestEntityTooLarge => SyncErrorCodes.PayloadTooLarge,
-            HttpStatusCode.TooManyRequests => SyncErrorCodes.RateLimited,
-            _ when status >= 500 => SyncErrorCodes.Unavailable,
-            _ => SyncErrorCodes.InvalidRequest,
-        };
-
-        var message = detail ?? $"The server answered {status} ({code}).";
-        if (code == SyncErrorCodes.ResetRequired)
-        {
-            return new SyncResetRequiredException(message, reason ?? ResetReasons.Epoch);
-        }
-
-        var transient = code is SyncErrorCodes.RateLimited or SyncErrorCodes.Unavailable || status >= 500;
-        return new SyncTransportException(code, message, transient, retryAfter, status);
-    }
-
-    private static async Task<(string? Code, string? Detail, string? Reason)> ReadProblemAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-            if (bytes.Length == 0 || bytes.Length > 64 * 1024)
-            {
-                return (null, null, null);
-            }
-
-            using var document = JsonDocument.Parse(bytes);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return (null, null, null);
-            }
-
-            static string? Text(JsonElement root, string name) =>
-                root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-            return (Text(root, "code"), Text(root, "detail"), Text(root, "reason"));
-        }
-        catch (JsonException)
-        {
-            return (null, null, null);
         }
     }
 }

@@ -1,7 +1,7 @@
 # ADR-016: Encryption at rest and replica wipe
 
-- **Status:** Wipe and storage persistence **accepted and implemented** (unreleased). Encryption **proposed**, not
-  implemented: it needs a maintainer decision on the SQLite provider (below).
+- **Status:** Accepted and implemented (unreleased): wipe and storage persistence (part 1), and encryption (part 2,
+  2026-10-06) with option 2 below for SQLite and the AES-GCM envelope for IndexedDB.
 - **Invariants:** I01 (a local write is durable when it reports success), I07 (accounts are isolated), I17 (schema
   upgrades keep pending work)
 - **Related:** improvement plan task G3, ADR-008 (browser storage), ADR-010 (auth and scope), ADR-012 (packaging)
@@ -46,7 +46,7 @@ Does not protect against:
 - Wiping loses unsynced changes; apps check `SyncStatus.Pending` and warn first. Blobs (attachments, bundles) are
   application files; the app's `DeleteReplica` removes them too (see the Tasks sample's blob directory).
 
-## Proposal, part 2: encryption (not implemented)
+## Decision, part 2: encryption (implemented)
 
 ### Key source
 
@@ -87,6 +87,26 @@ existing records, with a random 96-bit nonce per value and the record key as add
 value cannot be moved to another record. Indexes and keys stay plain (see the threat model). Rotation re-encrypts
 records in stamped batches, keeping both keys until done. This is a store schema change (version 4 or 5, depending on
 ADR-018).
+
+### As implemented
+
+- **SQLite:** package `Bsync.Storage.Sqlite.Encrypted` (option 2). It compiles the same sources as
+  `Bsync.Storage.Sqlite` (symbol `BSYNC_SQLCIPHER`) against `Microsoft.Data.Sqlite.Core` and
+  `SQLitePCLRaw.bundle_e_sqlcipher` 2.1.11, the community SQLCipher build. **That bundle's last release is 2.1.11 and
+  the SQLitePCLRaw 3 line no longer publishes it**: a maintained source (Zetetic's packages, or a self-built bundle) is
+  needed before this is relied on in production. `SqliteLocalStoreOptions.EncryptionKey` (32 bytes) is passed to
+  SQLCipher as a raw key (`x'…'`), so no password derivation runs per connection (the test suite went from 29 s to 1 s).
+  `SqliteEncryption.EncryptAsync` (plain to encrypted, in place, with `sqlcipher_export`), `RekeyAsync`, `IsPlain`,
+  `NewKey`; recovery overloads take the key. A wrong or missing key raises `SqliteStoreUnreadableException` (also in the
+  plain package, for an encrypted file) and changes nothing.
+- **IndexedDB:** `IndexedDbStoreOptions.EncryptionKey` (32 bytes, supplied by the application, imported as a
+  non-extractable WebCrypto key and kept in memory). Values are sealed outside transactions (awaiting WebCrypto inside
+  one would end it). A sealed check value in the database refuses a missing or wrong key (`LocalStoreUnavailableException`,
+  reason `key`). Values written before a key was used stay readable and are sealed when next written. Declared index
+  values (ADR-018) are stored readable; do not index fields that must stay secret in an encrypted browser replica.
+- **Verified:** the shared store and index conformance cases with encryption (SQLite on Windows; IndexedDB in Chromium,
+  Firefox and WebKit), no plain text in the stored data, wrong and missing keys refused, encrypt-in-place with pending
+  work, rekey, wipe. Not verified: Android, iOS, macOS (the SQLCipher native build differs per platform).
 
 ### Done when (from the plan)
 

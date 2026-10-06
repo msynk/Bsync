@@ -70,7 +70,8 @@ public static class SyncEndpoints
         SyncJsonTypes<TDocument> json,
         SyncEndpointOptions options,
         string prefix,
-        bool multiplexedHints)
+        bool multiplexedHints,
+        Dictionary<string, BatchPull>? batch = null)
         where TDocument : class, ISyncEntity
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -87,7 +88,7 @@ public static class SyncEndpoints
             ? async (context, request, cancellationToken) =>
             {
                 var result = await authority.PullAsync(context, request, cancellationToken).ConfigureAwait(false);
-                return result with { Features = [.. result.Features ?? [], SyncFeatures.HintsMultiplex] };
+                return result with { Features = [.. result.Features ?? [], SyncFeatures.HintsMultiplex, SyncFeatures.PullBatch] };
             }
             : authority.PullAsync;
         if (options.ReplicaAudit is { } audit)
@@ -141,6 +142,52 @@ public static class SyncEndpoints
         var pullSite = new Site(collection, "pull", logger);
         var pushSite = new Site(collection, "push", logger);
         group.MapPost("pull", (RequestDelegate)(context => HandleAsync(context, pullSite, options, json.PullRequest, json.PullResult, pull, validatePull, null)));
+        if (batch is not null)
+        {
+            // The same pull, as one part of a group's batch: same validation, same features and audit, same error codes.
+            batch[collection] = async (context, element, cancellationToken) =>
+            {
+                PullRequest request;
+                try
+                {
+                    request = element.Deserialize(json.PullRequest);
+                }
+                catch (JsonException)
+                {
+                    return BatchPart.Problem(pullSite, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, "Not a valid pull request.");
+                }
+
+                if (validatePull(request) is { } invalid)
+                {
+                    return BatchPart.Problem(pullSite, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, invalid);
+                }
+
+                try
+                {
+                    var result = await pull(context, request, cancellationToken).ConfigureAwait(false);
+                    pullSite.Count(Ok);
+                    return new BatchPart(StatusCodes.Status200OK, writer => JsonSerializer.Serialize(writer, result, json.PullResult));
+                }
+                catch (SyncResetRequiredException error)
+                {
+                    return BatchPart.Problem(pullSite, StatusCodes.Status409Conflict, SyncErrorCodes.ResetRequired, "The checkpoint cannot be served; reset and resnapshot.", error.Reason);
+                }
+                catch (SyncProtocolException error)
+                {
+                    return BatchPart.Problem(pullSite, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, error.Message);
+                }
+                catch (SyncTransportException error)
+                {
+                    return BatchPart.Problem(pullSite, StatusFor(error.ErrorCode), error.ErrorCode, error.Message);
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    ServerLog.AuthorityFailed(pullSite.Logger, collection, "pull", error);
+                    return BatchPart.Problem(pullSite, StatusCodes.Status503ServiceUnavailable, SyncErrorCodes.Unavailable, "The server could not process the request; try again later.");
+                }
+            };
+        }
+
         group.MapPost("push", (RequestDelegate)(context => HandleAsync(context, pushSite, options, json.PushRequest, json.PushResult, push, validatePush, countOutcomes)));
         if (authority is ISyncCommitNotifier notifier)
         {
@@ -173,6 +220,9 @@ public static class SyncEndpoints
         var site = new Site("*", "hints", logger);
         var notifiers = builder.Notifiers;
         group.MapGet("hints", (RequestDelegate)(context => MultiplexedHintsAsync(context, site, options, notifiers)));
+        var batchSite = new Site("*", "pull-batch", logger);
+        var pulls = builder.Pulls;
+        group.MapPost("pull", (RequestDelegate)(context => PullBatchAsync(context, batchSite, options, pulls)));
         return group;
     }
 
@@ -180,7 +230,7 @@ public static class SyncEndpoints
     public static TimeSpan HintKeepAlive { get; set; } = TimeSpan.FromSeconds(15);
 
     /// <summary>Where a request arrived, for logs and metrics.</summary>
-    private sealed record Site(string Collection, string Endpoint, ILogger Logger)
+    internal sealed record Site(string Collection, string Endpoint, ILogger Logger)
     {
         public void Count(string result)
         {
@@ -494,6 +544,101 @@ public static class SyncEndpoints
         http.Response.Headers.CacheControl = "no-store";
         http.Response.ContentType = "application/json; charset=utf-8";
         await JsonSerializer.SerializeAsync(http.Response.Body, response, responseType, http.RequestAborted);
+    }
+
+    /// <summary>
+    /// <c>POST {prefix}/pull</c> (task C3, protocol §8.5): <c>{ "collections": { "name": pullRequest, ... } }</c> answered by
+    /// <c>{ "results": { "name": { "status": 200, "result": pullResult } | { "status": 409, "problem": {...} } } }</c>.
+    /// Each collection is pulled exactly as its own endpoint would, concurrently; one collection's failure does not
+    /// affect the others.
+    /// </summary>
+    private static async Task PullBatchAsync(HttpContext http, Site site, SyncEndpointOptions options, IReadOnlyDictionary<string, BatchPull> pulls)
+    {
+        var scope = await AuthorizeAsync(http, site, options, requireJson: true);
+        if (scope is null)
+        {
+            return;
+        }
+
+        JsonDocument document;
+        try
+        {
+            await using var body = new LimitedReadStream(http.Request.Body, options.MaxRequestBodyBytes);
+            document = await JsonDocument.ParseAsync(body, cancellationToken: http.RequestAborted);
+        }
+        catch (Exception error) when (error is JsonException or LimitedReadStream.LimitExceededException)
+        {
+            await ProblemAsync(http, site, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, "The request body is not a valid pull batch.");
+            return;
+        }
+
+        using (document)
+        {
+            if (!document.RootElement.TryGetProperty("collections", out var requested) || requested.ValueKind != JsonValueKind.Object)
+            {
+                await ProblemAsync(http, site, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, "The pull batch names no collections.");
+                return;
+            }
+
+            var context = new SyncCallContext(http.User, scope);
+            var parts = requested.EnumerateObject()
+                .Select(entry => (entry.Name, Part: pulls.TryGetValue(entry.Name, out var pull)
+                    ? pull(context, entry.Value, http.RequestAborted)
+                    : Task.FromResult(BatchPart.Problem(site, StatusCodes.Status404NotFound, SyncErrorCodes.InvalidRequest, "No such collection in this group."))))
+                .ToList();
+            await Task.WhenAll(parts.Select(p => p.Part));
+
+            site.Count(Ok);
+            http.Response.StatusCode = StatusCodes.Status200OK;
+            http.Response.Headers.CacheControl = "no-store";
+            http.Response.ContentType = "application/json; charset=utf-8";
+            // Written to memory first: serializing a part flushes its writer, and response bodies allow only asynchronous writes.
+            var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+            await using var writer = new Utf8JsonWriter(buffer);
+            writer.WriteStartObject();
+            writer.WriteStartObject("results");
+            foreach (var (name, part) in parts)
+            {
+                var result = await part;
+                writer.WriteStartObject(name);
+                writer.WriteNumber("status", result.Status);
+                writer.WritePropertyName(result.Status == StatusCodes.Status200OK ? "result" : "problem");
+                result.Write(writer);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+            await writer.FlushAsync(http.RequestAborted);
+            await http.Response.Body.WriteAsync(buffer.WrittenMemory, http.RequestAborted);
+        }
+    }
+
+    /// <summary>One collection's pull within a batch.</summary>
+    internal delegate Task<BatchPart> BatchPull(SyncCallContext context, JsonElement request, CancellationToken cancellationToken);
+
+    /// <summary>One collection's answer within a batch: a status and its body (a pull result or a problem).</summary>
+    internal sealed record BatchPart(int Status, Action<Utf8JsonWriter> Write)
+    {
+        public static BatchPart Problem(Site site, int status, string code, string detail, string? reason = null)
+        {
+            site.Count(code);
+            ServerLog.Refused(site.Logger, status >= 500 ? LogLevel.Warning : LogLevel.Information, site.Collection, site.Endpoint, status, code, reason);
+            return new(status, writer =>
+            {
+                writer.WriteStartObject();
+                writer.WriteString("type", "about:blank");
+                writer.WriteNumber("status", status);
+                writer.WriteString("detail", detail);
+                writer.WriteString("code", code);
+                if (reason is not null)
+                {
+                    writer.WriteString("reason", reason);
+                }
+
+                writer.WriteEndObject();
+            });
+        }
     }
 
     private static int StatusFor(string code) => code switch

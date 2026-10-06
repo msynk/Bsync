@@ -24,6 +24,10 @@ public class LocalQuery
 
     private static readonly SyncQuery<BenchDocument> Selective = new() { Where = d => d.Category == 42, Limit = 50 };
 
+    private static readonly SyncQuery<BenchDocument> Indexed = new() { Index = Workload.Due.All().Descending(), Limit = 50 };
+
+    private static readonly SyncQuery<BenchDocument> IndexedRange = new() { Index = Workload.Due.Between(Workload.Start.AddDays(100), Workload.Start.AddDays(200)), Skip = 50, Limit = 50 };
+
     [Params(10_000, 50_000)]
     public int Count { get; set; }
 
@@ -34,7 +38,7 @@ public class LocalQuery
     public async Task SetupAsync()
     {
         _directory = Workload.TempDirectory();
-        var store = await Workload.StoreAsync(Store, _directory);
+        var store = await Workload.StoreAsync(Store, _directory, [Workload.Due]);
         await Workload.SeedSyncedAsync(store, Count, "seed");
         var server = Workload.Server();
         _session = new SyncSession<BenchDocument>(new SyncSessionOptions<BenchDocument>
@@ -60,6 +64,18 @@ public class LocalQuery
 
     [Benchmark]
     public Task<IReadOnlyList<BenchDocument>> SelectivePage() => _collection.QueryAsync(Selective);
+
+    /// <summary>E2: the same ordered page as <see cref="OrderedPage"/>, read through a declared index.</summary>
+    [Benchmark]
+    public Task<IReadOnlyList<BenchDocument>> IndexedPage() => _collection.QueryAsync(Indexed);
+
+    /// <summary>E2: the second page of a date range, through the index.</summary>
+    [Benchmark]
+    public Task<IReadOnlyList<BenchDocument>> IndexedRangePage() => _collection.QueryAsync(IndexedRange);
+
+    /// <summary>E2: counting a date range through the index.</summary>
+    [Benchmark]
+    public Task<int> IndexedRangeCount() => _collection.CountAsync(IndexedRange);
 
     private sealed class P95Config : ManualConfig
     {

@@ -67,4 +67,16 @@ public sealed class InterceptingStore<T>(ILocalStore<T> inner) : ILocalStore<T>
         Inner.PurgeAsync(ids, generation, cancellationToken);
 
     public Task<HlcTimestamp> GetClockHighWaterAsync(CancellationToken cancellationToken = default) => Inner.GetClockHighWaterAsync(cancellationToken);
+
+    // Members with default implementations: forward them, so tests exercise the real store's version.
+    public Task ResetClockHighWaterAsync(HlcTimestamp value, CancellationToken cancellationToken = default) => Inner.ResetClockHighWaterAsync(value, cancellationToken);
+
+    public Task<int> PurgeTombstonesAsync(long throughVersion, long generation, CancellationToken cancellationToken = default) => Inner.PurgeTombstonesAsync(throughVersion, generation, cancellationToken);
+
+    public Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default) => Inner.CountIssuesAsync(cancellationToken);
+
+    public Task<IReadOnlyList<T>> QueryIndexAsync(SyncIndexQuery<T> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default) =>
+        Inner.QueryIndexAsync(query, after, limit, cancellationToken);
+
+    public Task<int> CountIndexAsync(SyncIndexQuery<T> query, CancellationToken cancellationToken = default) => Inner.CountIndexAsync(query, cancellationToken);
 }

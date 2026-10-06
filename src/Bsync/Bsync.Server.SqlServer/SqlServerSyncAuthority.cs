@@ -1021,7 +1021,7 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         var json = Serialize(operation.Document);
         var fingerprint = Fingerprint(operation, json);
         await using (var find = Command(
-            $"SELECT [fingerprint], [kind], [version], [error_code], [message], [document] FROM {_schema}.[receipts] WHERE [feed_id] = @feed AND [operation_key] = @operation",
+            $"SELECT [fingerprint], [kind], [version], [error_code], [message], [document], [arguments] FROM {_schema}.[receipts] WHERE [feed_id] = @feed AND [operation_key] = @operation",
             write.Connection,
             write.Transaction))
         {
@@ -1042,6 +1042,7 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
                     ErrorCode = reader.IsDBNull(3) ? null : reader.GetString(3),
                     Message = reader.IsDBNull(4) ? null : reader.GetString(4),
                     Document = reader.IsDBNull(5) ? null : Deserialize(reader.GetString(5)),
+                    Arguments = reader.IsDBNull(6) ? null : JsonSerializer.Deserialize(reader.GetString(6), SqlServerJson.Default.DictionaryStringString),
                     IsDuplicate = true,
                 };
             }
@@ -1131,7 +1132,7 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
 
                 case SyncWriteDecisionKind.Reject:
                     write.Transaction.Rollback(OperationSavepoint);
-                    return PushOutcome<TDocument>.Rejected(opId, decision.ErrorCode!, decision.Message);
+                    return PushOutcome<TDocument>.Rejected(opId, decision.ErrorCode!, decision.Message) with { Arguments = decision.Arguments };
 
                 default:
                     write.Transaction.Rollback(OperationSavepoint);
@@ -1148,8 +1149,8 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
     {
         await using var command = Command(
             $"""
-            INSERT INTO {_schema}.[receipts] ([feed_id], [operation_key], [fingerprint], [kind], [version], [error_code], [message], [document])
-            VALUES (@feed, @operation, @fingerprint, @kind, @version, @error, @message, @document)
+            INSERT INTO {_schema}.[receipts] ([feed_id], [operation_key], [fingerprint], [kind], [version], [error_code], [message], [document], [arguments])
+            VALUES (@feed, @operation, @fingerprint, @kind, @version, @error, @message, @document, @arguments)
             """,
             write.Connection,
             write.Transaction);
@@ -1161,6 +1162,9 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         command.Parameters.Add("@error", SqlDbType.NVarChar, 256).Value = (object?)outcome.ErrorCode ?? DBNull.Value;
         command.Parameters.Add("@message", SqlDbType.NVarChar, -1).Value = (object?)outcome.Message ?? DBNull.Value;
         command.Parameters.Add("@document", SqlDbType.NVarChar, -1).Value = outcome.Document is { } document ? Serialize(document) : DBNull.Value;
+        command.Parameters.Add("@arguments", SqlDbType.NVarChar, -1).Value = outcome.Arguments is { Count: > 0 } arguments
+            ? JsonSerializer.Serialize(new Dictionary<string, string>(arguments, StringComparer.Ordinal), SqlServerJson.Default.DictionaryStringString)
+            : DBNull.Value;
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 

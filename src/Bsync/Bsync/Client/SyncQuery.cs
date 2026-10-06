@@ -1,3 +1,5 @@
+using Bsync.Storage;
+
 namespace Bsync.Client;
 
 /// <summary>A bounded, in-memory query over a collection.</summary>
@@ -11,8 +13,20 @@ public sealed record SyncQuery<TDocument>
     /// <summary>Keeps only matching documents. Default: all.</summary>
     public Func<TDocument, bool>? Where { get; init; }
 
-    /// <summary>Sort order. Default: by id (ordinal).</summary>
+    /// <summary>
+    /// Sort order evaluated in memory, which reads the whole collection. Default: by id (ordinal). Prefer
+    /// <see cref="Index"/> for large collections; the two cannot be combined.
+    /// </summary>
     public Comparison<TDocument>? Order { get; init; }
+
+    /// <summary>
+    /// A range of a declared index and its direction (ADR-018), for example <c>Due.From(today).Descending()</c>. Stores
+    /// opened with the index read only the requested page; <see cref="Where"/> filters what the range returns.
+    /// </summary>
+    public SyncIndexQuery<TDocument>? Index { get; init; }
+
+    /// <summary>How many matching documents to skip before the first one returned. Default 0.</summary>
+    public int Skip { get; init; }
 
     /// <summary>Maximum number of documents returned (1 to <see cref="MaxLimit"/>). Default 100.</summary>
     public int Limit { get; init; } = 100;
@@ -29,7 +43,20 @@ public sealed record SyncQuery<TDocument>
         Queries.Validate(this);
 
         var matching = documents.Where(d => !d.Deleted && (Where?.Invoke(d) ?? true)).ToList();
-        matching.Sort(Order ?? ((a, b) => string.CompareOrdinal(a.Id, b.Id)));
-        return matching.Count > Limit ? matching.GetRange(0, Limit) : matching;
+        if (Index is { } index)
+        {
+            var keyed = matching
+                .Select(d => (Cursor: Storage.LocalStoreIndexing.CursorOf(index, d), Document: d))
+                .Where(e => index.Contains(e.Cursor.Key))
+                .ToList();
+            keyed.Sort((a, b) => index.Compare(a.Cursor, b.Cursor));
+            matching = [.. keyed.Select(e => e.Document)];
+        }
+        else
+        {
+            matching.Sort(Order ?? ((a, b) => string.CompareOrdinal(a.Id, b.Id)));
+        }
+
+        return [.. matching.Skip(Skip).Take(Limit)];
     }
 }

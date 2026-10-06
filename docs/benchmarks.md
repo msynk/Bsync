@@ -116,10 +116,30 @@ The selective page stops once it has 50 matches, which here are within the first
 SQLite cost does not grow with the collection; a filter whose matches are rare or late scans everything. The
 in-memory store's paged read sorts its keys on every page, which is why its selective page grows with the collection.
 
-**Bar: p95 under 50 ms for a 50-item ordered page. Missed** on this desktop at 50,000 documents by six to seven
-times, and at 10,000 documents with SQLite. Phones and tablets are slower. Task E2 (declared indexes) is therefore
-needed; its design needs a store schema change and is proposed in
-[ADR-018](architecture/adr-018-local-secondary-indexes.md).
+**Bar: p95 under 50 ms for a 50-item ordered page. Missed** with `SyncQuery.Order` on this desktop at 50,000 documents
+by six to seven times, and at 10,000 documents with SQLite. Phones and tablets are slower. Hence task E2 (below).
+
+### With declared indexes (task E2, 2026-10-06)
+
+The same documents and machine, with an index on `Due` ([ADR-018](architecture/adr-018-local-secondary-indexes.md)).
+"Indexed page" is the same 50 newest-`Due` documents as "ordered page" above; "range page" is the second 50-item page
+of a 100-day range of `Due` (`Skip = 50`); "range count" counts that range (about 14% of the documents).
+
+| Query | Documents | Store | Mean | P95 | Allocated |
+|---|---:|---|---:|---:|---:|
+| indexed page | 10,000 | in-memory | 0.20 ms | 0.22 ms | 485 KB |
+| indexed page | 10,000 | SQLite, `FULL` | 0.35 ms | 0.37 ms | 896 KB |
+| indexed page | 50,000 | in-memory | 0.32 ms | 0.35 ms | 486 KB |
+| indexed page | 50,000 | SQLite, `FULL` | 0.45 ms | 0.47 ms | 897 KB |
+| range page | 50,000 | in-memory | 0.22 ms | 0.22 ms | 486 KB |
+| range page | 50,000 | SQLite, `FULL` | 0.50 ms | 0.51 ms | 898 KB |
+| range count | 50,000 | in-memory | 0.15 ms | 0.16 ms | 1 KB |
+| range count | 50,000 | SQLite, `FULL` | 0.42 ms | 0.44 ms | 7 KB |
+
+**Bar met on this desktop** by about a hundred times, and the cost no longer grows with the collection. Two fixes
+came from measuring: SQLite's planner had joined from the records (83 ms for the indexed page at 50,000) until the
+query forced the index first, and counts read only the index once purges removed their rows (72 ms before). Not
+measured: IndexedDB in browsers, phones and tablets.
 
 Not measured for E1: a mid-range Android device and an iPad (none available), IndexedDB in any browser, and first
 sync at 50,000 documents (100,000 is under "Scale" above).
@@ -145,8 +165,18 @@ machine as above, SQL Server 2025 LocalDB (Express) on the same disk, two runs e
 
 Writes to one feed are serialized by its feed lock (ADR-005), so a shared feed's push throughput falls as sessions
 contend for it; separate feeds (tenants) commit in parallel. Pulls take no feed lock. LocalDB is a development
-edition; a production SQL Server on separate storage will differ. **PostgreSQL was not measured** (no server
-available on this machine); the same command runs against one.
+edition; a production SQL Server on separate storage will differ.
+
+PostgreSQL 17.6 (portable Windows binaries, default configuration, same machine and disk):
+
+| Sessions × documents | Feeds | Push (operations/s) | Pull (changes/s) |
+|---|---|---:|---:|
+| 16 × 500 | one shared feed | 813 | 26,795 (16 replicas × 8,000) |
+| 16 × 500 | one feed per session | 10,101 | 41,528 |
+| 4 × 2,000 | one shared feed | 1,502 | 45,473 (4 replicas × 8,000) |
+| 4 × 2,000 | one feed per session | 5,162 | 44,839 |
+
+The same pattern: one feed's writes are serialized (its row lock, ADR-005), separate feeds scale. One run each.
 
 ## Observations
 

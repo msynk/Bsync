@@ -33,6 +33,12 @@ public interface IBlobStore
     /// mismatch.
     /// </summary>
     Task<bool> CompleteAsync(string upload, string sha256, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A short-lived URL that serves the object directly (presigned), or <see langword="null"/> when the store has none;
+    /// the routes then stream the bytes themselves.
+    /// </summary>
+    Task<Uri?> PresignReadAsync(string sha256, TimeSpan validity, CancellationToken cancellationToken = default) => Task.FromResult<Uri?>(null);
 }
 
 /// <summary>Blob storage in a directory: <c>objects/ab/&lt;sha256&gt;</c> and <c>uploads/&lt;upload&gt;.part</c>.</summary>
@@ -150,4 +156,7 @@ public sealed class FileSystemBlobStore : IBlobStore
     private string ObjectPath(string sha256) => Path.Combine(_objects, sha256[..2], sha256);
 
     private string UploadPath(string upload) => Path.Combine(_uploads, upload + ".part");
+
+    /// <summary>The file of a partial upload (for stores that keep only partial uploads here).</summary>
+    public string UploadFile(string upload) => UploadPath(upload);
 }

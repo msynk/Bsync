@@ -7,7 +7,7 @@ namespace Bsync.Server.SqlServer;
 /// <summary>Creates and migrates the authority's tables (ADR-011, ADR-014). Safe to run from several processes at once.</summary>
 internal static partial class SqlServerSchema
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>
     /// Version 1. Keys are <c>varbinary</c> holding UTF-16BE bytes: exact equality (an <c>nvarchar</c> comparison ignores
@@ -78,6 +78,12 @@ internal static partial class SqlServerSchema
         );
 
         CREATE UNIQUE INDEX [document_access_document] ON {0}.[document_access] ([feed_id], [id_key], [principal_key]) INCLUDE ([granted]);
+        """;
+
+    /// <summary>Version 3 (task C5): receipts keep the arguments of a rejection, so a replay returns them.</summary>
+    private const string Version3 = """
+        IF COL_LENGTH(N'{0}.[receipts]', N'arguments') IS NULL
+            EXEC(N'ALTER TABLE {0}.[receipts] ADD [arguments] nvarchar(max) NULL');
         """;
 
     /// <summary>Validates and quotes a schema name.</summary>
@@ -153,6 +159,18 @@ internal static partial class SqlServerSchema
             }
 
             await using var mark = new SqlCommand($"UPDATE {quoted}.[meta] SET [value] = '2' WHERE [key] = 'schema_version'", connection, transaction);
+            await mark.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            version = 2;
+        }
+
+        if (version == 2)
+        {
+            await using (var upgrade = new SqlCommand(string.Format(CultureInfo.InvariantCulture, Version3, quoted), connection, transaction))
+            {
+                await upgrade.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            await using var mark = new SqlCommand($"UPDATE {quoted}.[meta] SET [value] = '3' WHERE [key] = 'schema_version'", connection, transaction);
             await mark.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 

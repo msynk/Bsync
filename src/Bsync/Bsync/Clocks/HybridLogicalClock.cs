@@ -97,6 +97,22 @@ public sealed class HybridLogicalClock
         }
     }
 
+    /// <summary>
+    /// Moves the clock back to <paramref name="last"/> if it is ahead of it (ADR-017 part 2). Only for timestamps no peer
+    /// has seen: the engine rewinds after a <c>clock-skew</c> rejection and re-stamps the rejected writes.
+    /// </summary>
+    internal void Rewind(HlcTimestamp last)
+    {
+        lock (_gate)
+        {
+            if (new HlcTimestamp(_wallTime, _counter, Node) > last)
+            {
+                _wallTime = last.WallTime;
+                _counter = last.Counter;
+            }
+        }
+    }
+
     /// <summary>The uncorrected physical time, for measuring the offset.</summary>
     internal long PhysicalMilliseconds() => _physical.NowMilliseconds();
 

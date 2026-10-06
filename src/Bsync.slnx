@@ -5,6 +5,7 @@
     <Project Path="Bsync/Bsync.Server.PostgreSql/Bsync.Server.PostgreSql.csproj" />
     <Project Path="Bsync/Bsync.Server.SqlServer/Bsync.Server.SqlServer.csproj" />
     <Project Path="Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" />
+    <Project Path="Bsync/Bsync.Storage.Sqlite.Encrypted/Bsync.Storage.Sqlite.Encrypted.csproj" />
     <Project Path="Bsync/Bsync.Testing/Bsync.Testing.csproj" />
     <Project Path="Bsync/Bsync/Bsync.csproj" />
   </Folder>
@@ -28,6 +29,7 @@
     <Project Path="Tests/Bsync.Tests.CrashHost/Bsync.Tests.CrashHost.csproj" />
     <Project Path="Tests/Bsync.Tests.PostgreSql/Bsync.Tests.PostgreSql.csproj" />
     <Project Path="Tests/Bsync.Tests.SqlServer/Bsync.Tests.SqlServer.csproj" />
+    <Project Path="Tests/Bsync.Tests.SqliteEncrypted/Bsync.Tests.SqliteEncrypted.csproj" />
     <Project Path="Tests/Bsync.Tests/Bsync.Tests.csproj" />
   </Folder>
 </Solution>

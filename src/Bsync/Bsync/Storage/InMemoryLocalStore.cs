@@ -14,6 +14,8 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
     where TDocument : class, ISyncEntity
 {
     private readonly Dictionary<string, SyncRecord<TDocument>> _records = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> _ids = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (SyncIndex<TDocument> Index, SortedSet<SyncIndexCursor> Entries, Dictionary<string, string> Keys)> _indexes = new(StringComparer.Ordinal);
     private readonly Func<TDocument, TDocument> _clone;
     private readonly object _gate = new();
     private ReplicaCursor _cursor = ReplicaCursor.Initial;
@@ -29,9 +31,19 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
 
     /// <summary>Creates a store using the supplied deep-clone function.</summary>
     public InMemoryLocalStore(Func<TDocument, TDocument> cloner)
+        : this(cloner, null)
+    {
+    }
+
+    /// <summary>Creates a store using the supplied deep-clone function, maintaining <paramref name="indexes"/> (ADR-018).</summary>
+    public InMemoryLocalStore(Func<TDocument, TDocument> cloner, IEnumerable<SyncIndex<TDocument>>? indexes)
     {
         ArgumentNullException.ThrowIfNull(cloner);
         _clone = cloner;
+        foreach (var index in LocalStoreIndexing.Validate(indexes))
+        {
+            _indexes[index.Name] = (index, new SortedSet<SyncIndexCursor>(EntryOrder.Instance), new Dictionary<string, string>(StringComparer.Ordinal));
+        }
     }
 
     /// <inheritdoc />
@@ -92,6 +104,8 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 if (changed)
                 {
                     _records[id] = record!;
+                    _ids.Add(id);
+                    Reindex(id, record);
                     ObserveTimestamps(record!);
                 }
 
@@ -148,7 +162,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .ToList();
             foreach (var id in gone)
             {
-                _records.Remove(id);
+                Remove(id);
             }
 
             return Task.FromResult(gone.Count);
@@ -187,9 +201,12 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         lock (_gate)
         {
-            var documents = _records.Values
-                .Where(r => !r.MissingAfterReset && (includeDeleted || !r.Current.Deleted) && (afterId is null || string.CompareOrdinal(r.Current.Id, afterId) > 0))
-                .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
+            // The ids are kept sorted, so a page costs its own size, not the collection's.
+            var ids = afterId is null ? _ids : _ids.GetViewBetween(afterId, _ids.Max ?? afterId);
+            var documents = ids
+                .Where(id => afterId is null || string.CompareOrdinal(id, afterId) > 0)
+                .Select(id => _records[id])
+                .Where(r => !r.MissingAfterReset && (includeDeleted || !r.Current.Deleted))
                 .Take(limit)
                 .Select(r => _clone(r.Current))
                 .ToList();
@@ -239,6 +256,114 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
     }
 
     /// <inheritdoc />
+    public Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        lock (_gate)
+        {
+            if (!_indexes.TryGetValue(query.Index.Name, out var index) || index.Index.Version != query.Index.Version)
+            {
+                return LocalStoreIndexing.QueryAsync(this, query, after, limit, cancellationToken);
+            }
+
+            var documents = Range(index.Entries, query, after)
+                .Take(limit)
+                .Select(e => _clone(_records[e.Id].Current))
+                .ToList();
+            return Task.FromResult<IReadOnlyList<TDocument>>(documents);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        lock (_gate)
+        {
+            return !_indexes.TryGetValue(query.Index.Name, out var index) || index.Index.Version != query.Index.Version
+                ? LocalStoreIndexing.CountAsync(this, query, cancellationToken)
+                : Task.FromResult(Range(index.Entries, query, null).Count());
+        }
+    }
+
+    private static IEnumerable<SyncIndexCursor> Range(SortedSet<SyncIndexCursor> entries, SyncIndexQuery<TDocument> query, SyncIndexCursor? after)
+    {
+        if (entries.Count == 0)
+        {
+            return [];
+        }
+
+        // Every entry with key K sorts between (K, "") and (K + U+FFFF, ""). The view narrows the set; Contains decides.
+        var low = query.Lower is null ? entries.Min : new SyncIndexCursor(query.Lower, string.Empty);
+        var high = query.Upper is null ? entries.Max : new SyncIndexCursor(query.UpperExclusive ? query.Upper : query.Upper + '\uffff', string.Empty);
+        if (after is { } resume)
+        {
+            // Continue from the last entry returned instead of skipping everything before it.
+            if (query.IsDescending && EntryOrder.Instance.Compare(resume, high) < 0)
+            {
+                high = resume;
+            }
+            else if (!query.IsDescending && EntryOrder.Instance.Compare(resume, low) > 0)
+            {
+                low = resume;
+            }
+        }
+
+        if (EntryOrder.Instance.Compare(low, high) > 0)
+        {
+            return [];
+        }
+
+        // SortedSet<T>.Reverse streams the view backwards (LINQ's Reverse would copy it first).
+        var set = entries.GetViewBetween(low, high);
+        var view = (query.IsDescending ? set.Reverse() : set).Where(e => query.Contains(e.Key));
+        return after is { } position ? view.Where(e => query.Compare(e, position) > 0) : view;
+    }
+
+    private void Reindex(string id, SyncRecord<TDocument>? record)
+    {
+        foreach (var (index, entries, keys) in _indexes.Values)
+        {
+            if (keys.Remove(id, out var old))
+            {
+                entries.Remove(new SyncIndexCursor(old, id));
+            }
+
+            if (record is { MissingAfterReset: false, Current.Deleted: false })
+            {
+                var key = index.KeyOf(record.Current);
+                keys[id] = key;
+                entries.Add(new SyncIndexCursor(key, id));
+            }
+        }
+    }
+
+    private bool Remove(string id)
+    {
+        if (!_records.Remove(id))
+        {
+            return false;
+        }
+
+        _ids.Remove(id);
+        Reindex(id, null);
+        return true;
+    }
+
+    /// <summary>Ordinal order of index entries: key, then id.</summary>
+    private sealed class EntryOrder : IComparer<SyncIndexCursor>
+    {
+        public static EntryOrder Instance { get; } = new();
+
+        public int Compare(SyncIndexCursor x, SyncIndexCursor y)
+        {
+            var c = string.CompareOrdinal(x.Key, y.Key);
+            return c != 0 ? c : string.CompareOrdinal(x.Id, y.Id);
+        }
+    }
+
+    /// <inheritdoc />
     public Task<int> PurgeAsync(IReadOnlyList<string> ids, long generation, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
@@ -248,7 +373,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
             var removed = 0;
             foreach (var id in ids)
             {
-                if (_records.TryGetValue(id, out var record) && !record.IsDirty && record.Conflict is null && record.Generation < generation && _records.Remove(id))
+                if (_records.TryGetValue(id, out var record) && !record.IsDirty && record.Conflict is null && record.Generation < generation && Remove(id))
                 {
                     removed++;
                 }
@@ -281,6 +406,16 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         lock (_gate)
         {
             return Task.FromResult(_highWater);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task ResetClockHighWaterAsync(HlcTimestamp value, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            _highWater = value;
+            return Task.CompletedTask;
         }
     }
 

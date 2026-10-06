@@ -28,6 +28,12 @@ public static class SyncFeatures
     public const string HintsMultiplex = "hints-multiplex";
 
     /// <summary>
+    /// The server offers <c>POST {prefix}/pull</c> for the collections of one group: pages of several collections in one
+    /// request (task C3; protocol §8.5).
+    /// </summary>
+    public const string PullBatch = "pull-batch";
+
+    /// <summary>
     /// The pull response carries the server's retention horizon (<see cref="PullResult{TDocument}.RetentionHorizon"/>):
     /// replicas drop their own clean tombstones at or below it, which the server has already forgotten (task D4).
     /// </summary>

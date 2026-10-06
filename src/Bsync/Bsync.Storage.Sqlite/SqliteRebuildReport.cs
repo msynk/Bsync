@@ -2,7 +2,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Bsync.Storage.Sqlite;
 
-/// <summary>The outcome of <see cref="SqliteStoreRecovery.RebuildAsync"/>.</summary>
+/// <summary>The outcome of <see cref="SqliteStoreRecovery.RebuildAsync(string, CancellationToken)"/>.</summary>
 /// <param name="DamagedCopy">Where the old database file now is (never deleted).</param>
 /// <param name="SalvagedRecords">Records with local changes or kept conflicts copied into the new database.</param>
 /// <param name="ReadError">The first read problem, or <see langword="null"/> if the old file was read completely.</param>

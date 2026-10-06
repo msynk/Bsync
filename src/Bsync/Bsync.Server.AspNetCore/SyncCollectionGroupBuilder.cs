@@ -25,6 +25,8 @@ public sealed class SyncCollectionGroupBuilder
     /// <summary>The collections whose authorities announce commits, for the group's multiplexed hint stream.</summary>
     internal IReadOnlyDictionary<string, ISyncCommitNotifier> Notifiers => _notifiers;
 
+    internal Dictionary<string, SyncEndpoints.BatchPull> Pulls { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Adds <paramref name="collection"/> served by <paramref name="authority"/>.</summary>
     /// <exception cref="ArgumentException">The collection was already added to this group.</exception>
     public SyncCollectionGroupBuilder Add<TDocument>(string collection, ISyncAuthority<TDocument> authority, SyncJsonTypes<TDocument> json)
@@ -36,7 +38,7 @@ public sealed class SyncCollectionGroupBuilder
             throw new ArgumentException($"The collection '{collection}' is already mapped in this group.", nameof(collection));
         }
 
-        SyncEndpoints.MapCollection(_group, collection, authority, json, _options, prefix: string.Empty, multiplexedHints: true);
+        SyncEndpoints.MapCollection(_group, collection, authority, json, _options, prefix: string.Empty, multiplexedHints: true, batch: Pulls);
         if (authority is ISyncCommitNotifier notifier)
         {
             _notifiers[collection] = notifier;

@@ -55,6 +55,14 @@ public sealed class SyncOptions<TDocument>
     /// </summary>
     public Func<TDocument, CancellationToken, ValueTask<bool>>? ReadyToPush { get; init; }
 
+    /// <summary>
+    /// Whether writes the server rejected with <c>clock-skew</c> are re-stamped and sent again once the server's time is
+    /// known (ADR-017 part 2). Their timestamps never left this device, so the clock is moved back and they get new,
+    /// acceptable timestamps in their original order. Default <see langword="true"/>. Turn it off if the application
+    /// relies on <see cref="ISyncEntity.UpdatedAt"/> values it read before a write was uploaded.
+    /// </summary>
+    public bool RestampSkewedWrites { get; init; } = true;
+
     /// <summary>Throws <see cref="ArgumentOutOfRangeException"/> if any value is out of range.</summary>
     public void Validate()
     {

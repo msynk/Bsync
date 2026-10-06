@@ -1,0 +1,63 @@
+enum Bsync.Storage.Sqlite.SqliteDurability
+  Full = 0
+  Normal = 1
+static class Bsync.Storage.Sqlite.SqliteEncryption
+  const System.Int32 KeyLength = 32
+  static System.Boolean IsPlain(System.String dataSource)
+  static System.Byte[] NewKey()
+  static System.Threading.Tasks.Task EncryptAsync(System.String dataSource, System.Byte[] key, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task RekeyAsync(System.String dataSource, System.Byte[] currentKey, System.Byte[] newKey, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Storage.Sqlite.SqliteLocalStoreOptions
+  Bsync.Storage.Sqlite.SqliteDurability Durability { get; init; }
+  System.Byte[] EncryptionKey { get; init; }
+  System.String Collection { get; init; }
+  System.String DataSource { get; init; }
+  System.TimeSpan BusyTimeout { get; init; }
+  ctor()
+sealed class Bsync.Storage.Sqlite.SqliteLocalStore<TDocument> : Bsync.Storage.ILocalStore<TDocument> where TDocument : class, Bsync.ISyncEntity
+  System.Threading.Tasks.Task ResetClockHighWaterAsync(Bsync.Clocks.HlcTimestamp value, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Clocks.HlcTimestamp> GetClockHighWaterAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.ReplicaCursor> GetCursorAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.ReplicaIdentity> BeginNewIncarnationAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.ReplicaIdentity> GetReplicaIdentityAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.SyncIssueCounts> CountIssuesAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.SyncRecord<TDocument>> GetAsync(System.String id, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.RecordUpdateResult<TDocument>>> UpdateAsync(System.Collections.Generic.IReadOnlyList<Bsync.Storage.RecordUpdate<TDocument>> updates, Bsync.Storage.ReplicaCursor? cursor = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncRecord<TDocument>>> GetConflictsAsync(System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncRecord<TDocument>>> GetPendingAsync(System.Int32 limit, System.Collections.Generic.IReadOnlySet<System.String> exclude = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncRecord<TDocument>>> GetRejectedAsync(System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncRecord<TDocument>>> GetStaleAsync(System.Int64 generation, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryAsync(System.Boolean includeDeleted = false, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryIndexAsync(Bsync.Storage.SyncIndexQuery<TDocument> query, Bsync.Storage.SyncIndexCursor? after, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryPageAsync(System.String afterId, System.Int32 limit, System.Boolean includeDeleted = false, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> CountDirtyAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> CountIndexAsync(Bsync.Storage.SyncIndexQuery<TDocument> query, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> PurgeAsync(System.Collections.Generic.IReadOnlyList<System.String> ids, System.Int64 generation, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> PurgeTombstonesAsync(System.Int64 throughVersion, System.Int64 generation, System.Threading.CancellationToken cancellationToken = default)
+  const System.Int32 SchemaVersion = 5
+  static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteLocalStore<TDocument>> OpenAsync(Bsync.Storage.Sqlite.SqliteLocalStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Collections.Generic.IEnumerable<Bsync.Storage.SyncIndex<TDocument>> indexes, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteLocalStore<TDocument>> OpenAsync(Bsync.Storage.Sqlite.SqliteLocalStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Threading.CancellationToken cancellationToken = default)
+record Bsync.Storage.Sqlite.SqliteRebuildReport
+  System.Boolean Complete { get; }
+  System.Boolean Equals(Bsync.Storage.Sqlite.SqliteRebuildReport other)
+  System.Int32 DiscardedRecords { get; init; }
+  System.Int32 SalvagedRecords { get; init; }
+  System.String DamagedCopy { get; init; }
+  System.String ReadError { get; init; }
+  System.Void Deconstruct(out System.String DamagedCopy, out System.Int32 SalvagedRecords, out System.String ReadError, out System.Int32 DiscardedRecords)
+  ctor(System.String DamagedCopy, System.Int32 SalvagedRecords, System.String ReadError, System.Int32 DiscardedRecords = 0)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+static class Bsync.Storage.Sqlite.SqliteStorePool
+  static System.Threading.Tasks.Task DeleteDatabaseAsync(System.String dataSource, System.Threading.CancellationToken cancellationToken = default)
+  static System.Void Release(System.String dataSource)
+static class Bsync.Storage.Sqlite.SqliteStoreRecovery
+  static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteRebuildReport> RebuildAsync(System.String dataSource, System.Byte[] encryptionKey, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteRebuildReport> RebuildAsync(System.String dataSource, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> CheckAsync(System.String dataSource, System.Byte[] encryptionKey, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> CheckAsync(System.String dataSource, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Storage.Sqlite.SqliteStoreSchemaException : System.NotSupportedException, System.Runtime.Serialization.ISerializable
+  ctor(System.String message)
+sealed class Bsync.Storage.Sqlite.SqliteStoreUnreadableException : System.IO.IOException, System.Runtime.Serialization.ISerializable
+  ctor(System.String message, System.Exception innerException = null)

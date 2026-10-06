@@ -76,6 +76,11 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             throw new ArgumentException("The collection name must be a valid identifier.", nameof(options));
         }
 
+        if ((options.Readers is null) != (options.PrincipalKey is null))
+        {
+            throw new ArgumentException("Readers and PrincipalKey are set together.", nameof(options));
+        }
+
         var authority = new PostgreSqlSyncAuthority<TDocument>(options);
         authority._epoch = await PostgreSqlSchema.EnsureAsync(options.DataSource, cancellationToken).ConfigureAwait(false);
         return authority;
@@ -107,6 +112,13 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         if (since > 0 && since < purgedThrough)
         {
             throw new SyncResetRequiredException("The checkpoint is older than the retention horizon.", ResetReasons.Expired);
+        }
+
+        if (_options.PrincipalKey is { } principalKey)
+        {
+            var membership = await PullMembershipAsync(connection, transaction, context, request, principalKey(context), since, limit, purgedThrough, cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return membership;
         }
 
         await using var command = new NpgsqlCommand(
@@ -394,6 +406,13 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.Forbidden);
         }
 
+        // ADR-015: changing an existing document requires read access to it.
+        if (current is not null && _options.PrincipalKey is { } principalKey
+            && (principalKey(context) is not { } key || !(await ReadGrantedAsync(connection, transaction, context.Scope, operation.DocumentId, cancellationToken).ConfigureAwait(false)).Contains(key)))
+        {
+            return PushOutcome<TDocument>.Rejected(opId, PushErrorCodes.Forbidden);
+        }
+
         if (_options.Validator?.Invoke(context, operation, current?.Document) is { } error)
         {
             return PushOutcome<TDocument>.Rejected(opId, error);
@@ -420,7 +439,13 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             version,
             operation.Document.Deleted,
             json).ConfigureAwait(false);
-        return PushOutcome<TDocument>.Accepted(opId, version, Deserialize(json));
+        var accepted = Deserialize(json);
+        if (_options.Readers is { } readers)
+        {
+            await WriteAccessAsync(connection, transaction, context.Scope, operation.DocumentId, accepted.Deleted ? null : readers(accepted), version, cancellationToken).ConfigureAwait(false);
+        }
+
+        return PushOutcome<TDocument>.Accepted(opId, version, accepted);
     }
 
     /// <inheritdoc />
@@ -576,7 +601,8 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         if (current is { } existing)
         {
             stored.UpdatedAt = Deserialize(existing.Json).UpdatedAt;
-            if (Serialize(stored) == existing.Json)
+            if (Serialize(stored) == existing.Json
+                && (_options.Readers is not { } readers || (await ReadGrantedAsync(write.Connection, write.Transaction, write.Scope, document.Id, cancellationToken).ConfigureAwait(false)).SetEquals(readers(stored))))
             {
                 return new SyncPublishResult(0, 1, 0);
             }
@@ -623,8 +649,10 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? (reader.GetBoolean(0), reader.GetString(1)) : null;
     }
 
-    private Task WriteDocumentAsync(PublishScope write, string id, TDocument document, CancellationToken cancellationToken) =>
-        ExecuteAsync(
+    private async Task WriteDocumentAsync(PublishScope write, string id, TDocument document, CancellationToken cancellationToken)
+    {
+        var version = write.NextVersion();
+        await ExecuteAsync(
             write.Connection,
             write.Transaction,
             """
@@ -636,9 +664,139 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             write.Scope,
             id,
             Encoding.BigEndianUnicode.GetBytes(id),
-            write.NextVersion(),
+            version,
             document.Deleted,
-            Serialize(document));
+            Serialize(document)).ConfigureAwait(false);
+        if (_options.Readers is { } readers)
+        {
+            await WriteAccessAsync(write.Connection, write.Transaction, write.Scope, id, document.Deleted ? null : readers(document), version, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// ADR-015: moves every current reader's access row to <paramref name="version"/> (granted) and marks principals that
+    /// just lost access as revoked at the same version. A tombstone (<paramref name="readers"/> null) goes to everyone who
+    /// could read the document.
+    /// </summary>
+    private async Task WriteAccessAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string scope, string id, IEnumerable<string>? readers, long version, CancellationToken cancellationToken)
+    {
+        var before = await ReadGrantedAsync(connection, transaction, scope, id, cancellationToken).ConfigureAwait(false);
+        var after = readers is null ? before : readers.Where(SyncIds.IsValid).ToHashSet(StringComparer.Ordinal);
+        var rows = after.Select(p => (Principal: p, Granted: true)).Concat(before.Where(p => !after.Contains(p)).Select(p => (Principal: p, Granted: false))).ToList();
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO bs_document_access (collection, scope, principal_key, version, id, granted)
+            SELECT $1, $2, p, $3, $4, g FROM unnest($5::text[], $6::boolean[]) AS t(p, g)
+            ON CONFLICT (collection, scope, id, principal_key) DO UPDATE SET version = excluded.version, granted = excluded.granted
+            """,
+            connection,
+            transaction);
+        command.Parameters.Add(new() { Value = _options.Collection });
+        command.Parameters.Add(new() { Value = scope });
+        command.Parameters.Add(new() { Value = version });
+        command.Parameters.Add(new() { Value = id });
+        command.Parameters.Add(new() { Value = rows.Select(r => r.Principal).ToArray() });
+        command.Parameters.Add(new() { Value = rows.Select(r => r.Granted).ToArray() });
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<HashSet<string>> ReadGrantedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string scope, string id, CancellationToken cancellationToken)
+    {
+        await using var read = new NpgsqlCommand(
+            "SELECT principal_key FROM bs_document_access WHERE collection = $1 AND scope = $2 AND id = $3 AND granted",
+            connection,
+            transaction);
+        read.Parameters.Add(new() { Value = _options.Collection });
+        read.Parameters.Add(new() { Value = scope });
+        read.Parameters.Add(new() { Value = id });
+        var granted = new HashSet<string>(StringComparer.Ordinal);
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            granted.Add(reader.GetString(0));
+        }
+
+        return granted;
+    }
+
+    /// <summary>
+    /// ADR-015: reads the caller's access rows in version order (full pages; cost follows what the caller can see). Revoked
+    /// rows become removals for replicas that asked for them; others must resnapshot (<c>scope-changed</c>).
+    /// </summary>
+    private async Task<PullResult<TDocument>> PullMembershipAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, SyncCallContext context, PullRequest request, string? key, long since, int limit, long purgedThrough, CancellationToken cancellationToken)
+    {
+        var raw = new List<(long Version, bool Granted, string Id, long? DocumentVersion, string? Json)>();
+        if (key is not null && SyncIds.IsValid(key))
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                SELECT a.version, a.granted, a.id, d.version, d.document
+                FROM bs_document_access a
+                LEFT JOIN bs_documents d ON a.granted AND d.collection = a.collection AND d.scope = a.scope AND d.id = a.id
+                WHERE a.collection = $1 AND a.scope = $2 AND a.principal_key = $3 AND a.version > $4
+                ORDER BY a.version
+                LIMIT $5
+                """,
+                connection,
+                transaction);
+            command.Parameters.Add(new() { Value = _options.Collection });
+            command.Parameters.Add(new() { Value = context.Scope });
+            command.Parameters.Add(new() { Value = key });
+            command.Parameters.Add(new() { Value = since });
+            command.Parameters.Add(new() { Value = limit + 1 });
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                raw.Add((reader.GetInt64(0), reader.GetBoolean(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetInt64(3), reader.IsDBNull(4) ? null : reader.GetString(4)));
+            }
+        }
+
+        var hasMore = raw.Count > limit;
+        if (hasMore)
+        {
+            raw.RemoveAt(raw.Count - 1);
+        }
+
+        var acceptsRemovals = request.Features?.Contains(SyncFeatures.Removals, StringComparer.Ordinal) == true;
+        var changes = new List<RemoteChange<TDocument>>();
+        var removals = new List<string>();
+        foreach (var row in raw)
+        {
+            if (row.Granted && row.Json is not null)
+            {
+                var document = Deserialize(row.Json);
+                if (_options.CanRead?.Invoke(context, document) ?? true)
+                {
+                    changes.Add(new RemoteChange<TDocument>(document, row.DocumentVersion!.Value));
+                }
+            }
+            else if (!row.Granted && since > 0)
+            {
+                // A snapshot from the start never needs a removal: the replica holds nothing it may not see.
+                if (!acceptsRemovals)
+                {
+                    throw new SyncResetRequiredException("A document left this caller's view.", ResetReasons.ScopeChanged);
+                }
+
+                removals.Add(row.Id);
+            }
+        }
+
+        var position = raw.Count > 0 ? raw[^1].Version : Math.Max(since, 0);
+        return new PullResult<TDocument>(changes, FormatCheckpoint(context, position), hasMore)
+        {
+            Features = [SyncFeatures.Groups, SyncFeatures.Limits, SyncFeatures.ServerTime, SyncFeatures.Retention, SyncFeatures.Removals],
+            Limits = new SyncLimits(_options.MaxOperationsPerPush, _options.MaxPageSize),
+            ServerTime = _physical.NowMilliseconds(),
+            RetentionHorizon = purgedThrough,
+            Removals = acceptsRemovals ? removals : null,
+        };
+    }
 
     /// <inheritdoc />
     public async Task<StoredDocument<TDocument>?> GetAsync(SyncCallContext context, string id, CancellationToken cancellationToken = default)
@@ -710,6 +868,13 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         delete.Parameters.Add(new() { Value = scope });
         delete.Parameters.Add(new() { Value = throughVersion });
         var removed = await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await ExecuteAsync(
+            connection,
+            transaction,
+            "DELETE FROM bs_document_access a WHERE a.collection = $1 AND a.scope = $2 AND NOT EXISTS (SELECT 1 FROM bs_documents d WHERE d.collection = a.collection AND d.scope = a.scope AND d.id = a.id)",
+            cancellationToken,
+            _options.Collection,
+            scope).ConfigureAwait(false);
         await ExecuteAsync(connection, transaction, "UPDATE bs_feeds SET purged_through = GREATEST(purged_through, $3) WHERE collection = $1 AND scope = $2", cancellationToken, _options.Collection, scope, throughVersion).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         return removed;
@@ -872,7 +1037,9 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
     }
 
     private PushOutcome<TDocument> Visible(SyncCallContext context, PushOutcome<TDocument> outcome) =>
-        outcome.Document is { } document && _options.CanRead is { } canRead && !canRead(context, document)
+        outcome.Document is { } document
+        && ((_options.CanRead is { } canRead && !canRead(context, document))
+            || (_options.PrincipalKey is { } principalKey && (principalKey(context) is not { } key || !_options.Readers!(document).Contains(key, StringComparer.Ordinal))))
             ? PushOutcome<TDocument>.Rejected(outcome.OperationId, PushErrorCodes.Forbidden) with { IsDuplicate = outcome.IsDuplicate }
             : outcome;
 
@@ -892,9 +1059,12 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
 
     // A checkpoint names a position in one feed: bind the collection, the scope and what the caller may see, so a
     // checkpoint from another feed of the same database is never resumed.
+    // With membership a checkpoint names a position in one principal's view, so the principal is bound too (only then,
+    // so checkpoints of authorities without membership are unchanged).
     private string ScopeHash(SyncCallContext context) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            $"{_options.Collection}{context.Scope}{_options.ScopeFingerprint?.Invoke(context)}")))[..16];
+            $"{_options.Collection}{context.Scope}{_options.ScopeFingerprint?.Invoke(context)}"
+            + (_options.PrincipalKey is { } principalKey ? $"{principalKey(context)}" : string.Empty))))[..16];
 
     private long ParseCheckpoint(SyncCallContext context, Checkpoint checkpoint)
     {

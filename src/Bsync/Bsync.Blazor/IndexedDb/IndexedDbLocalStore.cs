@@ -37,10 +37,14 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
     private readonly JsonTypeInfo<TDocument> _typeInfo;
     private readonly int _maxAttempts;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly IReadOnlyList<SyncIndex<TDocument>> _indexes;
+    private readonly string _indexSignature;
     private int _disposed;
 
-    private IndexedDbLocalStore(IJSObjectReference module, int handle, IndexedDbStoreOptions options, JsonTypeInfo<TDocument> typeInfo)
+    private IndexedDbLocalStore(IJSObjectReference module, int handle, IndexedDbStoreOptions options, JsonTypeInfo<TDocument> typeInfo, IReadOnlyList<SyncIndex<TDocument>> indexes)
     {
+        _indexes = indexes;
+        _indexSignature = LocalStoreIndexing.Signature(indexes);
         _module = module;
         _handle = handle;
         _collection = options.Collection;
@@ -50,10 +54,25 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
 
     /// <summary>Opens (creating if needed) the store. Call only after the browser runtime is interactive.</summary>
     /// <exception cref="LocalStoreUnavailableException">IndexedDB is unavailable, blocked or newer than this application.</exception>
+    public static Task<IndexedDbLocalStore<TDocument>> OpenAsync(
+        IJSRuntime js,
+        IndexedDbStoreOptions options,
+        JsonTypeInfo<TDocument> typeInfo,
+        CancellationToken cancellationToken = default) =>
+        OpenAsync(js, options, typeInfo, [], cancellationToken);
+
+    /// <summary>
+    /// Opens (creating if needed) a store that maintains <paramref name="indexes"/> (ADR-018); keys of existing records
+    /// are built here when the declared set changed. Every tab's store of a collection should declare the same indexes:
+    /// a writer with another set marks the keys unusable, and queries are then evaluated in memory until a store with
+    /// the right set opens again. Call only after the browser runtime is interactive.
+    /// </summary>
+    /// <exception cref="LocalStoreUnavailableException">IndexedDB is unavailable, blocked or newer than this application.</exception>
     public static async Task<IndexedDbLocalStore<TDocument>> OpenAsync(
         IJSRuntime js,
         IndexedDbStoreOptions options,
         JsonTypeInfo<TDocument> typeInfo,
+        IEnumerable<SyncIndex<TDocument>> indexes,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(js);
@@ -68,8 +87,16 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxCommitAttempts, 1, nameof(options.MaxCommitAttempts));
 
         var module = await ImportAsync(js, cancellationToken).ConfigureAwait(false);
-        var handle = await Call(() => module.InvokeAsync<int>("open", cancellationToken, options.DatabaseName, (int)options.BlockedTimeout.TotalMilliseconds)).ConfigureAwait(false);
-        return new IndexedDbLocalStore<TDocument>(module, handle, options, typeInfo);
+        if (options.EncryptionKey is { Length: not 32 })
+        {
+            throw new ArgumentException("An encryption key is 32 bytes (256 bits).", nameof(options));
+        }
+
+        var key = options.EncryptionKey is { } bytes ? Convert.ToBase64String(bytes) : null;
+        var handle = await Call(() => module.InvokeAsync<int>("open", cancellationToken, options.DatabaseName, (int)options.BlockedTimeout.TotalMilliseconds, key)).ConfigureAwait(false);
+        var store = new IndexedDbLocalStore<TDocument>(module, handle, options, typeInfo, LocalStoreIndexing.Validate(indexes));
+        await store.RebuildIndexesAsync(cancellationToken).ConfigureAwait(false);
+        return store;
     }
 
     /// <summary>Deletes a whole database (all collections). For account removal and tests.</summary>
@@ -168,7 +195,8 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
                 _handle,
                 _collection,
                 JsonSerializer.Serialize(entries, IdbJsonContext.Default.ListIdbCommitEntry),
-                meta is null ? null : JsonSerializer.Serialize(meta, IdbJsonContext.Default.IdbMetaUpdate))).ConfigureAwait(false);
+                meta is null ? null : JsonSerializer.Serialize(meta, IdbJsonContext.Default.IdbMetaUpdate),
+                _indexSignature)).ConfigureAwait(false);
 
             if (outcome == "ok")
             {
@@ -253,6 +281,102 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        if (Maintains(query.Index))
+        {
+            var json = await Call(() => _module.InvokeAsync<string>(
+                "queryIndex",
+                cancellationToken,
+                _handle,
+                _collection,
+                _indexSignature,
+                query.Index.Name,
+                query.Lower,
+                query.LowerExclusive,
+                query.Upper,
+                query.UpperExclusive,
+                after?.Key,
+                after?.Id,
+                query.IsDescending,
+                limit)).ConfigureAwait(false);
+            if (json != "null")
+            {
+                return JsonSerializer.Deserialize(json, IdbJsonContext.Default.ListString)!.Select(Deserialize).ToList();
+            }
+        }
+
+        return await LocalStoreIndexing.QueryAsync(this, query, after, limit, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (Maintains(query.Index))
+        {
+            var count = await Call(() => _module.InvokeAsync<int>(
+                "countIndex", cancellationToken, _handle, _collection, _indexSignature, query.Index.Name, query.Lower, query.LowerExclusive, query.Upper, query.UpperExclusive).AsTask()).ConfigureAwait(false);
+            if (count >= 0)
+            {
+                return count;
+            }
+        }
+
+        return await LocalStoreIndexing.CountAsync(this, query, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The index set the stored keys were built for (tests).</summary>
+    internal Task<string> IndexStateAsync() => Call(() => _module.InvokeAsync<string>("indexState", CancellationToken.None, _handle, _collection).AsTask());
+
+    private bool Maintains(SyncIndex<TDocument> index) => _indexes.Any(i => i.Name == index.Name && i.Version == index.Version);
+
+    /// <summary>Builds the keys of existing records when the declared set differs from the one they were built for.</summary>
+    private async Task RebuildIndexesAsync(CancellationToken cancellationToken)
+    {
+        if (_indexes.Count == 0)
+        {
+            return;
+        }
+
+        var token = await Call(() => _module.InvokeAsync<string>("beginReindex", cancellationToken, _handle, _collection, _indexSignature).AsTask()).ConfigureAwait(false);
+        if (token.Length == 0)
+        {
+            return;
+        }
+
+        string? after = null;
+        while (true)
+        {
+            var json = await Call(() => _module.InvokeAsync<string>("scanLive", cancellationToken, _handle, _collection, after, 200).AsTask()).ConfigureAwait(false);
+            var page = JsonSerializer.Deserialize(json, IdbJsonContext.Default.ListIdbLiveRecord)!;
+            if (page.Count == 0)
+            {
+                break;
+            }
+
+            var keys = page.Select(r => new IdbIndexKeys(r.Id, r.Stamp, KeysOf(Deserialize(r.Current)))).ToList();
+            await Call(() => _module.InvokeVoidAsync("reindex", cancellationToken, _handle, _collection, JsonSerializer.Serialize(keys, IdbJsonContext.Default.ListIdbIndexKeys))).ConfigureAwait(false);
+            after = page[^1].Id;
+        }
+
+        await Call(() => _module.InvokeAsync<bool>("endReindex", cancellationToken, _handle, _collection, _indexSignature, token).AsTask()).ConfigureAwait(false);
+    }
+
+    private Dictionary<string, string> KeysOf(TDocument document)
+    {
+        var keys = new Dictionary<string, string>(_indexes.Count, StringComparer.Ordinal);
+        foreach (var index in _indexes)
+        {
+            keys[index.Name] = index.KeyOf(document);
+        }
+
+        return keys;
+    }
+
+    /// <inheritdoc />
     public async Task<ReplicaCursor> GetCursorAsync(CancellationToken cancellationToken = default)
     {
         var meta = await GetMetaAsync(cancellationToken).ConfigureAwait(false);
@@ -265,6 +389,10 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
         var meta = await GetMetaAsync(cancellationToken).ConfigureAwait(false);
         return meta.HighWater is null ? HlcTimestamp.MinValue : HlcTimestamp.Parse(meta.HighWater);
     }
+
+    /// <inheritdoc />
+    public Task ResetClockHighWaterAsync(HlcTimestamp value, CancellationToken cancellationToken = default) =>
+        Call(() => _module.InvokeVoidAsync("setHighWater", cancellationToken, _handle, _collection, value.Encode()));
 
     /// <summary>Returns the database's replica id and current incarnation.</summary>
     public async Task<ReplicaIdentity> GetReplicaIdentityAsync(CancellationToken cancellationToken = default)
@@ -382,6 +510,7 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
         RejectionRevision = Text(record.Rejection?.Revision),
         RejectionCode = record.Rejection?.ErrorCode,
         RejectionMessage = record.Rejection?.Message,
+        RejectionArguments = record.Rejection?.Arguments is { Count: > 0 } arguments ? new Dictionary<string, string>(arguments, StringComparer.Ordinal) : null,
         Observed = record.Observed is null ? null : Serialize(record.Observed),
         ObservedVersion = Text(record.ObservedVersion),
         Generation = Text(record.Generation)!,
@@ -394,6 +523,7 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
         GroupMembers = record.Group?.Members.ToList(),
         PendingGroup = record.Pending?.Group,
         PendingGroupSize = record.Pending is { Group: not null } pending ? pending.GroupSize : null,
+        IndexKeys = _indexes.Count == 0 || record.Current.Deleted || record.MissingAfterReset ? null : KeysOf(record.Current),
     };
 
     private SyncRecord<TDocument> ToRecord(IdbRecord dto) =>
@@ -408,7 +538,7 @@ public sealed partial class IndexedDbLocalStore<TDocument> : ILocalStore<TDocume
                     Group = dto.PendingGroup,
                     GroupSize = dto.PendingGroupSize ?? 0,
                 },
-            Rejection = dto.RejectionCode is null ? null : new SyncRejection(Number(dto.RejectionRevision) ?? 0, dto.RejectionCode, dto.RejectionMessage),
+            Rejection = dto.RejectionCode is null ? null : new SyncRejection(Number(dto.RejectionRevision) ?? 0, dto.RejectionCode, dto.RejectionMessage) { Arguments = dto.RejectionArguments },
             Observed = dto.Observed is null ? null : Deserialize(dto.Observed),
             ObservedVersion = Number(dto.ObservedVersion),
             Generation = Number(dto.Generation) ?? 0,

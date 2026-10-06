@@ -77,6 +77,7 @@ sealed class Bsync.Testing.ConformanceJsonContext : System.Text.Json.Serializati
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Protocol.SyncLimits> SyncLimits { get; }
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<Bsync.Testing.ConformanceDocument> ConformanceDocument { get; }
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Boolean> Boolean { get; }
+  System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyDictionary<System.String, System.String>> IReadOnlyDictionaryStringString { get; }
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<Bsync.Protocol.PushOperation<Bsync.Testing.ConformanceDocument>>> IReadOnlyListPushOperationConformanceDocument { get; }
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<Bsync.Protocol.PushOutcome<Bsync.Testing.ConformanceDocument>>> IReadOnlyListPushOutcomeConformanceDocument { get; }
   System.Text.Json.Serialization.Metadata.JsonTypeInfo<System.Collections.Generic.IReadOnlyList<Bsync.Protocol.RemoteChange<Bsync.Testing.ConformanceDocument>>> IReadOnlyListRemoteChangeConformanceDocument { get; }
@@ -109,4 +110,10 @@ sealed class Bsync.Testing.InMemoryAuthorityDriver : Bsync.Testing.IAuthorityCon
   System.Threading.Tasks.Task<Bsync.Testing.AuthorityUnderTest> CreateAsync(Bsync.Testing.AuthorityConformanceOptions options, System.Threading.CancellationToken cancellationToken = default)
   ctor()
 static class Bsync.Testing.LocalStoreConformance
+  static System.Collections.Generic.IReadOnlyList<Bsync.Testing.ConformanceCase> Cases { get; }
+static class Bsync.Testing.LocalStoreIndexConformance
+  static Bsync.Storage.SyncIndex<Bsync.Testing.ConformanceDocument, System.Int32> Length { get; }
+  static Bsync.Storage.SyncIndex<Bsync.Testing.ConformanceDocument, System.String> Tag { get; }
+  static Bsync.Storage.SyncIndex<Bsync.Testing.ConformanceDocument, System.String> Title { get; }
+  static System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncIndex<Bsync.Testing.ConformanceDocument>> Indexes { get; }
   static System.Collections.Generic.IReadOnlyList<Bsync.Testing.ConformanceCase> Cases { get; }

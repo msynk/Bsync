@@ -25,6 +25,9 @@ public sealed class SyncWriteDecision<TDocument>
     /// <summary>For a rejection or retry: an explanation for logs and developers (not localized).</summary>
     public string? Message { get; }
 
+    /// <summary>Values that complete <see cref="ErrorCode"/> for the client (task C5), or <see langword="null"/>.</summary>
+    public IReadOnlyDictionary<string, string>? Arguments { get; private init; }
+
     /// <summary>
     /// Accept, storing <paramref name="canonical"/> (it may differ from the submission, for example a recomputed field,
     /// but must keep its id). The handler's writes commit with it.
@@ -43,6 +46,18 @@ public sealed class SyncWriteDecision<TDocument>
     {
         ArgumentException.ThrowIfNullOrEmpty(errorCode);
         return new(SyncWriteDecisionKind.Reject, null, errorCode, message);
+    }
+
+    /// <summary>
+    /// Rejects the write with a stable code and <paramref name="arguments"/> that complete it for the UI, for example
+    /// <c>Reject("title-too-long", new Dictionary&lt;string, string&gt; { ["max"] = "200" })</c> (task C5). The replica
+    /// keeps both on the parked record.
+    /// </summary>
+    public static SyncWriteDecision<TDocument> Reject(string errorCode, IReadOnlyDictionary<string, string> arguments, string? message = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(errorCode);
+        ArgumentNullException.ThrowIfNull(arguments);
+        return new(SyncWriteDecisionKind.Reject, null, errorCode, message) { Arguments = new Dictionary<string, string>(arguments, StringComparer.Ordinal) };
     }
 
     /// <summary>Not decided now; the handler's writes are undone, no receipt is stored, and the replica resends later.</summary>

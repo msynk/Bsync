@@ -111,6 +111,88 @@ public sealed class CoordinatorTests
         }
     }
 
+    [Fact(DisplayName = "C3 I04 I14: fifteen collections pull in one batch request once the server offers it; a reset in one collection reaches only that collection")]
+    public async Task PullsAreBatched()
+    {
+        var servers = Enumerable.Range(0, 15).ToDictionary(i => $"c{i:00}", _ => Server());
+        foreach (var (name, server) in servers)
+        {
+            await new InProcessTransport<Note>(server, new SyncCallContext(new System.Security.Claims.ClaimsPrincipal(), "team"))
+                .PushAsync(new PushRequest<Note>([new PushOperation<Note>($"op-{name}", $"doc-{name}", null, new Note { Id = $"doc-{name}", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "w") })]));
+        }
+
+        var (app, _, _) = await HostAsync(servers, multiplexed: true);
+        await using var _ = app;
+        var pulls = 0;
+        var http = new HttpClient(new CountingHandler(() => Interlocked.Increment(ref pulls), app.GetTestServer().CreateHandler())) { BaseAddress = app.GetTestServer().BaseAddress };
+        http.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "alice");
+        http.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "team");
+        var batch = new HttpPullBatch(http, SyncTestHost.SchemaId) { Window = TimeSpan.FromMilliseconds(50) };
+        var engines = servers.Keys.ToDictionary(
+            name => name,
+            name => new SyncEngine<Note>(
+                new InMemoryLocalStore<Note>(NoteJson.Clone),
+                new HttpSyncTransport<Note>(http, new HttpSyncTransportOptions { Collection = name, SchemaId = SyncTestHost.SchemaId, PullBatch = batch }, SyncTestHost.Json),
+                new HybridLogicalClock($"n-{name}"),
+                NoteJson.Clone));
+
+        await Task.WhenAll(engines.Values.Select(e => e.PullAsync())); // single pulls: the servers advertise pull-batch
+        var single = Volatile.Read(ref pulls);
+        foreach (var (name, server) in servers.Where(s => s.Key != "c00"))
+        {
+            await new InProcessTransport<Note>(server, new SyncCallContext(new System.Security.Claims.ClaimsPrincipal(), "team"))
+                .PushAsync(new PushRequest<Note>([new PushOperation<Note>($"op2-{name}", $"more-{name}", null, new Note { Id = $"more-{name}", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "w") })]));
+        }
+
+        // c00 purges past the replica's checkpoint, so it answers reset-required (expired) within the batch.
+        var c00 = new InProcessTransport<Note>(servers["c00"], new SyncCallContext(new System.Security.Claims.ClaimsPrincipal(), "team"));
+        await c00.PushAsync(new PushRequest<Note>([new PushOperation<Note>("op-gone", "gone", null, new Note { Id = "gone", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "w") })]));
+        await c00.PushAsync(new PushRequest<Note>([new PushOperation<Note>("op-gone2", "gone", servers["c00"].GetVersion("gone"), new Note { Id = "gone", Deleted = true, UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 1, "w") })]));
+        servers["c00"].PurgeTombstones(servers["c00"].HighestVersion);
+        var results = await Task.WhenAll(engines.Values.Select(e => e.PullAsync()));
+
+        Assert.Equal(15, single);
+        Assert.InRange(Volatile.Read(ref pulls) - single, 1, 3); // a batch or two, not fifteen requests
+        Assert.InRange(batch.Requests, 1, 3);
+        Assert.Equal(14, results.Count(r => r.Pulled == 1 && !r.ResetPerformed));
+        Assert.Single(results, r => r.ResetPerformed);
+        Assert.All(engines.Where(e => e.Key != "c00"), e => Assert.Equal(2, e.Value.QueryAsync().Result.Count));
+    }
+
+    [Fact(DisplayName = "C3: a server without pull batches (collections mapped one by one) is pulled per collection")]
+    public async Task NoBatchAgainstOlderServers()
+    {
+        var servers = Enumerable.Range(0, 3).ToDictionary(i => $"c{i:00}", _ => Server());
+        var (app, _, _) = await HostAsync(servers, multiplexed: false);
+        await using var _ = app;
+        var http = Client(app);
+        var batch = new HttpPullBatch(http, SyncTestHost.SchemaId);
+        var engines = servers.Keys.Select(name => new SyncEngine<Note>(
+            new InMemoryLocalStore<Note>(NoteJson.Clone),
+            new HttpSyncTransport<Note>(http, new HttpSyncTransportOptions { Collection = name, SchemaId = SyncTestHost.SchemaId, PullBatch = batch }, SyncTestHost.Json),
+            new HybridLogicalClock($"n-{name}"),
+            NoteJson.Clone)).ToList();
+
+        await Task.WhenAll(engines.Select(e => e.PullAsync()));
+        await Task.WhenAll(engines.Select(e => e.PullAsync()));
+
+        Assert.Equal(0, batch.Requests);
+    }
+
+    /// <summary>Counts pull requests (single and batched) on their way to the test server.</summary>
+    private sealed class CountingHandler(Action counted, HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/pull", StringComparison.Ordinal))
+            {
+                counted();
+            }
+
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
+
     [Fact(DisplayName = "C3 I13: fifteen collections share one hint stream, and a commit wakes only its collection")]
     public async Task FifteenCollectionsOneStream()
     {

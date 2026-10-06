@@ -106,9 +106,21 @@ public static class BlobEndpoints
                     a => a.Tenant == tenant && a.Sha256 == sha256 && db.Tasks.Any(t => t.Tenant == tenant && t.Id == a.TaskId && !t.Deleted),
                     cancellationToken)
                 || await db.BundleItems.AnyAsync(i => i.Tenant == tenant && i.Sha256 == sha256, cancellationToken);
-            return readable && await store.OpenReadAsync(sha256, cancellationToken) is { } stream
+            if (!readable)
+            {
+                return Results.NotFound(); // not "forbidden": whether content exists is not disclosed
+            }
+
+            // An object store serves the bytes itself through a presigned URL valid for a few minutes (range requests and
+            // resumption work there too); otherwise the route streams them.
+            if (await store.PresignReadAsync(sha256, TimeSpan.FromMinutes(5), cancellationToken) is { } direct)
+            {
+                return Results.Redirect(direct.ToString(), permanent: false, preserveMethod: true);
+            }
+
+            return await store.OpenReadAsync(sha256, cancellationToken) is { } stream
                 ? Results.Stream(stream, "application/octet-stream", enableRangeProcessing: true)
-                : Results.NotFound(); // not "forbidden": whether content exists is not disclosed
+                : Results.NotFound();
         });
     }
 

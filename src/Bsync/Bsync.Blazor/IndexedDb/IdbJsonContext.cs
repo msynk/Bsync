@@ -13,4 +13,6 @@ namespace Bsync.Blazor.IndexedDb;
 [JsonSerializable(typeof(IdbMeta))]
 [JsonSerializable(typeof(List<IdbRecord>))]
 [JsonSerializable(typeof(List<string>))]
+[JsonSerializable(typeof(List<IdbLiveRecord>))]
+[JsonSerializable(typeof(List<IdbIndexKeys>))]
 internal sealed partial class IdbJsonContext : JsonSerializerContext;

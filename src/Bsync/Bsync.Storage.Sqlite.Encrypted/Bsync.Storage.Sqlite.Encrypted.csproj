@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsAotCompatible>true</IsAotCompatible>
+    <RootNamespace>Bsync.Storage.Sqlite</RootNamespace>
+    <DefineConstants>$(DefineConstants);BSYNC_SQLCIPHER</DefineConstants>
+    <Description>The Bsync SQLite local store with encryption at rest (SQLCipher, ADR-016). Use instead of Bsync.Storage.Sqlite, never together with it: both provide the native SQLite library.</Description>
+  </PropertyGroup>
+
+  <!-- The same store, compiled against the SQLCipher build of SQLite instead of the plain one. -->
+  <ItemGroup>
+    <Compile Include="..\Bsync.Storage.Sqlite\*.cs" LinkBase="Store" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.12" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Bsync\Bsync.csproj" />
+  </ItemGroup>
+
+</Project>

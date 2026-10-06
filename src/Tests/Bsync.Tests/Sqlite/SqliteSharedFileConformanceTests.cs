@@ -12,5 +12,8 @@ public sealed class SqliteSharedFileConformanceTests : LocalStoreConformanceTest
     protected override async Task<ILocalStore<ConformanceDocument>> CreateStoreAsync() =>
         new SplitStore<ConformanceDocument>(await _database.OpenConformanceAsync(), await _database.OpenConformanceAsync());
 
+    protected override async Task<ILocalStore<ConformanceDocument>> CreateIndexedStoreAsync() =>
+        new SplitStore<ConformanceDocument>(await _database.OpenConformanceAsync(LocalStoreIndexConformance.Indexes), await _database.OpenConformanceAsync(LocalStoreIndexConformance.Indexes));
+
     public void Dispose() => _database.Dispose();
 }

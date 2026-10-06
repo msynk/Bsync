@@ -30,11 +30,13 @@ public static class Harness
     }
 
     [JSInvokable(nameof(RunStoreConformance))]
-    public static async Task<string> RunStoreConformance(string databasePrefix)
+    public static async Task<string> RunStoreConformance(string databasePrefix, bool encrypted)
     {
+        var key = encrypted ? System.Security.Cryptography.RandomNumberGenerator.GetBytes(32) : null;
         var results = new List<CaseResult>();
         var n = 0;
-        foreach (var conformanceCase in LocalStoreConformance.Cases)
+        foreach (var (conformanceCase, indexes) in LocalStoreConformance.Cases.Select(c => (c, (IReadOnlyList<SyncIndex<ConformanceDocument>>)[]))
+            .Concat(LocalStoreIndexConformance.Cases.Select(c => (c, LocalStoreIndexConformance.Indexes))))
         {
             var opened = new List<IndexedDbLocalStore<ConformanceDocument>>();
             var database = $"{databasePrefix}-{n++}";
@@ -44,8 +46,9 @@ public static class Harness
                 {
                     var store = await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(
                         _js,
-                        new IndexedDbStoreOptions { DatabaseName = database, Collection = "conformance" },
-                        ConformanceJsonContext.Default.ConformanceDocument);
+                        new IndexedDbStoreOptions { DatabaseName = database, Collection = "conformance", EncryptionKey = key },
+                        ConformanceJsonContext.Default.ConformanceDocument,
+                        indexes);
                     opened.Add(store);
                     return store;
                 });
@@ -67,6 +70,134 @@ public static class Harness
         }
 
         return JsonSerializer.Serialize(results, HarnessJson.Default.ListCaseResult);
+    }
+
+    /// <summary>
+    /// ADR-018 in the browser: keys are kept and used (not only evaluated in memory), a writer without the indexes makes
+    /// them unusable while queries stay correct, and the next indexed open rebuilds them.
+    /// </summary>
+    [JSInvokable(nameof(RunIndexLifecycle))]
+    public static async Task<string> RunIndexLifecycle(string database)
+    {
+        var steps = new List<string>();
+        var options = new IndexedDbStoreOptions { DatabaseName = database, Collection = "conformance" };
+        var title = LocalStoreIndexConformance.Title;
+        static RecordUpdate<ConformanceDocument> Put(string id, string text) =>
+            new(id, _ => new SyncRecord<ConformanceDocument>(new ConformanceDocument { Id = id, Title = text }, null, IsDirty: true) { LocalRevision = 1 });
+        async Task<string> Ids(ILocalStore<ConformanceDocument> store) =>
+            string.Join(",", (await store.QueryIndexAsync(title.All(), null, 100)).Select(d => d.Id));
+        try
+        {
+            var plain = await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(_js, options, ConformanceJsonContext.Default.ConformanceDocument);
+            await plain.UpdateAsync([Put("a", "b"), Put("b", "a")]); // written before any index existed
+            var indexed = await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(_js, options, ConformanceJsonContext.Default.ConformanceDocument, LocalStoreIndexConformance.Indexes);
+            steps.Add($"rebuilt:{await indexed.IndexStateAsync()}|{await Ids(indexed)}");
+            await indexed.UpdateAsync([Put("c", "0")]);
+            steps.Add($"maintained:{await indexed.IndexStateAsync()}|{await Ids(indexed)}|{await indexed.CountIndexAsync(title.All())}");
+            await plain.UpdateAsync([Put("d", "1")]);
+            steps.Add($"invalidated:{await indexed.IndexStateAsync()}|{await Ids(indexed)}");
+            await indexed.DisposeAsync();
+            var reopened = await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(_js, options, ConformanceJsonContext.Default.ConformanceDocument, LocalStoreIndexConformance.Indexes);
+            steps.Add($"reopened:{await reopened.IndexStateAsync()}|{await Ids(reopened)}");
+            await reopened.DisposeAsync();
+            await plain.DisposeAsync();
+        }
+        catch (Exception error)
+        {
+            steps.Add($"error:{error.GetType().Name}: {error.Message}");
+        }
+        finally
+        {
+            await IndexedDbLocalStore<ConformanceDocument>.DeleteDatabaseAsync(_js, database);
+        }
+
+        return string.Join(" ;; ", steps);
+    }
+
+    /// <summary>ADR-016 in the browser: documents are stored sealed; a missing or wrong key is refused explicitly.</summary>
+    [JSInvokable(nameof(RunEncryptionChecks))]
+    public static async Task<string> RunEncryptionChecks(string database)
+    {
+        var key = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        IndexedDbStoreOptions Options(byte[]? k) => new() { DatabaseName = database, Collection = "conformance", EncryptionKey = k };
+        var steps = new List<string>();
+        var store = await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(_js, Options(key), ConformanceJsonContext.Default.ConformanceDocument);
+        await store.UpdateAsync([new("n1", _ => new SyncRecord<ConformanceDocument>(new ConformanceDocument { Id = "n1", Title = "secret-title-0123456789" }, null, IsDirty: true) { LocalRevision = 1 })]);
+        await store.DisposeAsync();
+        foreach (var (name, k) in new[] { ("none", (byte[]?)null), ("wrong", System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) })
+        {
+            try
+            {
+                await (await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(_js, Options(k), ConformanceJsonContext.Default.ConformanceDocument)).DisposeAsync();
+                steps.Add($"{name}:opened");
+            }
+            catch (LocalStoreUnavailableException error)
+            {
+                steps.Add($"{name}:{error.Reason}");
+            }
+        }
+
+        var reopened = await IndexedDbLocalStore<ConformanceDocument>.OpenAsync(_js, Options(key), ConformanceJsonContext.Default.ConformanceDocument);
+        steps.Add($"right:{(await reopened.GetAsync("n1"))!.Current.Title}");
+        await reopened.DisposeAsync();
+        return string.Join(" ;; ", steps);
+    }
+
+    private static byte[] BlobContent(int seed, int size)
+    {
+        var bytes = new byte[size];
+        new Random(seed).NextBytes(bytes);
+        return bytes;
+    }
+
+    /// <summary>F1 in the browser: import and ranged reads; a corrupted transfer is refused; wipe.</summary>
+    [JSInvokable(nameof(RunBlobChecks))]
+    public static async Task<string> RunBlobChecks(string name)
+    {
+        var steps = new List<string>();
+        var store = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, name);
+        var content = BlobContent(1, 3 * 1024 * 1024 + 17);
+        var (sha, size) = await store.ImportAsync(new MemoryStream(content));
+        await using (var read = store.OpenRead(sha, size))
+        {
+            var copy = new MemoryStream();
+            await read.CopyToAsync(copy);
+            steps.Add($"import:{size == content.Length && copy.ToArray().AsSpan().SequenceEqual(content) && sha == Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(content))}");
+        }
+
+        var other = BlobContent(2, 1024 * 1024);
+        var claimed = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(other));
+        await store.AppendPartialAsync(claimed, BlobContent(3, 1024 * 1024)); // not the bytes the hash names
+        steps.Add($"corrupt:{await store.CompletePartialAsync(claimed)}|{await store.SizeAsync(claimed) is null}|{await store.PartialLengthAsync(claimed)}");
+        steps.Add($"list:{string.Join(",", await store.ListAsync()) == sha}");
+        await Bsync.Blazor.Blobs.BrowserBlobStore.DeleteAllAsync(_js, name);
+        steps.Add($"wiped:{(await store.ListAsync()).Length}");
+        return string.Join(" ;; ", steps);
+    }
+
+    /// <summary>F1: the first half of a transfer, before the page reloads.</summary>
+    [JSInvokable(nameof(BlobFirstHalf))]
+    public static async Task<string> BlobFirstHalf(string name)
+    {
+        var content = BlobContent(4, 2 * 1024 * 1024);
+        var store = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, name);
+        var sha = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(content));
+        await store.AppendPartialAsync(sha, content[..(1024 * 1024)]);
+        return sha;
+    }
+
+    /// <summary>F1: after the reload, the transfer continues from what is kept, and completes verified.</summary>
+    [JSInvokable(nameof(BlobSecondHalf))]
+    public static async Task<string> BlobSecondHalf(string name, string sha)
+    {
+        var content = BlobContent(4, 2 * 1024 * 1024);
+        var store = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, name);
+        var kept = await store.PartialLengthAsync(sha);
+        await store.AppendPartialAsync(sha, content[(int)kept..]);
+        var completed = await store.CompletePartialAsync(sha);
+        var size = await store.SizeAsync(sha);
+        await Bsync.Blazor.Blobs.BrowserBlobStore.DeleteAllAsync(_js, name);
+        return $"kept:{kept} ;; completed:{completed} ;; size:{size}";
     }
 
     [JSInvokable(nameof(OpenReplica))]

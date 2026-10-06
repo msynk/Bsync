@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -9,6 +10,9 @@ namespace Bsync.Storage.Sqlite;
 /// <summary>Connection-pool helpers.</summary>
 public static class SqliteStorePool
 {
+    // Every connection string used per file (one per key), so Release closes all of their pools.
+    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> Pools = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Closes the pooled connections to one database file (for example before copying, restoring or deleting it).
     /// Unlike <see cref="SqliteConnection.ClearAllPools"/>, it does not touch other databases' connections.
@@ -16,8 +20,13 @@ public static class SqliteStorePool
     public static void Release(string dataSource)
     {
         ArgumentException.ThrowIfNullOrEmpty(dataSource);
-        using var connection = new SqliteConnection(ConnectionString(dataSource));
-        SqliteConnection.ClearPool(connection);
+        var strings = Pools.TryGetValue(dataSource, out var known) ? [.. known.Keys] : new List<string>();
+        strings.Add(ConnectionString(dataSource));
+        foreach (var connectionString in strings.Distinct(StringComparer.Ordinal))
+        {
+            using var connection = new SqliteConnection(connectionString);
+            SqliteConnection.ClearPool(connection);
+        }
     }
 
     /// <summary>
@@ -47,10 +56,39 @@ public static class SqliteStorePool
         }
     }
 
-    internal static string ConnectionString(string dataSource) => new SqliteConnectionStringBuilder
+    internal static string ConnectionString(string dataSource, byte[]? key = null)
     {
-        DataSource = dataSource,
-        Mode = SqliteOpenMode.ReadWriteCreate,
-        Pooling = true,
-    }.ToString();
+        var builder = new SqliteConnectionStringBuilder
+        {
+            DataSource = dataSource,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = true,
+        };
+        if (key is not null)
+        {
+            builder.Password = Passphrase(key);
+        }
+
+        var connectionString = builder.ToString();
+        if (key is not null)
+        {
+            Pools.GetOrAdd(dataSource, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal)).TryAdd(connectionString, 0);
+        }
+
+        return connectionString;
+    }
+
+    /// <summary>
+    /// The SQLCipher key string for a key: the raw-key form <c>x'…'</c>, so the 32 random bytes are the cipher key and
+    /// no password derivation (256,000 PBKDF2 rounds per connection) runs.
+    /// </summary>
+    internal static string Passphrase(byte[] key)
+    {
+        if (key.Length != 32)
+        {
+            throw new ArgumentException("An encryption key is 32 bytes (256 bits).", nameof(key));
+        }
+
+        return $"x'{Convert.ToHexString(key)}'";
+    }
 }

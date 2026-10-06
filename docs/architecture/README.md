@@ -20,9 +20,9 @@
 | [012](adr-012-packaging-and-support.md) | Packaging, support tiers, target framework, workloads | Accepted |
 | [013](adr-013-recovery.md) | Recovery of local work: retry, revert, export/import, SQLite rebuild, schema roll-out | Accepted |
 | [015](adr-015-membership-and-removals.md) | Read membership in the feed; removals without a resnapshot | Accepted; in-memory and SQL Server |
-| [017](adr-017-clock-correction.md) | Correcting a device clock that is ahead of the server | Part 1 implemented; part 2 proposed |
-| [016](adr-016-encryption-at-rest.md) | Encryption at rest and replica wipe | Wipe and persistence implemented; encryption proposed |
-| [018](adr-018-local-secondary-indexes.md) | Declared secondary indexes in the local stores (task E2) | Proposed; not implemented |
+| [017](adr-017-clock-correction.md) | Correcting a device clock that is ahead of the server | Accepted; parts 1 and 2 implemented |
+| [016](adr-016-encryption-at-rest.md) | Encryption at rest and replica wipe | Accepted; implemented (SQLCipher package, IndexedDB AES-GCM, wipe) |
+| [018](adr-018-local-secondary-indexes.md) | Declared secondary indexes in the local stores (task E2) | Accepted; implemented (in-memory, SQLite, IndexedDB) |
 | [014](adr-014-sql-server-authority.md) | SQL Server authority on the application's database: feed lock, transaction enlistment, write handler, publisher | Accepted; implemented (0.2.0, unreleased) |
 
 Operations: [disaster recovery and stuck replicas](../operations/disaster-recovery.md).

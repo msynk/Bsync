@@ -44,11 +44,14 @@ public static class Workload
         MaxPageSize = 1000,
     });
 
-    public static async Task<ILocalStore<BenchDocument>> StoreAsync(string kind, string directory) => kind switch
+    /// <summary>An index on <see cref="BenchDocument.Due"/> (task E2).</summary>
+    public static readonly SyncIndex<BenchDocument, DateTimeOffset> Due = SyncIndex<BenchDocument>.Create("due", d => d.Due);
+
+    public static async Task<ILocalStore<BenchDocument>> StoreAsync(string kind, string directory, IReadOnlyList<SyncIndex<BenchDocument>>? indexes = null) => kind switch
     {
-        "memory" => new InMemoryLocalStore<BenchDocument>(Clone),
-        "sqlite-full" => await SqliteLocalStore<BenchDocument>.OpenAsync(new SqliteLocalStoreOptions { DataSource = Path.Combine(directory, $"{Guid.NewGuid():N}.db"), Durability = SqliteDurability.Full }, BenchJson.Default.BenchDocument),
-        "sqlite-normal" => await SqliteLocalStore<BenchDocument>.OpenAsync(new SqliteLocalStoreOptions { DataSource = Path.Combine(directory, $"{Guid.NewGuid():N}.db"), Durability = SqliteDurability.Normal }, BenchJson.Default.BenchDocument),
+        "memory" => new InMemoryLocalStore<BenchDocument>(Clone, indexes),
+        "sqlite-full" => await SqliteLocalStore<BenchDocument>.OpenAsync(new SqliteLocalStoreOptions { DataSource = Path.Combine(directory, $"{Guid.NewGuid():N}.db"), Durability = SqliteDurability.Full }, BenchJson.Default.BenchDocument, indexes ?? []),
+        "sqlite-normal" => await SqliteLocalStore<BenchDocument>.OpenAsync(new SqliteLocalStoreOptions { DataSource = Path.Combine(directory, $"{Guid.NewGuid():N}.db"), Durability = SqliteDurability.Normal }, BenchJson.Default.BenchDocument, indexes ?? []),
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 

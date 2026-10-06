@@ -735,7 +735,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
                         ? throw new InvalidOperationException("The write handler answered a conflict for a document that does not exist.")
                         : PushOutcome<TDocument>.Conflict(opId, current.Version, _clone(current.Document));
                 case SyncWriteDecisionKind.Reject:
-                    return PushOutcome<TDocument>.Rejected(opId, decision.ErrorCode!, decision.Message);
+                    return PushOutcome<TDocument>.Rejected(opId, decision.ErrorCode!, decision.Message) with { Arguments = decision.Arguments };
                 default:
                     return PushOutcome<TDocument>.RetryLater(opId, decision.ErrorCode!, decision.Message);
             }

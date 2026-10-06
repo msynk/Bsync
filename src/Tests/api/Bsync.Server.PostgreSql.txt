@@ -5,8 +5,10 @@ sealed class Bsync.Server.PostgreSql.PostgreSqlSyncAuthorityOptions<TDocument> w
   Npgsql.NpgsqlDataSource DataSource { get; init; }
   System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<TDocument>, TDocument, System.Boolean> CanWrite { get; init; }
   System.Func<Bsync.Server.SyncCallContext, Bsync.Protocol.PushOperation<TDocument>, TDocument, System.String> Validator { get; init; }
+  System.Func<Bsync.Server.SyncCallContext, System.String> PrincipalKey { get; init; }
   System.Func<Bsync.Server.SyncCallContext, System.String> ScopeFingerprint { get; init; }
   System.Func<Bsync.Server.SyncCallContext, TDocument, System.Boolean> CanRead { get; init; }
+  System.Func<TDocument, System.Collections.Generic.IEnumerable<System.String>> Readers { get; init; }
   System.Int32 MaxOperationsPerPush { get; init; }
   System.Int32 MaxPageSize { get; init; }
   System.String Collection { get; init; }

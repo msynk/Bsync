@@ -9,7 +9,7 @@ namespace Bsync.Tests.PostgreSql;
 /// <summary>The public authority conformance suite against PostgreSQL (one collection per authority, one database per class).</summary>
 public sealed class PostgreSqlAuthorityConformanceTests(PostgresFixture fixture) : AuthorityConformanceTests, IClassFixture<PostgresFixture>
 {
-    private const AuthorityCapabilities Supported = AuthorityCapabilities.All & ~AuthorityCapabilities.Membership; // ADR-015 is not implemented for PostgreSQL
+    private const AuthorityCapabilities Supported = AuthorityCapabilities.All;
 
     protected override IAuthorityConformanceDriver Driver { get; } = new PostgreSqlDriver(fixture);
 
@@ -35,6 +35,8 @@ public sealed class PostgreSqlAuthorityConformanceTests(PostgresFixture fixture)
                     Validator = options.Validator,
                     CanRead = options.CanRead,
                     ScopeFingerprint = options.ScopeFingerprint,
+                    Readers = options.Readers,
+                    PrincipalKey = options.PrincipalKey,
                 },
                 cancellationToken));
     }

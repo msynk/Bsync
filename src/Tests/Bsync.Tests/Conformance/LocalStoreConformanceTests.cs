@@ -21,11 +21,30 @@ public abstract class LocalStoreConformanceTests
         return data;
     }
 
+    public static TheoryData<string> IndexCaseNames()
+    {
+        var data = new TheoryData<string>();
+        foreach (var conformanceCase in LocalStoreIndexConformance.Cases)
+        {
+            data.Add(conformanceCase.Name);
+        }
+
+        return data;
+    }
+
     /// <summary>Creates an empty store.</summary>
     protected abstract Task<ILocalStore<ConformanceDocument>> CreateStoreAsync();
+
+    /// <summary>Creates an empty store that maintains <see cref="LocalStoreIndexConformance.Indexes"/>.</summary>
+    protected abstract Task<ILocalStore<ConformanceDocument>> CreateIndexedStoreAsync();
 
     [Theory]
     [MemberData(nameof(CaseNames))]
     public Task Conformance(string name) =>
         LocalStoreConformance.Cases.Single(c => c.Name == name).RunAsync(CreateStoreAsync);
+
+    [Theory]
+    [MemberData(nameof(IndexCaseNames))]
+    public Task IndexConformance(string name) =>
+        LocalStoreIndexConformance.Cases.Single(c => c.Name == name).RunAsync(CreateIndexedStoreAsync);
 }

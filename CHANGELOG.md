@@ -4,7 +4,59 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
 [docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
 
-## Unreleased (0.3.0)
+## Unreleased
+
+Work committed after 0.4.0 (76944e9).
+
+### Added
+
+- Declared secondary indexes (ADR-018): `SyncIndex<T>.Create("due", d => d.Due)`, queries with
+  `SyncQuery.Index = due.From(today).Descending()`, `Skip`, and `CountAsync`. The in-memory, SQLite (schema 5) and
+  IndexedDB (schema 4) stores maintain them; a 50-item ordered page of 50,000 documents takes under 0.5 ms instead of
+  over 300 ms on a desktop.
+- Attachments: `BrowserBlobStore` in `Bsync.Blazor` (verified, resumable content in IndexedDB); the Tasks sample can
+  keep content in an S3-compatible bucket and serves downloads through presigned URLs.
+- `Bsync.Maui` (optional): sync on reconnect, pause and resume with the app, budgeted background runs, keys in
+  `SecureStorage`. Built and used by the MAUI sample on Windows; mobile targets not yet built or run.
+- Pull batches: collections mapped with `MapSyncCollections` can be pulled in one request (`HttpPullBatch`,
+  feature `pull-batch`); a reset or error in one collection reaches only that collection.
+- Rejections carry arguments: `SyncWriteDecision.Reject("title-too-long", new Dictionary<string, string> { ["max"] = "200" })`
+  reaches the replica's record, `GetItemStatusAsync` and `GetIssuesAsync`, and replays from receipts keep it.
+- Encryption at rest (ADR-016): `Bsync.Storage.Sqlite.Encrypted` (SQLCipher; encrypt in place, rekey) and
+  `IndexedDbStoreOptions.EncryptionKey` (AES-GCM with WebCrypto). A wrong or missing key fails explicitly.
+- PostgreSQL schema 2 (upgraded in place from schema 1): the PostgreSQL authority supports read membership too
+  (`Readers`, `PrincipalKey`; ADR-015).
+
+### Changed
+
+- Writes stamped with a fast clock before the first pull (offline, right after install) are re-stamped from the
+  server's time and uploaded in the same sync instead of staying parked with `clock-skew` (ADR-017, part 2;
+  `SyncOptions.RestampSkewedWrites`).
+- SQLite schema 5 (table `bs_index`, column `rejection_arguments`) and IndexedDB schema 4 (index `ix`); both upgrade
+  in place on open.
+- SQL Server schema 3 (receipts keep rejection arguments); schema 1 and 2 databases upgrade in place on first open.
+
+## 0.4.0 (committed as 76944e9; not yet on NuGet)
+
+### Added
+
+- Operations: the `bsync.issues` gauge (conflicts, rejections, blocked group members per collection); an optional
+  replica acknowledgement audit (`SyncEndpointOptions.ReplicaAudit`, `SqlServerReplicaAudit`) recording which
+  checkpoint each replica reached and when; a SQL Server restore drill, retention service and capacity guidance in
+  the runbook; an authority throughput benchmark with concurrent sessions (`docs/benchmarks.md`).
+- Wipe on sign-out: `SyncSession.DeleteReplicaAsync(account)` and `SyncCoordinator.DeleteReplicasAsync(account)` close
+  an account's replicas and delete them from the device (`SqliteStorePool.DeleteDatabaseAsync`; the browser recipe
+  deletes the IndexedDB database). The browser recipe requests persistent storage and reports it in
+  `SyncStatus.PersistentStorage`. Encryption at rest is proposed in ADR-016, not implemented.
+- `SyncOptions.ReadyToPush` holds a pending document back until something it names has reached the server.
+- The Tasks sample attaches files to tasks: content-addressed blob stores on the device and the server, resumable
+  chunked uploads and range downloads verified by SHA-256, uploads before the task, reads limited to callers who can
+  read a referencing task, pinning and eviction (`docs/patterns/attachments.md`). Browser clients, presigned URLs and an
+  S3 adapter are not done yet.
+- The Tasks sample distributes bundles: a server-published manifest that devices switch to in one step once every
+  item is downloaded and verified, keeping the previous revision in use meanwhile (`docs/patterns/bundles.md`).
+
+## 0.3.0 (committed as bba45f9; not yet on NuGet)
 
 ### Added
 
@@ -28,21 +80,6 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
   receipts older than `MaxOfflineHorizon` (default 45 days) in every in-memory, SQL Server or PostgreSQL authority it
   is given. A receipt horizon shorter than the offline horizon fails the host at startup.
 - `SyncOptions.KeptConflictView = KeptConflictView.Local` keeps showing the user's own edit while a conflict waits.
-- Operations: the `bsync.issues` gauge (conflicts, rejections, blocked group members per collection); an optional
-  replica acknowledgement audit (`SyncEndpointOptions.ReplicaAudit`, `SqlServerReplicaAudit`) recording which
-  checkpoint each replica reached and when; a SQL Server restore drill, retention service and capacity guidance in
-  the runbook; an authority throughput benchmark with concurrent sessions (`docs/benchmarks.md`).
-- Wipe on sign-out: `SyncSession.DeleteReplicaAsync(account)` and `SyncCoordinator.DeleteReplicasAsync(account)` close
-  an account's replicas and delete them from the device (`SqliteStorePool.DeleteDatabaseAsync`; the browser recipe
-  deletes the IndexedDB database). The browser recipe requests persistent storage and reports it in
-  `SyncStatus.PersistentStorage`. Encryption at rest is proposed in ADR-016, not implemented.
-- `SyncOptions.ReadyToPush` holds a pending document back until something it names has reached the server.
-- The Tasks sample attaches files to tasks: content-addressed blob stores on the device and the server, resumable
-  chunked uploads and range downloads verified by SHA-256, uploads before the task, reads limited to callers who can
-  read a referencing task, pinning and eviction (`docs/patterns/attachments.md`). Browser clients, presigned URLs and an
-  S3 adapter are not done yet.
-- The Tasks sample distributes bundles: a server-published manifest that devices switch to in one step once every
-  item is downloaded and verified, keeping the previous revision in use meanwhile (`docs/patterns/bundles.md`).
 - The Tasks sample executes immutable intents (complete, rename) exactly once in the write handler's transaction,
   with execution state separate from sync state; documented as a pattern in `docs/patterns/intents.md`. No new
   package types.

@@ -18,7 +18,11 @@ public enum SyncIssueKind
 /// <param name="Kind">What kind of decision.</param>
 /// <param name="ErrorCode">For a rejection, the server's stable code (match on it, never on <paramref name="Message"/>).</param>
 /// <param name="Message">For a rejection, the server's explanation, for logs and developers.</param>
-public sealed record SyncIssue(string Id, SyncIssueKind Kind, string? ErrorCode = null, string? Message = null);
+public sealed record SyncIssue(string Id, SyncIssueKind Kind, string? ErrorCode = null, string? Message = null)
+{
+    /// <summary>Values that complete <see cref="ErrorCode"/> (task C5), when the server sent any.</summary>
+    public IReadOnlyDictionary<string, string>? Arguments { get; init; }
+}
 
 /// <summary>A page of <see cref="SyncIssue"/>s, conflicts first, each kind in id order.</summary>
 /// <param name="Items">The issues on this page.</param>

@@ -35,11 +35,16 @@ public sealed class TasksSampleTests : IAsyncLifetime
         return new Uri($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}/");
     }
 
-    private Task<WebApplication> StartServerAsync(Uri address) => TasksServer.BuildAsync([], builder =>
+    private Task<WebApplication> StartServerAsync(Uri address, IReadOnlyDictionary<string, string>? settings = null) => TasksServer.BuildAsync([], builder =>
     {
         builder.WebHost.UseUrls(address.ToString());
         builder.Configuration["ConnectionStrings:Tasks"] = _database.ConnectionString;
         builder.Configuration["Tasks:BlobDirectory"] = Path.Combine(_data, "server-blobs");
+        foreach (var (key, value) in settings ?? new Dictionary<string, string>())
+        {
+            builder.Configuration[key] = value;
+        }
+
         builder.Logging.ClearProviders();
     });
 
@@ -391,6 +396,54 @@ public sealed class TasksSampleTests : IAsyncLifetime
         return await new StreamReader(stream).ReadToEndAsync();
     }
 
+    [S3Fact(DisplayName = "F1 I01: with an S3-compatible store, attachments land in the bucket once and downloads resume from presigned URLs")]
+    public async Task AttachmentsInObjectStorage()
+    {
+        var serviceUrl = Environment.GetEnvironmentVariable("BSYNC_S3")!;
+        var bucket = $"bsync-{Guid.NewGuid():N}";
+        using var s3 = new Amazon.S3.AmazonS3Client(
+            new Amazon.Runtime.BasicAWSCredentials("test", "test"),
+            new Amazon.S3.AmazonS3Config { ServiceURL = serviceUrl, ForcePathStyle = true, AuthenticationRegion = "us-east-1" });
+        await s3.PutBucketAsync(bucket);
+        var content = new byte[6 * 1024 * 1024];
+        new Random(11).NextBytes(content);
+        var sha256 = Convert.ToHexStringLower(SHA256.HashData(content));
+        var address = FreeAddress();
+        await using var server = await StartServerAsync(address, new Dictionary<string, string>
+        {
+            ["Tasks:S3:ServiceUrl"] = serviceUrl,
+            ["Tasks:S3:Bucket"] = bucket,
+            ["Tasks:S3:AccessKey"] = "test",
+            ["Tasks:S3:SecretKey"] = "test",
+        });
+        await server.StartAsync();
+
+        await using var alice = TasksClient.Create(address, Path.Combine(_data, "alice"), "alice", "team-1");
+        await alice.Tasks.SaveAsync(new TaskDocument { Id = "t1", Title = "Report" });
+        var blob = await alice.AttachAsync("t1", new MemoryStream(content), "report.bin", "application/octet-stream");
+        await alice.SyncNowAsync();
+
+        var stored = await s3.GetObjectMetadataAsync(bucket, $"objects/{sha256[..2]}/{sha256}");
+        Assert.Equal(content.Length, stored.ContentLength);
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(_data, "server-blobs"), "*", SearchOption.AllDirectories)); // nothing kept on the server
+
+        var faults = new Faults { CutDownloadAfter = content.Length / 2 };
+        await using var bob = TasksClient.Create(address, Path.Combine(_data, "bob"), "bob", "team-1", inner => new FaultyHandler(faults) { InnerHandler = inner });
+        await bob.SyncNowAsync();
+        await Assert.ThrowsAnyAsync<IOException>(() => bob.DownloadAsync(blob));
+        var resumed = await bob.DownloadAsync(blob);
+
+        Assert.InRange(resumed, 1, content.Length / 2); // the rest only, by a range request to the presigned URL
+        Assert.Equal(2, faults.ServedElsewhere); // both downloads were served by the object store, not the application server
+        await using (var opened = bob.OpenAttachment(blob))
+        {
+            Assert.Equal(sha256, Convert.ToHexStringLower(await SHA256.HashDataAsync(opened!)));
+        }
+
+        using var eve = await SignedInAsync(address, "eve", "team-2");
+        Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"api/blobs/{sha256}")).StatusCode); // no URL for others
+    }
+
     /// <summary>Faults injected into one client's HTTP traffic, and what crossed the network.</summary>
     private sealed class Faults
     {
@@ -405,6 +458,8 @@ public sealed class TasksSampleTests : IAsyncLifetime
         public long UploadBytes;
 
         public long DownloadBytes;
+
+        public int ServedElsewhere;
     }
 
     /// <summary>Drops connections part-way through blob transfers, loses a response, or fails everything (offline).</summary>
@@ -418,6 +473,7 @@ public sealed class TasksSampleTests : IAsyncLifetime
             }
 
             var path = request.RequestUri!.AbsolutePath;
+            var port = request.RequestUri.Port; // following a redirect changes the request's URI in place
             if (request.Method == HttpMethod.Put && path.Contains("/uploads/", StringComparison.Ordinal) && request.Content is { } body)
             {
                 var bytes = await body.ReadAsByteArrayAsync(cancellationToken);
@@ -446,6 +502,11 @@ public sealed class TasksSampleTests : IAsyncLifetime
 
             if (request.Method == HttpMethod.Get && path.StartsWith("/api/blobs/", StringComparison.Ordinal) && response.IsSuccessStatusCode)
             {
+                if (response.RequestMessage?.RequestUri is { } final && final.Port != port)
+                {
+                    Interlocked.Increment(ref faults.ServedElsewhere); // redirected to the object store
+                }
+
                 response.Content = new StreamContent(new DroppingStream(await response.Content.ReadAsStreamAsync(cancellationToken), faults));
             }
 

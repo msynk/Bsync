@@ -153,7 +153,7 @@ public sealed class SqlServerWriteHandlerTests : IAsyncLifetime
         Assert.Equal(16, await _database.ScalarAsync("SELECT title_length FROM dbo.notes_domain WHERE id = 'n1'"));
     }
 
-    [Fact(DisplayName = "ADR-014 I19: a handler rejection parks only that record, keeps its code, and undoes its domain write")]
+    [Fact(DisplayName = "ADR-014 I19 C5: a handler rejection parks only that record, keeps its code and arguments (also on replay), and undoes its domain write")]
     public async Task RejectionParksOnlyThatRecord()
     {
         var handler = new DomainHandler();
@@ -170,6 +170,8 @@ public sealed class SqlServerWriteHandlerTests : IAsyncLifetime
         Assert.False((await client.RecordAsync("good")).IsDirty);
         Assert.Equal(1, await DomainRowsAsync()); // the rejected write's domain row was rolled back
         Assert.Equal(("title-forbidden", true), (replayed.ErrorCode, replayed.IsDuplicate));
+        Assert.Equal("forbidden", replayed.Arguments!["title"]); // from the receipt
+        Assert.Equal("forbidden", (await client.RecordAsync("bad")).Rejection!.Arguments!["title"]);
         Assert.Equal(2, handler.Calls);
     }
 
@@ -267,7 +269,7 @@ public sealed class SqlServerWriteHandlerTests : IAsyncLifetime
 
             if (note.Title == "forbidden")
             {
-                return SyncWriteDecision<Note>.Reject("title-forbidden", "This title is not allowed.");
+                return SyncWriteDecision<Note>.Reject("title-forbidden", new Dictionary<string, string> { ["title"] = note.Title }, "This title is not allowed.");
             }
 
             note.Body = $"length {note.Title.Length}";

@@ -6,7 +6,7 @@ namespace Bsync.Storage.Sqlite;
 /// <summary>The SQLite store's schema: creation, forward migration and the version check (ADR-004, I17).</summary>
 internal static class SqliteSchema
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public const string DatabaseScope = "";
 
@@ -23,6 +23,9 @@ internal static class SqliteSchema
     public const string Version3Columns = "group_id, group_members, pending_group, pending_group_size";
 
     public const string Version4Columns = "base_same";
+
+    /// <summary>The record columns schema 5 added.</summary>
+    public const string Version5Columns = "rejection_arguments";
 
     private const string Version1 = """
         CREATE TABLE bs_meta (
@@ -79,6 +82,20 @@ internal static class SqliteSchema
         ALTER TABLE bs_records ADD COLUMN base_same INTEGER NOT NULL DEFAULT 0;
         """;
 
+    // Schema 5 (ADR-018): declared secondary indexes. Rows exist for live, visible records of indexes the writing store
+    // declared; the bs_meta key 'indexes' names the set the rows were built for.
+    private const string MigrationTo5 = """
+        ALTER TABLE bs_records ADD COLUMN rejection_arguments TEXT;
+        CREATE TABLE bs_index (
+            collection TEXT NOT NULL,
+            name TEXT NOT NULL,
+            key BLOB NOT NULL,
+            id_key BLOB NOT NULL,
+            PRIMARY KEY (collection, name, key, id_key)
+        ) WITHOUT ROWID;
+        CREATE INDEX bs_index_record ON bs_index (collection, id_key);
+        """;
+
     private const string MigrationTo3 = """
         ALTER TABLE bs_records ADD COLUMN group_id TEXT;
         ALTER TABLE bs_records ADD COLUMN group_members TEXT;
@@ -127,6 +144,11 @@ internal static class SqliteSchema
         if (version < 4)
         {
             await ExecuteAsync(connection, transaction, MigrationTo4, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (version < 5)
+        {
+            await ExecuteAsync(connection, transaction, MigrationTo5, cancellationToken).ConfigureAwait(false);
         }
 
         await ExecuteAsync(connection, transaction, $"PRAGMA user_version = {CurrentVersion}", cancellationToken).ConfigureAwait(false);

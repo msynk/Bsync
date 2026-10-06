@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <DefineConstants>$(DefineConstants);BSYNC_ENCRYPTED_API</DefineConstants>
+    <Description>Tests of the encrypted SQLite store (SQLCipher). A separate project: the plain and encrypted stores cannot share a process.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Bsync.Tests\PublicApiTests.cs" Link="PublicApiTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite.Encrypted\Bsync.Storage.Sqlite.Encrypted.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Testing\Bsync.Testing.csproj" />
+  </ItemGroup>
+
+</Project>

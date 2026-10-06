@@ -1,7 +1,7 @@
 # ADR-015: Read membership in the feed, and removals without a resnapshot
 
-- **Status:** Accepted (2026-10-05). Implemented by the in-memory and SQL Server authorities (0.3.0, unreleased);
-  PostgreSQL: not implemented (its replicas keep the scope-fingerprint behaviour of ADR-010).
+- **Status:** Accepted (2026-10-05). Implemented by the in-memory, SQL Server and PostgreSQL authorities (0.3.0,
+  unreleased; PostgreSQL schema 2, table `bs_document_access`, 2026-10-06).
 - **Invariants:** I03, I06, I07, I10, I14
 - **Related:** ADR-005 (feed ordering), ADR-010 (scopes), ADR-014 (SQL Server authority), improvement plan task C1
 

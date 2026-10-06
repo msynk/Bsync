@@ -39,6 +39,7 @@
         <ProjectReference Include="..\Bsync.Samples.Shared\Bsync.Samples.Shared.csproj" />
         <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite\Bsync.Storage.Sqlite.csproj" />
         <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
+        <ProjectReference Include="..\..\Bsync\Bsync.Maui\Bsync.Maui.csproj" />
     </ItemGroup>
 
 </Project>

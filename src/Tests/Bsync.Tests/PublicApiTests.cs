@@ -11,6 +11,10 @@ namespace Bsync.Tests;
 /// </summary>
 public sealed class PublicApiTests
 {
+#if BSYNC_ENCRYPTED_API
+    // Compiled into Bsync.Tests.SqliteEncrypted too: the encrypted store cannot be loaded next to the plain one.
+    public static TheoryData<string> Packages() => ["Bsync.Storage.Sqlite.Encrypted"];
+#else
     public static TheoryData<string> Packages() =>
     [
         "Bsync",
@@ -21,6 +25,7 @@ public sealed class PublicApiTests
         "Bsync.Storage.Sqlite",
         "Bsync.Testing",
     ];
+#endif
 
     [Theory(DisplayName = "The public API matches the reviewed baseline")]
     [MemberData(nameof(Packages))]

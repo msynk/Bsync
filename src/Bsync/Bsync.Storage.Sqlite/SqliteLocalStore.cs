@@ -35,17 +35,26 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
     private const string Columns =
         "id, current, base, base_version, is_dirty, local_revision, pending_id, pending_revision, pending_base_version, " +
         "pending_payload, rejection_revision, rejection_code, rejection_message, observed, observed_version, generation, missing, " +
-        "conflict_server, conflict_server_version, conflict_local, conflict_base, group_id, group_members, pending_group, pending_group_size, base_same";
+        "conflict_server, conflict_server_version, conflict_local, conflict_base, group_id, group_members, pending_group, pending_group_size, base_same, " +
+        "rejection_arguments";
 
     private readonly string _connectionString;
     private readonly string _collection;
     private readonly JsonTypeInfo<TDocument> _typeInfo;
     private readonly string _synchronous;
     private readonly int _busyTimeoutMs;
+    private readonly IReadOnlyList<SyncIndex<TDocument>> _indexes;
+    private readonly string _indexSignature;
 
-    private SqliteLocalStore(SqliteLocalStoreOptions options, JsonTypeInfo<TDocument> typeInfo)
+    private SqliteLocalStore(SqliteLocalStoreOptions options, JsonTypeInfo<TDocument> typeInfo, IReadOnlyList<SyncIndex<TDocument>> indexes)
     {
+        _indexes = indexes;
+        _indexSignature = LocalStoreIndexing.Signature(indexes);
+#if BSYNC_SQLCIPHER
+        _connectionString = SqliteStorePool.ConnectionString(options.DataSource, options.EncryptionKey);
+#else
         _connectionString = SqliteStorePool.ConnectionString(options.DataSource);
+#endif
         _collection = options.Collection;
         _typeInfo = typeInfo;
         _synchronous = options.Durability == SqliteDurability.Full ? "FULL" : "NORMAL";
@@ -54,9 +63,23 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
 
     /// <summary>Opens (creating or upgrading if needed) a store.</summary>
     /// <exception cref="SqliteStoreSchemaException">The database uses a newer schema.</exception>
+    public static Task<SqliteLocalStore<TDocument>> OpenAsync(
+        SqliteLocalStoreOptions options,
+        JsonTypeInfo<TDocument> typeInfo,
+        CancellationToken cancellationToken = default) =>
+        OpenAsync(options, typeInfo, [], cancellationToken);
+
+    /// <summary>
+    /// Opens (creating or upgrading if needed) a store that maintains <paramref name="indexes"/> (ADR-018). When the
+    /// declared set differs from the one the stored index rows were built for, they are rebuilt once, here. Every store
+    /// instance of a collection should declare the same indexes: a writer with a different set marks the rows unusable,
+    /// and queries then evaluate in memory until a store with the right set is opened again.
+    /// </summary>
+    /// <exception cref="SqliteStoreSchemaException">The database uses a newer schema.</exception>
     public static async Task<SqliteLocalStore<TDocument>> OpenAsync(
         SqliteLocalStoreOptions options,
         JsonTypeInfo<TDocument> typeInfo,
+        IEnumerable<SyncIndex<TDocument>> indexes,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -69,8 +92,9 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
 
         ArgumentOutOfRangeException.ThrowIfLessThan(options.BusyTimeout, TimeSpan.Zero, nameof(options.BusyTimeout));
 
-        var store = new SqliteLocalStore<TDocument>(options, typeInfo);
+        var store = new SqliteLocalStore<TDocument>(options, typeInfo, LocalStoreIndexing.Validate(indexes));
         await store.EnsureSchemaAsync(cancellationToken).ConfigureAwait(false);
+        await store.RebuildIndexesAsync(cancellationToken).ConfigureAwait(false);
         return store;
     }
 
@@ -105,6 +129,7 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         await using var transaction = connection.BeginTransaction(deferred: false); // BEGIN IMMEDIATE
 
         var results = new List<RecordUpdateResult<TDocument>>(updates.Count);
+        var maintainIndexes = await IndexesUsableAsync(connection, transaction, invalidate: true, cancellationToken).ConfigureAwait(false);
         var highWater = await ReadHighWaterAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
         var newHighWater = highWater;
         foreach (var update in updates)
@@ -126,6 +151,10 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
             }
 
             var written = await WriteRecordAsync(connection, transaction, next, cancellationToken).ConfigureAwait(false);
+            if (maintainIndexes && _indexes.Count > 0)
+            {
+                await WriteIndexRowsAsync(connection, transaction, written, cancellationToken).ConfigureAwait(false);
+            }
             newHighWater = Max(newHighWater, next.Current.UpdatedAt);
             if (next.Pending is { } pending)
             {
@@ -198,8 +227,8 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
                     rows++;
-                    lastUpdatedAt = reader.GetString(26);
-                    lastKey = (byte[])reader.GetValue(27);
+                    lastUpdatedAt = reader.GetString(27);
+                    lastKey = (byte[])reader.GetValue(28);
                     var record = ReadRecord(reader);
                     if ((exclude is null || !exclude.Contains(record.Current.Id)) && found.Count < limit)
                     {
@@ -321,7 +350,18 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
             command.Parameters.AddWithValue("$c", _collection);
             command.Parameters.AddWithValue("$id", id);
             command.Parameters.AddWithValue("$g", generation);
-            removed += await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1)
+            {
+                removed++;
+
+                // Index rows exist exactly for live, visible records, so counts need not look at the records.
+                await using var rows = connection.CreateCommand();
+                rows.Transaction = transaction;
+                rows.CommandText = "DELETE FROM bs_index WHERE collection = $c AND id_key = $key";
+                rows.Parameters.AddWithValue("$c", _collection);
+                rows.Parameters.AddWithValue("$key", OrdinalKey(id));
+                await rows.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -394,6 +434,15 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         return await ReadHighWaterAsync(connection, null, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task ResetClockHighWaterAsync(HlcTimestamp value, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        await SetMetaAsync(connection, transaction, _collection, "clock_high_water", value.Encode(), cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Returns the database's replica id and current incarnation.</summary>
     public async Task<ReplicaIdentity> GetReplicaIdentityAsync(CancellationToken cancellationToken = default)
     {
@@ -418,6 +467,209 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
 
     private static string NewId() => Guid.NewGuid().ToString("N");
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = connection.BeginTransaction(deferred: true);
+        if (!Maintains(query.Index) || !await IndexesUsableAsync(connection, transaction, invalidate: false, cancellationToken).ConfigureAwait(false))
+        {
+            return await LocalStoreIndexing.QueryAsync(this, query, after, limit, cancellationToken).ConfigureAwait(false);
+        }
+
+        await using var command = IndexCommand(connection, transaction, query, "r.current", after);
+        command.CommandText += $" ORDER BY i.key {(query.IsDescending ? "DESC" : "ASC")}, i.id_key {(query.IsDescending ? "DESC" : "ASC")} LIMIT $limit";
+        command.Parameters.AddWithValue("$limit", limit);
+        var documents = new List<TDocument>(limit);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            documents.Add(Deserialize(reader.GetString(0)));
+        }
+
+        return documents;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = connection.BeginTransaction(deferred: true);
+        if (!Maintains(query.Index) || !await IndexesUsableAsync(connection, transaction, invalidate: false, cancellationToken).ConfigureAwait(false))
+        {
+            return await LocalStoreIndexing.CountAsync(this, query, cancellationToken).ConfigureAwait(false);
+        }
+
+        await using var command = IndexCommand(connection, transaction, query, "COUNT(*)", null, join: false);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
+    }
+
+    private bool Maintains(SyncIndex<TDocument> index) =>
+        _indexes.Any(i => i.Name == index.Name && i.Version == index.Version);
+
+    /// <summary>
+    /// Whether the stored index rows were built for exactly this store's indexes. A writer with a different set
+    /// (<paramref name="invalidate"/>) marks them unusable, since it cannot keep rows of indexes it does not know.
+    /// </summary>
+    private async Task<bool> IndexesUsableAsync(SqliteConnection connection, SqliteTransaction transaction, bool invalidate, CancellationToken cancellationToken)
+    {
+        var stored = await GetMetaAsync(connection, transaction, _collection, "indexes", cancellationToken).ConfigureAwait(false) ?? string.Empty;
+        if (stored == _indexSignature)
+        {
+            return true;
+        }
+
+        if (invalidate && stored != "!")
+        {
+            await SetMetaAsync(connection, transaction, _collection, "indexes", "!", cancellationToken).ConfigureAwait(false);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Rebuilds the index rows when the stored set differs from this store's (in one write transaction). A store without
+    /// indexes leaves them alone; if it writes, it marks them unusable instead (<see cref="IndexesUsableAsync"/>).
+    /// </summary>
+    private async Task RebuildIndexesAsync(CancellationToken cancellationToken)
+    {
+        if (_indexes.Count == 0)
+        {
+            return;
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+        var stored = await GetMetaAsync(connection, transaction, _collection, "indexes", cancellationToken).ConfigureAwait(false) ?? string.Empty;
+        if (stored == _indexSignature)
+        {
+            return;
+        }
+
+        await using (var clear = connection.CreateCommand())
+        {
+            clear.Transaction = transaction;
+            clear.CommandText = "DELETE FROM bs_index WHERE collection = $c";
+            clear.Parameters.AddWithValue("$c", _collection);
+            await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (_indexes.Count > 0)
+        {
+            var live = new List<(byte[] IdKey, TDocument Document)>();
+            await using (var read = connection.CreateCommand())
+            {
+                read.Transaction = transaction;
+                read.CommandText = "SELECT id_key, current FROM bs_records WHERE collection = $c AND missing = 0 AND deleted = 0";
+                read.Parameters.AddWithValue("$c", _collection);
+                await using var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    live.Add(((byte[])reader.GetValue(0), Deserialize(reader.GetString(1))));
+                }
+            }
+
+            await using var insert = InsertIndexCommand(connection, transaction);
+            foreach (var (idKey, document) in live)
+            {
+                foreach (var index in _indexes)
+                {
+                    insert.Parameters["$name"].Value = index.Name;
+                    insert.Parameters["$key"].Value = OrdinalKey(index.KeyOf(document));
+                    insert.Parameters["$id"].Value = idKey;
+                    await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+
+        await SetMetaAsync(connection, transaction, _collection, "indexes", _indexSignature, cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Replaces a record's index rows: one per declared index while the record is live and visible.</summary>
+    private async Task WriteIndexRowsAsync(SqliteConnection connection, SqliteTransaction transaction, SyncRecord<TDocument> record, CancellationToken cancellationToken)
+    {
+        var idKey = OrdinalKey(record.Current.Id);
+        await using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM bs_index WHERE collection = $c AND id_key = $id";
+            delete.Parameters.AddWithValue("$c", _collection);
+            delete.Parameters.AddWithValue("$id", idKey);
+            await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (_indexes.Count == 0 || record.MissingAfterReset || record.Current.Deleted)
+        {
+            return;
+        }
+
+        await using var insert = InsertIndexCommand(connection, transaction);
+        foreach (var index in _indexes)
+        {
+            insert.Parameters["$name"].Value = index.Name;
+            insert.Parameters["$key"].Value = OrdinalKey(index.KeyOf(record.Current));
+            insert.Parameters["$id"].Value = idKey;
+            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private SqliteCommand InsertIndexCommand(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText = "INSERT OR REPLACE INTO bs_index (collection, name, key, id_key) VALUES ($c, $name, $key, $id)";
+        insert.Parameters.AddWithValue("$c", _collection);
+        insert.Parameters.Add("$name", SqliteType.Text);
+        insert.Parameters.Add("$key", SqliteType.Blob);
+        insert.Parameters.Add("$id", SqliteType.Blob);
+        return insert;
+    }
+
+    /// <summary>
+    /// The range of <paramref name="query"/> over bs_index joined to the live, visible records (rows of purged or hidden
+    /// records never surface), after <paramref name="after"/> in the query's direction. CROSS JOIN makes SQLite walk the
+    /// index range first (in order, stopping at the limit) instead of scanning the records.
+    /// </summary>
+    private SqliteCommand IndexCommand(SqliteConnection connection, SqliteTransaction transaction, SyncIndexQuery<TDocument> query, string select, SyncIndexCursor? after, bool join = true)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        var sql = new StringBuilder(join
+            ? $"""
+                SELECT {select} FROM bs_index i
+                CROSS JOIN bs_records r ON r.collection = i.collection AND r.id_key = i.id_key AND r.missing = 0 AND r.deleted = 0
+                WHERE i.collection = $c AND i.name = $name
+                """
+            : $"SELECT {select} FROM bs_index i WHERE i.collection = $c AND i.name = $name");
+        command.Parameters.AddWithValue("$c", _collection);
+        command.Parameters.AddWithValue("$name", query.Index.Name);
+        if (query.Lower is { } lower)
+        {
+            sql.Append(query.LowerExclusive ? " AND i.key > $lower" : " AND i.key >= $lower");
+            command.Parameters.AddWithValue("$lower", OrdinalKey(lower));
+        }
+
+        if (query.Upper is { } upper)
+        {
+            sql.Append(query.UpperExclusive ? " AND i.key < $upper" : " AND i.key <= $upper");
+            command.Parameters.AddWithValue("$upper", OrdinalKey(upper));
+        }
+
+        if (after is { } position)
+        {
+            sql.Append(query.IsDescending ? " AND (i.key, i.id_key) < ($afterKey, $afterId)" : " AND (i.key, i.id_key) > ($afterKey, $afterId)");
+            command.Parameters.AddWithValue("$afterKey", OrdinalKey(position.Key));
+            command.Parameters.AddWithValue("$afterId", OrdinalKey(position.Id));
+        }
+
+        command.CommandText = sql.ToString();
+        return command;
+    }
+
     private static HlcTimestamp Max(HlcTimestamp a, HlcTimestamp b) => a >= b ? a : b;
 
     /// <summary>UTF-16 big-endian bytes: memcmp order equals <see cref="string.CompareOrdinal(string, string)"/>.</summary>
@@ -425,8 +677,18 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
 
     private async Task EnsureSchemaAsync(CancellationToken cancellationToken)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await SqliteSchema.EnsureAsync(connection, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await SqliteSchema.EnsureAsync(connection, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException error) when (error.SqliteErrorCode == 26)
+        {
+            // SQLITE_NOTADB: encrypted with another key, encrypted while no key was given (or the reverse), or not SQLite.
+            throw new SqliteStoreUnreadableException(
+                "The database cannot be read: it is encrypted with another key, or not encrypted as expected, or not a SQLite database. Nothing was changed.",
+                error);
+        }
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -538,7 +800,12 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                     Group = NullableString(23),
                     GroupSize = reader.IsDBNull(24) ? 0 : reader.GetInt32(24),
                 },
-            Rejection = rejectionCode is null ? null : new SyncRejection(reader.GetInt64(10), rejectionCode, NullableString(12)),
+            Rejection = rejectionCode is null
+                ? null
+                : new SyncRejection(reader.GetInt64(10), rejectionCode, NullableString(12))
+                {
+                    Arguments = NullableString(26) is { } arguments ? JsonSerializer.Deserialize(arguments, SqliteJson.Default.DictionaryStringString) : null,
+                },
             Observed = observed is null ? null : Deserialize(observed),
             ObservedVersion = NullableInt64(14),
             Generation = reader.GetInt64(15),
@@ -573,12 +840,12 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
                 pending_id, pending_revision, pending_base_version, pending_payload,
                 rejection_revision, rejection_code, rejection_message, observed, observed_version, generation, missing,
                 conflict_server, conflict_server_version, conflict_local, conflict_base,
-                group_id, group_members, pending_group, pending_group_size, base_same)
+                group_id, group_members, pending_group, pending_group_size, base_same, rejection_arguments)
             VALUES ($c, $id, $key, $current, $updated, $deleted, $base, $baseVersion, $dirty, $revision,
                 $pendingId, $pendingRevision, $pendingBase, $pendingPayload,
                 $rejectionRevision, $rejectionCode, $rejectionMessage, $observed, $observedVersion, $generation, $missing,
                 $conflictServer, $conflictServerVersion, $conflictLocal, $conflictBase,
-                $groupId, $groupMembers, $pendingGroup, $pendingGroupSize, $baseSame)
+                $groupId, $groupMembers, $pendingGroup, $pendingGroupSize, $baseSame, $rejectionArguments)
             """;
         var p = command.Parameters;
         p.AddWithValue("$c", _collection);
@@ -603,6 +870,11 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         p.AddWithValue("$rejectionRevision", (object?)record.Rejection?.Revision ?? DBNull.Value);
         p.AddWithValue("$rejectionCode", (object?)record.Rejection?.ErrorCode ?? DBNull.Value);
         p.AddWithValue("$rejectionMessage", (object?)record.Rejection?.Message ?? DBNull.Value);
+        p.AddWithValue(
+            "$rejectionArguments",
+            record.Rejection?.Arguments is { Count: > 0 } rejectionArguments
+                ? JsonSerializer.Serialize(new Dictionary<string, string>(rejectionArguments, StringComparer.Ordinal), SqliteJson.Default.DictionaryStringString)
+                : DBNull.Value);
         var observed = record.Observed is null ? null : Text(record.Observed);
         p.AddWithValue("$observed", (object?)observed ?? DBNull.Value);
         p.AddWithValue("$observedVersion", (object?)record.ObservedVersion ?? DBNull.Value);

@@ -25,13 +25,15 @@ public static class IndexedDbSyncServiceCollectionExtensions
     /// Default: <c>"default"</c> (single-user apps).
     /// </param>
     /// <param name="configure">Optional changes to intervals, backoff or conflict policy.</param>
+    /// <param name="indexes">Secondary indexes the replica maintains for <see cref="SyncQuery{TDocument}.Index"/> queries (ADR-018).</param>
     public static IServiceCollection AddBrowserSyncCollection<TDocument>(
         this IServiceCollection services,
         string collection,
         JsonTypeInfo<TDocument> documentType,
         Func<IServiceProvider, string, ISyncTransport<TDocument>> transport,
         Func<IServiceProvider, CancellationToken, Task<string>>? resolveAccount = null,
-        Func<SyncSessionOptions<TDocument>, SyncSessionOptions<TDocument>>? configure = null)
+        Func<SyncSessionOptions<TDocument>, SyncSessionOptions<TDocument>>? configure = null,
+        IEnumerable<SyncIndex<TDocument>>? indexes = null)
         where TDocument : class, ISyncEntity
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -42,6 +44,7 @@ public static class IndexedDbSyncServiceCollectionExtensions
             throw new ArgumentException("The collection name must be a valid identifier.", nameof(collection));
         }
 
+        var declared = LocalStoreIndexing.Validate(indexes);
         return services.AddLocalSyncCollection<TDocument>(
             sp =>
             {
@@ -57,6 +60,7 @@ public static class IndexedDbSyncServiceCollectionExtensions
                             js,
                             new IndexedDbStoreOptions { DatabaseName = $"bsync-{account}", Collection = collection },
                             documentType,
+                            declared,
                             cancellationToken).ConfigureAwait(false);
                         var identity = await store.GetReplicaIdentityAsync(cancellationToken).ConfigureAwait(false);
 

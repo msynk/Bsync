@@ -40,6 +40,17 @@ public sealed class PostgreSqlSyncAuthorityOptions<TDocument>
     /// <summary>Optional read authorization (pages skip unreadable documents; outcomes never reveal them).</summary>
     public Func<SyncCallContext, TDocument, bool>? CanRead { get; init; }
 
+    /// <summary>
+    /// Read membership in the feed (ADR-015): the principal keys that may read a document, computed whenever it is written
+    /// (push or publisher). With it, each caller's pull reads only its own access rows (full pages), and documents that
+    /// leave its view are listed as removals. A change of readers is a new version: republish a document after a membership
+    /// change elsewhere. Set together with <see cref="PrincipalKey"/>.
+    /// </summary>
+    public Func<TDocument, IEnumerable<string>>? Readers { get; init; }
+
+    /// <summary>The caller's principal key for <see cref="Readers"/> (for example a user id claim); <see langword="null"/> reads nothing.</summary>
+    public Func<SyncCallContext, string?>? PrincipalKey { get; init; }
+
     /// <summary>Optional write authorization, checked before validation.</summary>
     public Func<SyncCallContext, PushOperation<TDocument>, TDocument?, bool>? CanWrite { get; init; }
 

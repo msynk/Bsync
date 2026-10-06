@@ -116,8 +116,17 @@ public static class TasksServer
         BundleEndpoints.Map(app, connectionString, bundles);
 
         // Attachments (task F1): resumable uploads and range downloads next to the sync routes.
-        BlobEndpoints.Map(app, connectionString, new FileSystemBlobStore(
-            app.Configuration["Tasks:BlobDirectory"] ?? Path.Combine(app.Environment.ContentRootPath, "App_Data", "blobs")));
+        var blobDirectory = app.Configuration["Tasks:BlobDirectory"] ?? Path.Combine(app.Environment.ContentRootPath, "App_Data", "blobs");
+        IBlobStore blobStore = app.Configuration["Tasks:S3:ServiceUrl"] is { Length: > 0 } serviceUrl
+            ? new S3BlobStore(
+                new Amazon.S3.AmazonS3Client(
+                    new Amazon.Runtime.BasicAWSCredentials(app.Configuration["Tasks:S3:AccessKey"], app.Configuration["Tasks:S3:SecretKey"]),
+                    new Amazon.S3.AmazonS3Config { ServiceURL = serviceUrl, ForcePathStyle = true, AuthenticationRegion = app.Configuration["Tasks:S3:Region"] ?? "us-east-1" }),
+                app.Configuration["Tasks:S3:Bucket"] ?? throw new InvalidOperationException("Set Tasks:S3:Bucket."),
+                new FileSystemBlobStore(blobDirectory),
+                useHttp: serviceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            : new FileSystemBlobStore(blobDirectory);
+        BlobEndpoints.Map(app, connectionString, blobStore);
 
         app.MapSyncCollections(
             new SyncEndpointOptions

@@ -338,8 +338,22 @@ await coordinator.DeleteReplicasAsync(account);   // or session.DeleteReplicaAsy
 
 Replication of the account stops, its replicas are closed, and `SyncSessionOptions.DeleteReplica` removes the files
 (the browser recipe deletes the account's IndexedDB database; native apps call `SqliteStorePool.DeleteDatabaseAsync`
-and delete their own blob files). Nothing is deleted on the server. Encryption at rest is not available yet
-([ADR-016](docs/architecture/adr-016-encryption-at-rest.md) proposes it).
+and delete their own blob files). Nothing is deleted on the server.
+
+### Encryption at rest
+
+Native apps reference `Bsync.Storage.Sqlite.Encrypted` instead of `Bsync.Storage.Sqlite` (never both) and pass a
+32-byte key kept in the platform's protected store; browser apps pass a key to `IndexedDbStoreOptions.EncryptionKey`:
+
+```csharp
+var store = await SqliteLocalStore<Note>.OpenAsync(new SqliteLocalStoreOptions
+{
+    DataSource = path, Collection = "notes", EncryptionKey = keyFromSecureStorage,   // SqliteEncryption.NewKey() once
+}, AppJson.Default.Note);
+```
+
+A wrong or missing key fails explicitly; it never opens an empty replica. See
+[ADR-016](docs/architecture/adr-016-encryption-at-rest.md) for the threat model and what stays readable.
 
 ## Server restores, access changes and retention
 
@@ -347,7 +361,7 @@ If the server is restored from a backup, it must start a new epoch and never reu
 Replicas then reset automatically: they keep pending edits and kept conflicts, pull a fresh snapshot, and
 mark local records the restored server no longer has as `MissingAfterReset` (hidden, not deleted).
 
-With read membership (in-memory and SQL Server authorities, ADR-015), each caller pulls only the documents it may
+With read membership (in-memory, SQL Server and PostgreSQL authorities, ADR-015), each caller pulls only the documents it may
 read, and a document that leaves its view arrives as a removal: clean copies leave the device, local drafts are kept
 hidden. Nothing else resets:
 
@@ -468,6 +482,19 @@ Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true"
 `src/Samples/Bsync.Samples.Hybrid.Wpf` and `src/Samples/Bsync.Samples.Hybrid.Maui` host the same `NotesPanel` in a
 `BlazorWebView`, with a SQLite replica registered through `AddLocalSyncCollection`. Sync pauses while the window
 is minimized or the app is in the background. Both have a `--smoke` mode that the tests use to drive the real UI.
+
+MAUI apps can use the optional `Bsync.Maui` package (build it with the MAUI workloads; Android, iOS and Mac Catalyst
+need `-p:BsyncMauiMobileTargets=true`):
+
+```csharp
+builder.Services.AddLocalSyncCollection<Note>(_ => new SyncSessionOptions<Note> { /* ... */ }.UseMauiLifecycle());
+var key = await SecureReplicaKeys.GetOrCreateAsync(account);          // for Bsync.Storage.Sqlite.Encrypted
+var result = await MauiSync.RunInBackgroundAsync(session, account, TimeSpan.FromSeconds(25));   // from a background task
+```
+
+`UseMauiLifecycle` syncs when internet access returns and pauses and resumes with the app's window.
+`RunInBackgroundAsync` is the body of an Android `WorkManager` worker or an iOS `BGTaskScheduler` task. Registering
+those tasks is platform code in the app, and it has not been verified here.
 
 ## When something goes wrong
 

@@ -60,7 +60,7 @@ public sealed class SqlServerMembershipTests(ITestOutputHelper output) : IAsyncL
         Assert.Equal(1000, (await authority.PullAsync(User("bob"), new PullRequest(Checkpoint.Start, 1000))).Changes.Count);
     }
 
-    [Fact(DisplayName = "C1 I17: a schema 1 database upgrades in place to schema 2 and keeps its documents and receipts")]
+    [Fact(DisplayName = "C1 C5 I17: a schema 1 database upgrades in place to the current schema and keeps its documents and receipts")]
     public async Task SchemaOneUpgrades()
     {
         var operation = new PushOperation<Note>("o1", "n1", null, new Note { Id = "n1", Title = "kept", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "n") });
@@ -70,15 +70,35 @@ public sealed class SqlServerMembershipTests(ITestOutputHelper output) : IAsyncL
         }
 
         // Turn the database back into schema 1, as 0.2.0 left it.
-        await _database.ExecuteAsync("DROP TABLE bsync.document_access; UPDATE bsync.meta SET value = '1' WHERE [key] = 'schema_version';");
+        await _database.ExecuteAsync("DROP TABLE bsync.document_access; ALTER TABLE bsync.receipts DROP COLUMN arguments; UPDATE bsync.meta SET value = '1' WHERE [key] = 'schema_version';");
 
         await using var upgraded = await _database.AuthorityAsync();
         var replay = await upgraded.PushAsync(SyncCallContext.Anonymous, new PushRequest<Note>([operation]));
 
-        Assert.Equal(2, await _database.ScalarAsync("SELECT CAST(value AS int) FROM bsync.meta WHERE [key] = 'schema_version'"));
+        Assert.Equal(3, await _database.ScalarAsync("SELECT CAST(value AS int) FROM bsync.meta WHERE [key] = 'schema_version'"));
+        Assert.Equal(1, await _database.ScalarAsync("SELECT count(*) FROM sys.columns WHERE object_id = OBJECT_ID('bsync.receipts') AND name = 'arguments'"));
         Assert.Equal(1, await _database.ScalarAsync("SELECT count(*) FROM sys.tables WHERE name = 'document_access'"));
         Assert.Equal("kept", (await upgraded.GetAsync(SyncCallContext.Anonymous, "n1"))!.Document.Title);
         Assert.True(replay.Outcomes.Single().IsDuplicate); // the receipt survived the upgrade
+    }
+
+    [Fact(DisplayName = "C5 I17: a schema 2 database (0.3.0) upgrades to schema 3; its receipts gain arguments and replay unchanged")]
+    public async Task SchemaTwoUpgrades()
+    {
+        var operation = new PushOperation<Note>("o1", "n1", null, new Note { Id = "n1", Title = "kept", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "n") });
+        await using (var first = await _database.AuthorityAsync())
+        {
+            await first.PushAsync(SyncCallContext.Anonymous, new PushRequest<Note>([operation]));
+        }
+
+        await _database.ExecuteAsync("ALTER TABLE bsync.receipts DROP COLUMN arguments; UPDATE bsync.meta SET value = '2' WHERE [key] = 'schema_version';");
+
+        await using var upgraded = await _database.AuthorityAsync();
+        var replay = await upgraded.PushAsync(SyncCallContext.Anonymous, new PushRequest<Note>([operation]));
+
+        Assert.Equal(3, await _database.ScalarAsync("SELECT CAST(value AS int) FROM bsync.meta WHERE [key] = 'schema_version'"));
+        Assert.True(replay.Outcomes.Single().IsDuplicate);
+        Assert.Null(replay.Outcomes.Single().Arguments);
     }
 
     /// <summary>Loads documents and access rows directly, as the authority would have written them: alice reads every nth, bob reads all.</summary>

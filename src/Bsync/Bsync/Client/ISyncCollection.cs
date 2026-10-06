@@ -26,6 +26,26 @@ public interface ISyncCollection<TDocument>
     /// </summary>
     Task<IReadOnlyList<TDocument>> QueryAsync(SyncQuery<TDocument>? query = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Counts the documents <paramref name="query"/> matches, ignoring its <see cref="SyncQuery{TDocument}.Skip"/> and
+    /// <see cref="SyncQuery{TDocument}.Limit"/> (ADR-018). An index range without <see cref="SyncQuery{TDocument}.Where"/>
+    /// is counted by the store; otherwise the default pages through <see cref="QueryAsync"/>.
+    /// </summary>
+    async Task<int> CountAsync(SyncQuery<TDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        query = (query ?? new SyncQuery<TDocument>()) with { Limit = SyncQuery<TDocument>.MaxLimit };
+        var count = 0;
+        while (true)
+        {
+            var page = await QueryAsync(query with { Skip = count }, cancellationToken).ConfigureAwait(false);
+            count += page.Count;
+            if (page.Count < SyncQuery<TDocument>.MaxLimit)
+            {
+                return count;
+            }
+        }
+    }
+
     /// <summary>Returns where one document stands (synced, pending, rejected), or <see langword="null"/> if unknown.</summary>
     Task<SyncItemStatus?> GetItemStatusAsync(string id, CancellationToken cancellationToken = default);
 

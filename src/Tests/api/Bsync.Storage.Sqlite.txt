@@ -8,6 +8,7 @@ sealed class Bsync.Storage.Sqlite.SqliteLocalStoreOptions
   System.TimeSpan BusyTimeout { get; init; }
   ctor()
 sealed class Bsync.Storage.Sqlite.SqliteLocalStore<TDocument> : Bsync.Storage.ILocalStore<TDocument> where TDocument : class, Bsync.ISyncEntity
+  System.Threading.Tasks.Task ResetClockHighWaterAsync(Bsync.Clocks.HlcTimestamp value, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Clocks.HlcTimestamp> GetClockHighWaterAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Storage.ReplicaCursor> GetCursorAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Storage.ReplicaIdentity> BeginNewIncarnationAsync(System.Threading.CancellationToken cancellationToken = default)
@@ -20,11 +21,14 @@ sealed class Bsync.Storage.Sqlite.SqliteLocalStore<TDocument> : Bsync.Storage.IL
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncRecord<TDocument>>> GetRejectedAsync(System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.SyncRecord<TDocument>>> GetStaleAsync(System.Int64 generation, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryAsync(System.Boolean includeDeleted = false, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryIndexAsync(Bsync.Storage.SyncIndexQuery<TDocument> query, Bsync.Storage.SyncIndexCursor? after, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryPageAsync(System.String afterId, System.Int32 limit, System.Boolean includeDeleted = false, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int32> CountDirtyAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> CountIndexAsync(Bsync.Storage.SyncIndexQuery<TDocument> query, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int32> PurgeAsync(System.Collections.Generic.IReadOnlyList<System.String> ids, System.Int64 generation, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int32> PurgeTombstonesAsync(System.Int64 throughVersion, System.Int64 generation, System.Threading.CancellationToken cancellationToken = default)
-  const System.Int32 SchemaVersion = 4
+  const System.Int32 SchemaVersion = 5
+  static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteLocalStore<TDocument>> OpenAsync(Bsync.Storage.Sqlite.SqliteLocalStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Collections.Generic.IEnumerable<Bsync.Storage.SyncIndex<TDocument>> indexes, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteLocalStore<TDocument>> OpenAsync(Bsync.Storage.Sqlite.SqliteLocalStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Threading.CancellationToken cancellationToken = default)
 record Bsync.Storage.Sqlite.SqliteRebuildReport
   System.Boolean Complete { get; }
@@ -46,3 +50,5 @@ static class Bsync.Storage.Sqlite.SqliteStoreRecovery
   static System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> CheckAsync(System.String dataSource, System.Threading.CancellationToken cancellationToken = default)
 sealed class Bsync.Storage.Sqlite.SqliteStoreSchemaException : System.NotSupportedException, System.Runtime.Serialization.ISerializable
   ctor(System.String message)
+sealed class Bsync.Storage.Sqlite.SqliteStoreUnreadableException : System.IO.IOException, System.Runtime.Serialization.ISerializable
+  ctor(System.String message, System.Exception innerException = null)
