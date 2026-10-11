@@ -79,7 +79,7 @@ public sealed class PostgreSqlMembershipTests(ITestOutputHelper output) : IAsync
             await first.PushAsync(SyncCallContext.Anonymous, new PushRequest<Note>([operation]));
         }
 
-        // Turn the database back into schema 1, as 0.2.0 left it.
+        // Turn the database back into schema 1, as 0.1.0 left it.
         await ExecuteAsync("DROP TABLE bs_document_access; UPDATE bs_meta SET value = '1' WHERE key = 'schema_version';");
 
         await using var upgraded = await _database.AuthorityAsync();

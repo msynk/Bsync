@@ -99,7 +99,7 @@ public sealed class SqliteStoreTests : IDisposable
         await replica.Engine.WriteAsync(new Note { Id = "clean", Title = "edited" }); // pending, base differs from current
         SqliteStorePool.Release(_database.Path);
 
-        // Turn the file into what a 0.2.0 store wrote: base stored in full, no base_same column, schema 3.
+        // Turn the file into what a 0.1.0 store wrote: base stored in full, no base_same column, schema 3.
         await using (var connection = new SqliteConnection($"Data Source={_database.Path}"))
         {
             await connection.OpenAsync();

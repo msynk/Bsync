@@ -69,7 +69,7 @@ public sealed class SqlServerMembershipTests(ITestOutputHelper output) : IAsyncL
             await first.PushAsync(SyncCallContext.Anonymous, new PushRequest<Note>([operation]));
         }
 
-        // Turn the database back into schema 1, as 0.2.0 left it.
+        // Turn the database back into schema 1, as early 0.2.0 builds left it.
         await _database.ExecuteAsync("DROP TABLE bsync.document_access; ALTER TABLE bsync.receipts DROP COLUMN arguments; UPDATE bsync.meta SET value = '1' WHERE [key] = 'schema_version';");
 
         await using var upgraded = await _database.AuthorityAsync();
@@ -82,7 +82,7 @@ public sealed class SqlServerMembershipTests(ITestOutputHelper output) : IAsyncL
         Assert.True(replay.Outcomes.Single().IsDuplicate); // the receipt survived the upgrade
     }
 
-    [Fact(DisplayName = "C5 I17: a schema 2 database (0.3.0) upgrades to schema 3; its receipts gain arguments and replay unchanged")]
+    [Fact(DisplayName = "C5 I17: a schema 2 database (0.2.0 pre-release) upgrades to schema 3; its receipts gain arguments and replay unchanged")]
     public async Task SchemaTwoUpgrades()
     {
         var operation = new PushOperation<Note>("o1", "n1", null, new Note { Id = "n1", Title = "kept", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "n") });
