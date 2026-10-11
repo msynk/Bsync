@@ -12,7 +12,7 @@ public static class NoteJson
 
     public static InMemorySyncServerOptions<Note> ServerOptions(
         IPhysicalClock? clock = null,
-        Func<Protocol.PushOperation<Note>, Note?, string?>? validator = null,
+        Func<SyncCallContext, Protocol.PushOperation<Note>, Note?, string?>? validator = null,
         int maxOperationsPerPush = 1000) =>
         new()
         {

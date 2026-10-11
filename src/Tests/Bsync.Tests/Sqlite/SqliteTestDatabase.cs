@@ -1,3 +1,4 @@
+using Bsync.Storage;
 using Bsync.Storage.Sqlite;
 using Bsync.Tests.TestSupport;
 using Microsoft.Data.Sqlite;
@@ -25,10 +26,11 @@ public sealed class SqliteTestDatabase : IDisposable
 
     public SqliteLocalStore<Note> Open(string collection = "notes") => OpenAsync(collection).GetAwaiter().GetResult();
 
-    public Task<SqliteLocalStore<Bsync.Testing.ConformanceDocument>> OpenConformanceAsync() =>
+    public Task<SqliteLocalStore<Bsync.Testing.ConformanceDocument>> OpenConformanceAsync(IEnumerable<SyncIndex<Bsync.Testing.ConformanceDocument>>? indexes = null) =>
         SqliteLocalStore<Bsync.Testing.ConformanceDocument>.OpenAsync(
             new SqliteLocalStoreOptions { DataSource = Path, Collection = "conformance" },
-            Bsync.Testing.ConformanceJsonContext.Default.ConformanceDocument);
+            Bsync.Testing.ConformanceJsonContext.Default.ConformanceDocument,
+            indexes ?? []);
 
     public void Dispose()
     {

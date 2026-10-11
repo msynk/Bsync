@@ -7,12 +7,16 @@
 - **Target framework:** `net10.0` only. .NET 10 is the current LTS release (see ADR-001 sources for the
   lifecycle dates checked). Adding older targets requires a demonstrated user need and CI coverage.
 - **Packages are split only when a real boundary exists** (a dependency that must not flow into another
-  host). Packages: `Bsync` (core, the UI-independent client in namespace `Bsync.Client` and the HTTP
-  transport in `Bsync.Transport`; depends only on the DI and logging abstractions), `Bsync.Blazor` (browser
-  store in `Bsync.Blazor.IndexedDb` and the server-connected profile; JS interop and the Blazor
-  authentication state), `Bsync.Storage.Sqlite` (native SQLite binaries), `Bsync.Server.AspNetCore` (the
-  ASP.NET Core shared framework), `Bsync.Server.PostgreSql` (Npgsql) and `Bsync.Testing` (provider
-  conformance cases). The client and HTTP transport live in the core because they add no dependency that
+  host). Packages: `Bsync` (core, the UI-independent client in namespace `Bsync.Client`, the HTTP
+  transport in `Bsync.Transport` and the provider conformance cases in `Bsync.Testing`; depends only on the DI
+  and logging abstractions), `Bsync.Blazor` (browser store in `Bsync.Blazor.IndexedDb` and the server-connected
+  profile; JS interop and the Blazor authentication state), `Bsync.Storage.Sqlite` (`Microsoft.Data.Sqlite.Core`;
+  the application adds the plain or SQLCipher native bundle, ADR-016), `Bsync.Server.AspNetCore` (the ASP.NET Core
+  shared framework), `Bsync.Server.PostgreSql` (Npgsql) and `Bsync.Server.SqlServer` (Microsoft.Data.SqlClient).
+  Integrations with one third-party SDK or app model and a few files of public-API code (S3 blob storage, MAUI
+  lifecycle) are recipes in the samples, not packages (2026-10-11: six packages; `Bsync.Testing`,
+  `Bsync.Storage.Sqlite.Encrypted`, `Bsync.Server.Blobs.S3` and `Bsync.Maui` merged or turned into recipes;
+  `Bsync.Testing` adds no dependency, so it lives in the core). The client and HTTP transport live in the core because they add no dependency that
   must be kept out of any host; `Microsoft.AspNetCore.Components` still never flows into native hosts
   without Blazor. The browser store and the server-connected collection share `Bsync.Blazor` because both
   are Blazor-only and an Auto-mode app uses both (2026-09-28: consolidated from nine packages).

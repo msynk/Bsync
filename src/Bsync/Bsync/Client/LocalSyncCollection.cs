@@ -23,7 +23,7 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
         ArgumentNullException.ThrowIfNull(resolveAccount);
         _session = session;
         _resolveAccount = resolveAccount;
-        Capabilities = new SyncCapabilities(session.Host, DurableOfflineWrites: true, WritesConfirmedByServer: false, LiveUpdates: session.LiveHints);
+        Capabilities = new SyncCapabilities(session.Host, DurableOfflineWrites: !session.PullOnly, WritesConfirmedByServer: false, LiveUpdates: session.LiveHints);
     }
 
     /// <inheritdoc />
@@ -49,7 +49,7 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
             null => null,
             { MissingAfterReset: true } => new SyncItemStatus(SyncItemState.MissingAfterReset),
             { Conflict: not null } => new SyncItemStatus(SyncItemState.Conflicted),
-            { Rejection: { } rejection } => new SyncItemStatus(SyncItemState.Rejected, rejection.ErrorCode),
+            { Rejection: { } rejection } => new SyncItemStatus(SyncItemState.Rejected, rejection.ErrorCode) { Arguments = rejection.Arguments },
             { IsDirty: true } => new SyncItemStatus(SyncItemState.Pending),
             _ => new SyncItemStatus(SyncItemState.Synced),
         };
@@ -60,29 +60,85 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
     {
         var engine = await EngineAsync(cancellationToken).ConfigureAwait(false);
         query ??= new SyncQuery<TDocument>();
+        Queries.Validate(query);
         if (query.Order is not null)
         {
             return query.Apply(await engine.QueryAsync(cancellationToken: cancellationToken).ConfigureAwait(false));
         }
 
-        // The default order is by id, which is the store's index order: walk it in pages and stop at the limit, so
-        // memory stays bounded by the page size however large the collection is.
-        Queries.Validate(query);
+        // Both the default (id) order and an index are store order: walk it in pages and stop at the limit, so memory
+        // and time stay bounded by the page, however large the collection is.
         var matches = new List<TDocument>(query.Limit);
-        string? after = null;
-        while (matches.Count < query.Limit)
+        var skip = query.Skip;
+        await foreach (var document in WalkAsync(engine, query, cancellationToken).ConfigureAwait(false))
         {
-            var page = await engine.QueryPageAsync(after, Queries.PageSize, cancellationToken: cancellationToken).ConfigureAwait(false);
-            if (page.Count == 0)
+            if (skip > 0)
+            {
+                skip--;
+                continue;
+            }
+
+            matches.Add(document);
+            if (matches.Count == query.Limit)
             {
                 break;
             }
-
-            matches.AddRange(page.Where(d => query.Where?.Invoke(d) ?? true).Take(query.Limit - matches.Count));
-            after = page[^1].Id;
         }
 
         return matches;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountAsync(SyncQuery<TDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        var engine = await EngineAsync(cancellationToken).ConfigureAwait(false);
+        query ??= new SyncQuery<TDocument>();
+        Queries.Validate(query);
+        if (query is { Index: { } index, Where: null })
+        {
+            return await engine.CountIndexAsync(index, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (query.Order is not null)
+        {
+            return (await engine.QueryAsync(cancellationToken: cancellationToken).ConfigureAwait(false)).Count(d => query.Where?.Invoke(d) ?? true);
+        }
+
+        var count = 0;
+        await foreach (var _ in WalkAsync(engine, query, cancellationToken).ConfigureAwait(false))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>The matching documents in store order (id, or the query's index), read page by page.</summary>
+    private static async IAsyncEnumerable<TDocument> WalkAsync(SyncEngine<TDocument> engine, SyncQuery<TDocument> query, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        string? afterId = null;
+        Storage.SyncIndexCursor? afterEntry = null;
+        while (true)
+        {
+            var page = query.Index is { } index
+                ? await engine.QueryIndexAsync(index, afterEntry, Queries.PageSize, cancellationToken).ConfigureAwait(false)
+                : await engine.QueryPageAsync(afterId, Queries.PageSize, cancellationToken: cancellationToken).ConfigureAwait(false);
+            foreach (var document in page)
+            {
+                if (query.Where?.Invoke(document) ?? true)
+                {
+                    yield return document;
+                }
+            }
+
+            if (page.Count < Queries.PageSize)
+            {
+                yield break;
+            }
+
+            afterId = page[^1].Id;
+            afterEntry = query.Index is { } current ? Storage.LocalStoreIndexing.CursorOf(current, page[^1]) : null;
+        }
     }
 
     /// <inheritdoc />
@@ -125,6 +181,35 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
         var engine = await EngineAsync(cancellationToken).ConfigureAwait(false);
         var records = await engine.GetConflictsAsync(limit, cancellationToken).ConfigureAwait(false);
         return [.. records.Select(r => new SyncDocumentConflict<TDocument>(r.Current.Id, r.Conflict!.Local, r.Conflict.Server, r.Conflict.Base))];
+    }
+
+    /// <inheritdoc />
+    public async Task<SyncGoalResult> SyncAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var account = await _resolveAccount(cancellationToken).ConfigureAwait(false);
+        return await _session.SyncAsync(account, goal, budget, progress, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<SyncIssuePage> GetIssuesAsync(int offset = 0, int limit = 100, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        var engine = await EngineAsync(cancellationToken).ConfigureAwait(false);
+        var counts = await engine.CountIssuesAsync(cancellationToken).ConfigureAwait(false);
+        var wanted = (int)Math.Min((long)offset + limit, int.MaxValue);
+        var conflicts = offset < counts.Conflicts ? await engine.GetConflictsAsync(wanted, cancellationToken).ConfigureAwait(false) : [];
+        var rejected = offset + limit > counts.Conflicts ? await engine.GetRejectedAsync(wanted, cancellationToken).ConfigureAwait(false) : [];
+        var items = conflicts.Select(r => new SyncIssue(r.Current.Id, SyncIssueKind.Conflict))
+            .Concat(rejected.Select(r => new SyncIssue(
+                r.Current.Id,
+                r.Rejection?.ErrorCode == Protocol.PushErrorCodes.GroupFailed ? SyncIssueKind.Blocked : SyncIssueKind.Rejected,
+                r.Rejection?.ErrorCode,
+                r.Rejection?.Message) { Arguments = r.Rejection?.Arguments }))
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+        return new SyncIssuePage(items, counts.Total);
     }
 
     /// <inheritdoc />

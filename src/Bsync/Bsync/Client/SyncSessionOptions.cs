@@ -62,10 +62,27 @@ public sealed record SyncSessionOptions<TDocument>
     public Func<SyncSession<TDocument>, string, CancellationToken, Task<IAsyncDisposable?>>? AttachLifecycle { get; init; }
 
     /// <summary>
-    /// Called when the server answers <c>unauthorized</c>. Return <see langword="true"/> after renewing credentials
-    /// to retry at once; otherwise the session reports <see cref="SyncState.AttentionRequired"/>.
+    /// Called once per failure streak when the server answers <c>unauthorized</c>, with the account. Return
+    /// <see cref="CredentialRenewal.Renewed"/> to retry at once, <see cref="CredentialRenewal.Offline"/> when the identity
+    /// provider could not be reached (the session keeps everything and tries again with backoff; an exception counts as
+    /// offline), or <see cref="CredentialRenewal.SignInRequired"/> when only the user can fix it (uploads stop with
+    /// <see cref="SyncState.AttentionRequired"/>). Share one renewal between an account's sessions with
+    /// <see cref="CredentialRenewals.Coalesce"/>.
     /// </summary>
-    public Func<string, CancellationToken, Task<bool>>? RenewCredentials { get; init; }
+    public Func<string, CancellationToken, Task<CredentialRenewal>>? RenewCredentials { get; init; }
+
+    /// <summary>
+    /// Joins a <see cref="SyncCoordinator"/>: the coordinator decides when this session may sync (concurrency limit,
+    /// priority, parents first, shared backoff), listens to hints for it, and includes it in its aggregate status.
+    /// </summary>
+    public SyncCoordination? Coordination { get; init; }
+
+    /// <summary>
+    /// Deletes everything this device holds for an account: database files, blob content, keys (task G3). Called by
+    /// <see cref="SyncSession{TDocument}.DeleteReplicaAsync"/> after the account's replica is closed. Must succeed when
+    /// there is nothing to delete. Without it, <c>DeleteReplicaAsync</c> throws.
+    /// </summary>
+    public Func<string, CancellationToken, Task>? DeleteReplica { get; init; }
 
     /// <summary>
     /// Receives state changes and failures (category <c>Bsync.SyncSession</c>). Messages carry states, counts and

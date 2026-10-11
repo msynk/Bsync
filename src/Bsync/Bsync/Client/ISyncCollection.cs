@@ -26,6 +26,26 @@ public interface ISyncCollection<TDocument>
     /// </summary>
     Task<IReadOnlyList<TDocument>> QueryAsync(SyncQuery<TDocument>? query = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Counts the documents <paramref name="query"/> matches, ignoring its <see cref="SyncQuery{TDocument}.Skip"/> and
+    /// <see cref="SyncQuery{TDocument}.Limit"/> (ADR-018). An index range without <see cref="SyncQuery{TDocument}.Where"/>
+    /// is counted by the store; otherwise the default pages through <see cref="QueryAsync"/>.
+    /// </summary>
+    async Task<int> CountAsync(SyncQuery<TDocument>? query = null, CancellationToken cancellationToken = default)
+    {
+        query = (query ?? new SyncQuery<TDocument>()) with { Limit = SyncQuery<TDocument>.MaxLimit };
+        var count = 0;
+        while (true)
+        {
+            var page = await QueryAsync(query with { Skip = count }, cancellationToken).ConfigureAwait(false);
+            count += page.Count;
+            if (page.Count < SyncQuery<TDocument>.MaxLimit)
+            {
+                return count;
+            }
+        }
+    }
+
     /// <summary>Returns where one document stands (synced, pending, rejected), or <see langword="null"/> if unknown.</summary>
     Task<SyncItemStatus?> GetItemStatusAsync(string id, CancellationToken cancellationToken = default);
 
@@ -48,6 +68,21 @@ public interface ISyncCollection<TDocument>
     /// their writes report <see cref="SyncConfirmation.Conflict"/> immediately instead.
     /// </summary>
     Task<IReadOnlyList<SyncDocumentConflict<TDocument>>> GetConflictsAsync(int limit = 100, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits until <paramref name="goal"/> is reached or <paramref name="budget"/> runs out (task C4), for example
+    /// <see cref="SyncGoal.Complete"/> before signing out, or <see cref="SyncGoal.Accepted"/> with a write's revision.
+    /// Background replication continues either way; cancelling the wait never undoes a local write.
+    /// </summary>
+    Task<SyncGoalResult> SyncAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This collection cannot wait for sync goals.");
+
+    /// <summary>
+    /// Returns a page of documents that need a decision (kept conflicts, rejections, blocked group members) and how many
+    /// there are in all (task C5). Hosts without a local replica return an empty page.
+    /// </summary>
+    Task<SyncIssuePage> GetIssuesAsync(int offset = 0, int limit = 100, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This collection does not list issues.");
 
     /// <summary>
     /// Resolves a kept conflict: <paramref name="resolved"/> becomes a new local change based on the newest server

@@ -58,6 +58,48 @@ public interface ILocalStore<TDocument>
     Task<int> CountDirtyAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sets the clock high-water mark to <paramref name="value"/>, also lower than now (ADR-017 part 2). Only the engine
+    /// calls it, after re-stamping writes the server rejected with <c>clock-skew</c>; <paramref name="value"/> covers every
+    /// timestamp still stored. Stores that cannot do it throw <see cref="NotSupportedException"/> (the default); the engine
+    /// then keeps the higher mark, and a restart resumes the clock from it.
+    /// </summary>
+    Task ResetClockHighWaterAsync(HlcTimestamp value, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This store cannot lower its clock high-water mark.");
+
+    /// <summary>
+    /// Physically removes clean tombstones of <paramref name="generation"/> whose server version is at or below
+    /// <paramref name="throughVersion"/> (task D4: the server already purged them). Records with local changes or a kept
+    /// conflict are never removed. The default enumerates; stores override it with one statement. Returns the number removed.
+    /// </summary>
+    async Task<int> PurgeTombstonesAsync(long throughVersion, long generation, CancellationToken cancellationToken = default)
+    {
+        var ids = new List<string>();
+        foreach (var document in await QueryAsync(includeDeleted: true, cancellationToken).ConfigureAwait(false))
+        {
+            if (document.Deleted
+                && await GetAsync(document.Id, cancellationToken).ConfigureAwait(false) is { IsDirty: false, Conflict: null, BaseVersion: { } version } record
+                && version <= throughVersion
+                && record.Generation == generation)
+            {
+                ids.Add(document.Id);
+            }
+        }
+
+        return ids.Count == 0 ? 0 : await PurgeAsync(ids, generation + 1, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Counts records that need a decision: kept conflicts and parked rejections (task C5). The default enumerates them;
+    /// stores override it with a count.
+    /// </summary>
+    async Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default)
+    {
+        var conflicts = await GetConflictsAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        var rejected = await GetRejectedAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        return new SyncIssueCounts(conflicts.Count, rejected.Count, rejected.Count(static r => r.Rejection?.ErrorCode == Protocol.PushErrorCodes.GroupFailed));
+    }
+
+    /// <summary>
     /// Returns up to <paramref name="limit"/> clean records that are not marked
     /// <see cref="SyncRecord{TDocument}.MissingAfterReset"/> and whose
     /// <see cref="SyncRecord{TDocument}.Generation"/> is lower than <paramref name="generation"/>: the
@@ -98,6 +140,18 @@ public interface ILocalStore<TDocument>
     /// read a large collection in bounded pages. Same visibility rules as <see cref="QueryAsync"/>.
     /// </summary>
     Task<IReadOnlyList<TDocument>> QueryPageAsync(string? afterId, int limit, bool includeDeleted = false, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns up to <paramref name="limit"/> live, visible documents within <paramref name="query"/>'s range, in its
+    /// order, after <paramref name="after"/> (ADR-018). Stores that maintain the index read it; for an index the store was
+    /// not opened with, and in this default implementation, the collection is evaluated in memory.
+    /// </summary>
+    Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default) =>
+        LocalStoreIndexing.QueryAsync(this, query, after, limit, cancellationToken);
+
+    /// <summary>Counts the live, visible documents within <paramref name="query"/>'s range (ADR-018).</summary>
+    Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default) =>
+        LocalStoreIndexing.CountAsync(this, query, cancellationToken);
 
     /// <summary>Gets the replica cursor (pull checkpoint and generation) for this collection.</summary>
     Task<ReplicaCursor> GetCursorAsync(CancellationToken cancellationToken = default);

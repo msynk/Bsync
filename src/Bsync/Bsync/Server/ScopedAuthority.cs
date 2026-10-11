@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Bsync.Protocol;
 
 namespace Bsync.Server;
@@ -7,7 +8,7 @@ namespace Bsync.Server;
 /// operation receipts of different scopes (tenants) are fully isolated (I07).
 /// </summary>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
-public sealed class ScopedAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier
+public sealed class ScopedAuthority<TDocument> : ISyncAuthority<TDocument>, ISyncDocumentReader<TDocument>, ISyncCommitNotifier, ISyncPublisher<TDocument>
     where TDocument : class, ISyncEntity
 {
     private readonly Func<string, ISyncAuthority<TDocument>> _factory;
@@ -44,6 +45,38 @@ public sealed class ScopedAuthority<TDocument> : ISyncAuthority<TDocument>, ISyn
     /// <inheritdoc />
     public Task<IReadOnlyList<StoredDocument<TDocument>>> ListAsync(SyncCallContext context, int limit, string? afterId = null, CancellationToken cancellationToken = default) =>
         Reader(context).ListAsync(context, limit, afterId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<SyncPublishResult> UpsertAsync(string scope, TDocument document, DbTransaction? transaction = null, CancellationToken cancellationToken = default) =>
+        Publisher(scope).UpsertAsync(scope, document, transaction, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<SyncPublishResult> DeleteAsync(string scope, string id, DbTransaction? transaction = null, CancellationToken cancellationToken = default) =>
+        Publisher(scope).DeleteAsync(scope, id, transaction, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<SyncPublishResult> ReplaceScopeAsync(string scope, IEnumerable<TDocument> documents, DbTransaction? transaction = null, CancellationToken cancellationToken = default) =>
+        Publisher(scope).ReplaceScopeAsync(scope, documents, transaction, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<SyncPublishResult> PublishAsync(TDocument document, IEnumerable<string> scopes, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(scopes);
+        var result = SyncPublishResult.None;
+        foreach (var scope in scopes.Distinct(StringComparer.Ordinal))
+        {
+            result = result.Add(await Publisher(scope).UpsertAsync(scope, document, transaction, cancellationToken).ConfigureAwait(false));
+        }
+
+        return result;
+    }
+
+    private ISyncPublisher<TDocument> Publisher(string scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        return For(SyncCallContext.Anonymous with { Scope = scope }) as ISyncPublisher<TDocument>
+            ?? throw new NotSupportedException("The per-scope authority does not support publishing.");
+    }
 
     private ISyncDocumentReader<TDocument> Reader(SyncCallContext context) =>
         For(context) as ISyncDocumentReader<TDocument>

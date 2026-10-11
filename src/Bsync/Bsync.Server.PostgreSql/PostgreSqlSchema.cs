@@ -5,7 +5,7 @@ namespace Bsync.Server.PostgreSql;
 /// <summary>Creates and migrates the authority's tables (ADR-011). Safe to run from several processes at once.</summary>
 internal static class PostgreSqlSchema
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     // Serializes schema changes across processes for the duration of the transaction.
     private const long SchemaLock = 0x426c617a53796e63; // "BlazSync"
@@ -52,6 +52,22 @@ internal static class PostgreSqlSchema
         );
         """;
 
+    // Version 2 (ADR-015): one access row per document and principal that can or could read it, at the version of its last
+    // change; a member's pull reads its own rows in version order.
+    private const string Version2 = """
+        CREATE TABLE bs_document_access (
+            collection text NOT NULL,
+            scope text NOT NULL,
+            principal_key text NOT NULL,
+            version bigint NOT NULL,
+            id text NOT NULL,
+            granted boolean NOT NULL,
+            PRIMARY KEY (collection, scope, principal_key, version)
+        );
+
+        CREATE UNIQUE INDEX bs_document_access_document ON bs_document_access (collection, scope, id, principal_key) INCLUDE (granted);
+        """;
+
     /// <summary>Ensures the schema exists at the current version and returns the epoch.</summary>
     public static async Task<string> EnsureAsync(NpgsqlDataSource source, CancellationToken cancellationToken)
     {
@@ -86,10 +102,22 @@ internal static class PostgreSqlSchema
                 await create.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            await using var meta = new NpgsqlCommand("INSERT INTO bs_meta (key, value) VALUES ('schema_version', $1), ('epoch', $2)", connection, transaction);
-            meta.Parameters.Add(new() { Value = CurrentVersion.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+            await using var meta = new NpgsqlCommand("INSERT INTO bs_meta (key, value) VALUES ('schema_version', '1'), ('epoch', $1)", connection, transaction);
             meta.Parameters.Add(new() { Value = NewEpoch() });
             await meta.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            version = 1;
+        }
+
+        // Forward, in place, under the lock; existing feeds, documents and receipts are kept.
+        if (version == 1)
+        {
+            await using (var upgrade = new NpgsqlCommand(Version2, connection, transaction))
+            {
+                await upgrade.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            await using var mark = new NpgsqlCommand("UPDATE bs_meta SET value = '2' WHERE key = 'schema_version'", connection, transaction);
+            await mark.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
         string epoch;

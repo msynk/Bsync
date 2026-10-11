@@ -3,13 +3,34 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status: pre-1.0, not published.**
-> - Tested: durable client stores (SQLite on native hosts, IndexedDB in browsers), a PostgreSQL authority, the
->   HTTP binding, and the Blazor integration: web render modes in Chromium, Firefox and WebKit, plus WPF and .NET
->   MAUI Hybrid on Windows.
-> - Everything was verified on one Windows machine; the CI workflow for Linux and macOS has not run yet.
->
-> See [docs/support-matrix.md](docs/support-matrix.md) and [docs/roadmap.md](docs/roadmap.md). Targets `net10.0`.
+> **Status:** `0.1.0` is published on NuGet; this branch builds `0.2.0` (unreleased). Pre-1.0: minor versions may
+> break. What is released, tested and where: [Status](#status). Targets `net10.0`.
+
+## Status
+
+This section is the single source of truth for release and verification status; other documents link here.
+
+- **Packages.** Six packages are at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
+  `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. The repository
+  is at `0.2.0` (unreleased) with six packages: it adds `Bsync.Server.SqlServer` and merges `Bsync.Testing` into
+  `Bsync` (namespace `Bsync.Testing` unchanged). `Bsync.Storage.Sqlite` covers plain and encrypted (SQLCipher)
+  replicas and leaves the native SQLite library to the application. S3 blob storage and the MAUI helpers are recipes
+  in the samples, not packages ([attachments](docs/patterns/attachments.md), [MAUI](docs/patterns/maui.md)).
+  Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+- **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
+  ([compatibility policy](docs/compatibility.md#policy)).
+- **Authorities.** Durable: PostgreSQL (`Bsync.Server.PostgreSql`, released) and SQL Server
+  (`Bsync.Server.SqlServer`, unreleased; verified on SQL Server 2025 LocalDB). The in-memory authority is for tests
+  and samples.
+- **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
+- **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
+  including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
+  Windows machine.
+- **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push: unit tests on Windows, Linux
+  and macOS (with the encrypted SQLite store); the PostgreSQL authority on Linux; the SQL Server authority and the
+  tasks sample on Linux, with an S3-compatible server; browser and WPF tests on Windows; pack, plus a build and test of
+  consumers that reference only the packed packages. Its current state is in the support matrix.
+- **Roadmap.** [docs/roadmap.md](docs/roadmap.md).
 
 ## What it guarantees today
 
@@ -46,10 +67,14 @@ src/Bsync/Bsync/                        Core: engine, clock, conflicts, storage/
                                         and the UI-independent client (Bsync.Client: ISyncCollection, local session
                                         loop, AddLocalSyncCollection) for Blazor WebAssembly/Hybrid, MAUI, WPF,
                                         WinForms, Avalonia and console hosts
-src/Bsync/Bsync.Storage.Sqlite/         Durable SQLite store for native hosts (MAUI, WPF, WinForms, console)
+src/Bsync/Bsync.Storage.Sqlite/         Durable SQLite store for native hosts (MAUI, WPF, WinForms, console),
+                                        plain or encrypted (SQLCipher) depending on the app's native bundle
 src/Bsync/Bsync.Server.AspNetCore/      ASP.NET Core endpoints for the protocol over any ISyncAuthority
 src/Bsync/Bsync.Server.PostgreSql/      Durable PostgreSQL authority (Npgsql)
-src/Bsync/Bsync.Testing/                Provider conformance cases (framework-free; also run in browsers)
+src/Bsync/Bsync.Server.SqlServer/       Durable SQL Server authority on the application's database (Microsoft.Data.SqlClient)
+src/Bsync/Bsync/Testing/                Public conformance suites for stores and authorities (namespace
+                                        Bsync.Testing), with in-memory and HTTP authority drivers (framework-free;
+                                        store cases also run in browsers)
 src/Bsync/Bsync.Blazor/                 Blazor integration: durable browser store (Bsync.Blazor.IndexedDb, with a
                                         multi-tab replication lease, AddBrowserSyncCollection) and the
                                         server-connected collection (AddServerSyncCollection)
@@ -57,6 +82,8 @@ src/Samples/                            Samples and the demo
 src/Samples/Bsync.Samples.Shared/       Note model + NotesPanel component shared by the samples
 src/Samples/Bsync.Samples.Notes.*       Offline-capable notes PWA: ASP.NET Core server + WebAssembly client
 src/Samples/Bsync.Samples.WebApp*       Blazor Web App: one component in static SSR, Server, WebAssembly and Auto
+src/Samples/Bsync.Samples.Tasks.*       Relational system of record: EF Core on SQL Server, write handler, publisher,
+                                        bearer tokens; console (SQLite) and WebAssembly (IndexedDB) clients
 src/Samples/Bsync.Samples.Hybrid.Wpf/   WPF Blazor Hybrid app: SQLite replica, same NotesPanel
 src/Samples/Bsync.Samples.Hybrid.Maui/  .NET MAUI Blazor Hybrid app (Windows target; needs the maui-windows workload)
 src/Samples/Bsync.Demo/                 Blazor WebAssembly playground simulating several devices in one tab
@@ -64,10 +91,12 @@ src/Tests/                              Tests, test hosts and benchmarks
 src/Tests/Bsync.Tests/                  xUnit tests: unit, regression, provider conformance, wire fixtures,
                                         fault injection, process-kill, seeded randomized convergence
 src/Tests/Bsync.Tests.PostgreSql/       Authority conformance and PostgreSQL-specific tests (needs BSYNC_POSTGRES)
+src/Tests/Bsync.Tests.SqlServer/        Authority conformance and SQL Server-specific tests (needs BSYNC_SQLSERVER)
 src/Tests/Bsync.Tests.Browser/          Playwright tests (Chromium, Firefox, WebKit) and their WASM harness
 src/Tests/Bsync.Tests.CrashHost/        Helper process the tests kill mid-write
 src/Tests/Bsync.Benchmarks/             BenchmarkDotNet workloads (docs/benchmarks.md)
 src/Tests/api/                          Public API baselines checked by PublicApiTests
+src/Tests/PackageConsumers/             Projects that use only the packed packages (CI pack job)
 docs/                                   Baseline review, architecture decisions, invariants, roadmap, compatibility
 ```
 
@@ -221,6 +250,11 @@ var server = new InMemorySyncServer<Note>(new InMemorySyncServerOptions<Note>
 
 ## Durable storage on native hosts (SQLite)
 
+`Bsync.Storage.Sqlite` does not bring a native SQLite library, so plain and encrypted replicas share one package.
+Add `SQLitePCLRaw.bundle_e_sqlite3` to the application (apps that use EF Core SQLite or `Microsoft.Data.Sqlite`
+already have it), or `SQLitePCLRaw.bundle_e_sqlcipher` for [encryption at rest](#encryption-at-rest); never both.
+Without either, opening a store throws an `InvalidOperationException` that names them.
+
 ```csharp
 var store = await SqliteLocalStore<Note>.OpenAsync(
     new SqliteLocalStoreOptions { DataSource = Path.Combine(appData, "replica.db"), Collection = "notes" },
@@ -269,6 +303,17 @@ builder.Services.AddBrowserSyncCollection<Note>("notes", AppJson.Default.Note,
 (the samples' `NotesPanel` offers "Keep mine" / "Keep theirs"). See `src/Samples/Bsync.Samples.WebApp` for all
 four render modes side by side.
 
+Apps with many collections give each session a `Coordination` on one `SyncCoordinator`: it limits how many sync at
+once, syncs parents before children (`DependsOn`), shares one hint stream (`HttpSyncHints.Multiplexed`, served by
+`MapSyncCollections`), and reports one aggregate `Status`. To wait for sync, call `SyncAsync` with a goal:
+
+```csharp
+var result = await notes.SyncAsync(SyncGoal.Complete, TimeSpan.FromSeconds(10));    // everything uploaded and pulled
+var receipt = await engine.WriteAsync(order);
+await coordinator.SyncAsync(SyncGoal.Accepted(order.Id, receipt.LocalRevision), TimeSpan.FromSeconds(5), ["orders"]);
+hub.On<string>("changed", coordinator.Hint);                                        // your own real-time hub as hints
+```
+
 Browser sessions sync after each local write, when the browser comes back online or the tab becomes visible,
 when the server announces a change over its Server-Sent Events hint stream, and on an interval as a safety
 net. Hints only make things faster: losing them never loses data. If your app has a service worker, do not
@@ -290,13 +335,51 @@ tabs are safe: every update commits in one IndexedDB transaction and only if no 
 records first. Failures (IndexedDB missing, quota, an upgrade from another tab) surface as
 `LocalStoreUnavailableException`. See `src/Samples/Bsync.Samples.Notes.Client` for a complete offline PWA.
 
+The browser recipe asks for persistent storage when it opens a replica and reports the answer in
+`SyncStatus.PersistentStorage`; without it, a browser may delete the replica under storage pressure.
+
+### Signing out on a shared device
+
+```csharp
+if (session.Status.Pending > 0) { /* warn: unsynced changes will be lost */ }
+await coordinator.DeleteReplicasAsync(account);   // or session.DeleteReplicaAsync(account) for one collection
+```
+
+Replication of the account stops, its replicas are closed, and `SyncSessionOptions.DeleteReplica` removes the files
+(the browser recipe deletes the account's IndexedDB database; native apps call `SqliteStorePool.DeleteDatabaseAsync`
+and delete their own blob files). Nothing is deleted on the server.
+
+### Encryption at rest
+
+Native apps reference `SQLitePCLRaw.bundle_e_sqlcipher` instead of `SQLitePCLRaw.bundle_e_sqlite3` (never both) next
+to `Bsync.Storage.Sqlite` and pass a 32-byte key kept in the platform's protected store; browser apps pass a key to `IndexedDbStoreOptions.EncryptionKey`:
+
+```csharp
+var store = await SqliteLocalStore<Note>.OpenAsync(new SqliteLocalStoreOptions
+{
+    DataSource = path, Collection = "notes", EncryptionKey = keyFromSecureStorage,   // SqliteEncryption.NewKey() once
+}, AppJson.Default.Note);
+```
+
+A wrong or missing key fails explicitly; it never opens an empty replica. See
+[ADR-016](docs/architecture/adr-016-encryption-at-rest.md) for the threat model and what stays readable.
+
 ## Server restores, access changes and retention
 
 If the server is restored from a backup, it must start a new epoch and never reuse a version number.
 Replicas then reset automatically: they keep pending edits and kept conflicts, pull a fresh snapshot, and
 mark local records the restored server no longer has as `MissingAfterReset` (hidden, not deleted).
 
-When what a user may see changes (revoked or granted access, a different filter), the authority's
+With read membership (in-memory, SQL Server and PostgreSQL authorities, ADR-015), each caller pulls only the documents it may
+read, and a document that leaves its view arrives as a removal: clean copies leave the device, local drafts are kept
+hidden. Nothing else resets:
+
+```csharp
+Readers = note => note.SharedWith,                              // computed at every write; a change is a new version
+PrincipalKey = caller => caller.Principal.FindFirst("sub")?.Value,
+```
+
+Without membership, when what a user may see changes (revoked or granted access, a different filter), the authority's
 `ScopeFingerprint` changes and the old checkpoint is refused with reason `scope-changed`; the replica
 resnapshots and removes documents it may no longer see from the device (never from the server). Documents
 with local changes or kept conflicts are never removed.
@@ -306,6 +389,20 @@ replica offline for longer than the retention horizon resets (`expired`), and an
 document is rejected with `base-expired` rather than resurrecting it; writing it again recreates it.
 `SyncResult.ResetPerformed`, `MissingAfterReset` and `PurgedAfterReset` report what happened. See
 `docs/protocol/v1.md` §4 and §6.1.
+
+To purge on a schedule, register the retention service; it purges what is older than the offline horizon in
+every authority it is given, and refuses (at startup) a receipt horizon shorter than that horizon:
+
+```csharp
+builder.Services.AddSyncRetention(options =>
+{
+    options.MaxOfflineHorizon = TimeSpan.FromDays(45); // the default
+    options.Targets.Add(authority);                    // or register authorities as ISyncRetentionTarget
+});
+```
+
+Replicas drop their own clean tombstones below the server's retention horizon (feature `retention`), so local
+tombstones do not accumulate either.
 
 ## Groups: changes that belong together
 
@@ -336,11 +433,78 @@ app.MapSyncCollection("notes", authority, json, endpointOptions).RequireAuthoriz
   and `PurgeReceiptsAsync`.
 - Tests: `BSYNC_POSTGRES="Host=...;Username=...;Password=..." dotnet test src/Tests/Bsync.Tests.PostgreSql`.
 
+## A durable server on your SQL Server database
+
+The authority keeps its tables in a `bsync` schema of the application's own database, so the application's tables
+and the replication feed commit together (ADR-014):
+
+```csharp
+var authority = await SqlServerSyncAuthority<Note>.CreateAsync(new()
+{
+    ConnectionString = connectionString, DocumentType = AppJson.Default.Note, Collection = "notes",
+    WriteHandler = new NoteRules(),            // optional: runs in the authority's transaction
+});
+app.MapSyncCollection("notes", authority, json, endpointOptions).RequireAuthorization();
+```
+
+A write handler sees each replicated write that would be accepted, with the open connection and transaction. It
+can write the application's tables, return a canonical document (for example with a server-computed field), or
+answer conflict, reject (a stable error code the replica keeps) or retry later:
+
+```csharp
+sealed class NoteRules : ISyncWriteHandler<Note>
+{
+    public async ValueTask<SyncWriteDecision<Note>> HandleAsync(SyncWriteContext<Note> write, CancellationToken ct)
+    {
+        if (write.Submitted.Title.Length > 200) return SyncWriteDecision<Note>.Reject("title-too-long");
+        await SaveToDomainTableAsync((SqlConnection)write.Connection!, (SqlTransaction)write.Transaction!, write.Submitted, ct);
+        write.Submitted.WordCount = Count(write.Submitted.Body);   // reaches every replica
+        return SyncWriteDecision<Note>.Accept(write.Submitted);
+    }
+}
+```
+
+Server-originated changes go through the publisher, optionally in the application's transaction (EF Core shown):
+
+```csharp
+await using var transaction = await db.Database.BeginTransactionAsync();
+db.Prices.Add(price);
+await db.SaveChangesAsync();
+await authority.UpsertAsync(tenant, new PriceDocument { Id = price.Id, Amount = price.Amount }, transaction.GetDbTransaction());
+await transaction.CommitAsync();
+authority.NotifyCommitted(new AuthorityCommit(tenant, [price.Id]));   // optional: prompt hint
+```
+
+`ReplaceScopeAsync(scope, documents)` rebuilds a projection: unchanged documents keep their version (a rebuild of
+10,000 unchanged documents adds no feed entry) and documents no longer listed become tombstones. Commits by other
+server processes are announced by polling the feed heads (`CommitPollInterval`, default 5 s) or by calling
+`NotifyCommitted` from your own message bus. After a restore call `BeginNewEpochAsync(versionFloor)`.
+A complete example with EF Core, bearer tokens and two kinds of clients: `src/Samples/Bsync.Samples.Tasks.Server`.
+Actions that must run exactly once (complete, approve, send) are modeled as immutable intents executed by a write
+handler; see [the intents pattern](docs/patterns/intents.md), which the Tasks sample implements. Files attached to
+documents are uploaded before the document and transferred resumably; see [the attachments pattern](docs/patterns/attachments.md).
+Sets of files that must switch version together are [bundles](docs/patterns/bundles.md).
+Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer`.
+
 ## Native apps (WPF, .NET MAUI)
 
 `src/Samples/Bsync.Samples.Hybrid.Wpf` and `src/Samples/Bsync.Samples.Hybrid.Maui` host the same `NotesPanel` in a
 `BlazorWebView`, with a SQLite replica registered through `AddLocalSyncCollection`. Sync pauses while the window
 is minimized or the app is in the background. Both have a `--smoke` mode that the tests use to drive the real UI.
+
+MAUI apps can copy the `MauiSync` recipe from the MAUI sample
+([`MauiSync.cs`](src/Samples/Bsync.Samples.Hybrid.Maui/MauiSync.cs), see [docs/patterns/maui.md](docs/patterns/maui.md));
+it uses only public `Bsync` API:
+
+```csharp
+builder.Services.AddLocalSyncCollection<Note>(_ => new SyncSessionOptions<Note> { /* ... */ }.UseMauiLifecycle());
+var key = await SecureReplicaKeys.GetOrCreateAsync(account);          // for an encrypted SQLite replica
+var result = await MauiSync.RunInBackgroundAsync(session, account, TimeSpan.FromSeconds(25));   // from a background task
+```
+
+`UseMauiLifecycle` syncs when internet access returns and pauses and resumes with the app's window.
+`RunInBackgroundAsync` is the body of an Android `WorkManager` worker or an iOS `BGTaskScheduler` task. Registering
+those tasks is platform code in the app, and it has not been verified here.
 
 ## When something goes wrong
 
@@ -407,7 +571,7 @@ Errors surface as `SyncResetRequiredException` (handled by the engine), `SyncPro
 `SyncTransportException` with `ErrorCode`, `IsTransient` and `RetryAfter`. Server-rendered code calls the
 same authority in-process with `new InProcessTransport<Note>(authority, new SyncCallContext(user, scope))`,
 so authorization is identical. `CanRead`/`CanWrite` hooks on the reference authority filter and authorize
-per document. The in-memory authority is still the only authority; a PostgreSQL-backed one is planned.
+per document. For a durable authority see [A durable server: PostgreSQL](#a-durable-server-postgresql).
 
 ## Wire protocol
 
@@ -416,6 +580,29 @@ and the rules for authorities and replicas are specified in [docs/protocol/v1.md
 with fixtures in `docs/protocol/fixtures`. Add the protocol types for your document to a
 `JsonSerializerContext` (`PullRequest`, `PullResult<T>`, `PushRequest<T>`, `PushResult<T>`). Give
 documents a `[JsonExtensionData]` member so fields unknown to older clients are not erased.
+
+## Testing your own store or authority
+
+The `Bsync` package carries, in namespace `Bsync.Testing`, the conformance suites that every provider in this repository passes. They have
+no test-framework dependency; wrap each case in your framework's test:
+
+```csharp
+// An authority: implement IAuthorityConformanceDriver (create an empty authority from AuthorityConformanceOptions,
+// and optionally purge/new-epoch operations), then run every case its capabilities allow.
+foreach (var conformanceCase in AuthorityConformance.CasesFor(driver.Capabilities))
+    await conformanceCase.RunAsync(driver);
+
+// The same cases over HTTP: serve each authority with MapSyncCollection and let the driver connect to it.
+var overHttp = new HttpAuthorityDriver(driver, (authority, ct) => StartMyServerAsync(authority, ct));
+
+// A local store.
+foreach (var conformanceCase in LocalStoreConformance.Cases)
+    await conformanceCase.RunAsync(() => OpenEmptyStoreAsync());
+```
+
+`InMemoryAuthorityDriver` is the reference driver. Provider-specific drills (delayed commits, several processes,
+crashes, restores from a real backup) are not part of the public suites; see `src/Tests/Bsync.Tests.PostgreSql` for
+the PostgreSQL ones.
 
 ## Hybrid Logical Clock
 
@@ -445,6 +632,7 @@ dotnet run --project src/Samples/Bsync.Demo
 dotnet build src/Bsync.slnx -c Release
 dotnet test src/Tests/Bsync.Tests -c Release                      # unit, conformance, HTTP, Blazor, recovery
 BSYNC_POSTGRES="Host=localhost;Username=postgres;Password=..." dotnet test src/Tests/Bsync.Tests.PostgreSql -c Release
+BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer -c Release
 dotnet publish src/Samples/Bsync.Demo -c Release                              # optional
 dotnet publish src/Samples/Bsync.Demo -c Release -p:RunAOTCompilation=true    # needs the wasm-tools workload
 ```
@@ -460,8 +648,20 @@ dotnet test src/Tests/Bsync.Tests.Browser -c Release -p:BrowserHostAot=true   # 
 
 A change to a package's public API fails `PublicApiTests` until the baseline in `src/Tests/api` is regenerated on purpose
 (`BSYNC_UPDATE_API=1 dotnet test src/Tests/Bsync.Tests --filter PublicApiTests`) and reviewed. `dotnet pack` builds
-the seven library packages (`0.1.0-preview`); nothing is published from this repository's tooling.
-CI: `.github/workflows/ci.yml` (Windows, Linux and macOS unit tests, browser tests, pack).
+the six library packages; nothing is published from this repository's tooling.
+CI: `.github/workflows/ci.yml` (Windows, Linux and macOS unit tests, PostgreSQL, SQL Server, browser tests, pack
+and package consumers) and `.github/workflows/nightly.yml` (nightly `-preview` pack, not published).
+
+Consume the packages exactly as a NuGet user would (no project references; `src/Tests/PackageConsumers/nuget.config` takes
+`Bsync*` only from `artifacts/packages`):
+
+```bash
+for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite; do
+  dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
+dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.2.0-local
+dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.2.0-local -o artifacts/consumer-web
+dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
+```
 
 Run the notes sample: `dotnet run --project src/Samples/Bsync.Samples.Notes.Server` (the offline service worker
 is active only in a published build).
@@ -479,6 +679,7 @@ dotnet test src/Bsync.slnx --filter "DisplayName~I04"
 - [Protocol specification v1](docs/protocol/v1.md).
 - [Compatibility policy and migration notes](docs/compatibility.md).
 - [Disaster recovery and stuck replicas](docs/operations/disaster-recovery.md) and [observability](docs/operations/observability.md).
+- Patterns: [immutable intents](docs/patterns/intents.md), [attachments](docs/patterns/attachments.md) and [bundles](docs/patterns/bundles.md).
 - [Benchmarks](docs/benchmarks.md).
 - [Support matrix](docs/support-matrix.md) and [roadmap](docs/roadmap.md).
 

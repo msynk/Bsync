@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using Bsync.Clocks;
 using Bsync.Conflicts;
 using Bsync.Diagnostics;
@@ -51,6 +52,9 @@ public sealed class SyncEngine<TDocument>
 
     // What the server advertised on the last pull page (null: not known yet in this engine instance).
     private volatile IReadOnlyList<string>? _serverFeatures;
+    private volatile SyncLimits? _serverLimits;
+    private long _compactedThrough;
+    private volatile bool _serverTimeKnown;
 
     /// <summary>
     /// Creates an engine for one collection that clones documents with reflection-based JSON. Not
@@ -122,6 +126,14 @@ public sealed class SyncEngine<TDocument>
     public Task<IReadOnlyList<TDocument>> QueryPageAsync(string? afterId, int limit, bool includeDeleted = false, CancellationToken cancellationToken = default) =>
         _store.QueryPageAsync(afterId, limit, includeDeleted, cancellationToken);
 
+    /// <summary>Returns up to <paramref name="limit"/> live documents of an index range after <paramref name="after"/> (ADR-018).</summary>
+    public Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default) =>
+        _store.QueryIndexAsync(query, after, limit, cancellationToken);
+
+    /// <summary>Counts the live documents of an index range (ADR-018).</summary>
+    public Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default) =>
+        _store.CountIndexAsync(query, cancellationToken);
+
     /// <summary>Returns the stored record (including sync metadata) for <paramref name="id"/>.</summary>
     public Task<SyncRecord<TDocument>?> GetAsync(string id, CancellationToken cancellationToken = default) =>
         _store.GetAsync(id, cancellationToken);
@@ -154,13 +166,57 @@ public sealed class SyncEngine<TDocument>
         _store.CountDirtyAsync(cancellationToken);
 
     /// <summary>
+    /// One-shot headless sync (task C4), for background tasks with a time limit: runs <see cref="SyncAsync"/> until no work
+    /// remains, <paramref name="maxRuns"/> runs were made, or <paramref name="timeBudget"/> ran out. Running out of time is
+    /// not an error: the result reports <see cref="SyncResult.HasRemainingWork"/>, every applied page and acknowledged
+    /// operation is already committed with its checkpoint, and the next call resumes from there.
+    /// </summary>
+    public async Task<SyncResult> SyncForAsync(TimeSpan timeBudget, int maxRuns = int.MaxValue, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(timeBudget, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxRuns, 1);
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(timeBudget);
+        var total = default(SyncResult);
+        for (var run = 0; run < maxRuns; run++)
+        {
+            SyncResult result;
+            try
+            {
+                result = await SyncAsync(budget.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return total with { HasRemainingWork = true };
+            }
+
+            total += result;
+            if (!result.HasRemainingWork)
+            {
+                return total with { HasRemainingWork = false };
+            }
+        }
+
+        return total with { HasRemainingWork = true };
+    }
+
+    /// <summary>Counts records that need a decision: kept conflicts and parked rejections (task C5).</summary>
+    public async Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        return await _store.CountIssuesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Commits a local create or update and queues it for push. A copy of <paramref name="document"/>
     /// is stored with a fresh HLC timestamp; the caller's object is not modified. The last-known server
     /// baseline is preserved so conflicts are still detected against it.
     /// </summary>
     /// <exception cref="ArgumentException">The document id is invalid.</exception>
+    /// <exception cref="SyncReadOnlyException">The replica is <see cref="SyncMode.PullOnly"/>.</exception>
     public async Task<LocalWriteReceipt> WriteAsync(TDocument document, CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         ArgumentNullException.ThrowIfNull(document);
         SyncIds.Validate(document.Id, nameof(document));
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
@@ -181,8 +237,10 @@ public sealed class SyncEngine<TDocument>
     /// Soft-deletes the document with <paramref name="id"/> (stores a tombstone and queues it for push).
     /// Returns <see langword="null"/> without writing if the document is unknown locally.
     /// </summary>
+    /// <exception cref="SyncReadOnlyException">The replica is <see cref="SyncMode.PullOnly"/>.</exception>
     public async Task<LocalWriteReceipt?> DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         SyncIds.Validate(id);
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
@@ -225,6 +283,7 @@ public sealed class SyncEngine<TDocument>
     /// <exception cref="ArgumentException">The list is empty, or an id is invalid or repeated.</exception>
     public async Task<IReadOnlyList<LocalWriteReceipt>> WriteGroupAsync(IReadOnlyList<TDocument> documents, CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         ArgumentNullException.ThrowIfNull(documents);
         if (documents.Count == 0)
         {
@@ -269,6 +328,7 @@ public sealed class SyncEngine<TDocument>
     /// </summary>
     public async Task<LocalWriteReceipt?> ResolveConflictAsync(string id, TDocument resolved, CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         SyncIds.Validate(id);
         ArgumentNullException.ThrowIfNull(resolved);
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
@@ -297,7 +357,8 @@ public sealed class SyncEngine<TDocument>
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         var results = await CommitAsync(
             SyncChangeKind.Local,
-            [new RecordUpdate<TDocument>(id, existing => existing?.Conflict is null ? null : existing with { Conflict = null })],
+            // The record shows the latest known server state again (it may have shown the local edit, D7).
+            [new RecordUpdate<TDocument>(id, existing => existing?.Conflict is null ? null : existing with { Conflict = null, Current = existing.Base is { } server ? _clone(server) : existing.Current })],
             cancellationToken: cancellationToken).ConfigureAwait(false);
         return results[0].Changed;
     }
@@ -312,6 +373,7 @@ public sealed class SyncEngine<TDocument>
     /// </summary>
     public async Task<LocalWriteReceipt?> RetryRejectedAsync(string id, CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         SyncIds.Validate(id);
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         var stamp = _clock.Now();
@@ -428,6 +490,7 @@ public sealed class SyncEngine<TDocument>
     /// </summary>
     public async Task<IReadOnlyList<string>> ImportLocalChangesAsync(IReadOnlyList<SyncRecord<TDocument>> records, CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         ArgumentNullException.ThrowIfNull(records);
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
         var generation = (await _store.GetCursorAsync(cancellationToken).ConfigureAwait(false)).Generation;
@@ -589,13 +652,18 @@ public sealed class SyncEngine<TDocument>
     /// <summary>Refreshes the queue gauges, only while someone listens to them.</summary>
     private async Task MeasureQueueAsync()
     {
-        if (!SyncDiagnostics.QueueDepth.Enabled && !SyncDiagnostics.QueueOldestAge.Enabled)
+        if (!SyncDiagnostics.QueueDepth.Enabled && !SyncDiagnostics.QueueOldestAge.Enabled && !SyncDiagnostics.Issues.Enabled)
         {
             return;
         }
 
         try
         {
+            if (SyncDiagnostics.Issues.Enabled)
+            {
+                _queue.Issues = await _store.CountIssuesAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+
             var depth = await _store.CountDirtyAsync(CancellationToken.None).ConfigureAwait(false);
             var oldest = await _store.GetPendingAsync(1, cancellationToken: CancellationToken.None).ConfigureAwait(false);
             _queue.Update(depth, oldest.Count == 0 ? null : oldest[0].Current.UpdatedAt.WallTime);
@@ -641,6 +709,8 @@ public sealed class SyncEngine<TDocument>
     private async Task<SyncResult> PullCoreAsync(CancellationToken cancellationToken)
     {
         var applied = 0;
+        var removed = 0;
+        var compacted = 0;
         var reset = false;
         var cursor = await _store.GetCursorAsync(cancellationToken).ConfigureAwait(false);
 
@@ -649,10 +719,11 @@ public sealed class SyncEngine<TDocument>
             cancellationToken.ThrowIfCancellationRequested();
 
             PullResult<TDocument> result;
+            var sent = _clock.PhysicalMilliseconds();
             try
             {
                 result = await _transport
-                    .PullAsync(new PullRequest(cursor.Checkpoint, _options.PullBatchSize), cancellationToken)
+                    .PullAsync(new PullRequest(cursor.Checkpoint, PullBatchSize) { Features = ReplicaFeatures, Replica = _clock.Node }, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (SyncResetRequiredException required) when (!cursor.Checkpoint.IsStart)
@@ -669,9 +740,33 @@ public sealed class SyncEngine<TDocument>
 
             ValidatePullPage(result, cursor.Checkpoint);
             _serverFeatures = result.Features ?? [];
+            _serverLimits = result.Features?.Contains(SyncFeatures.Limits, StringComparer.Ordinal) == true
+                && result.Limits is { MaxOperationsPerPush: > 0, MaxPageSize: > 0 } limits ? limits : null;
+            if (result.Features?.Contains(SyncFeatures.ServerTime, StringComparer.Ordinal) == true && result.ServerTime is { } serverTime)
+            {
+                CorrectClock(serverTime, sent, _clock.PhysicalMilliseconds());
+            }
 
             var generation = cursor.Generation;
             var updates = new List<RecordUpdate<TDocument>>(result.Changes.Count);
+            var removals = result.Features?.Contains(SyncFeatures.Removals, StringComparer.Ordinal) == true ? result.Removals ?? [] : [];
+            if (removals.Count > 0)
+            {
+                // ADR-015: clean copies leave the device. The purge runs before the page commits, so an interrupted run
+                // repeats it (it is idempotent); records with local changes or a kept conflict are hidden in the same
+                // atomic update as the page, and their uploads are answered forbidden and parked.
+                removed += await _store.PurgeAsync(removals, generation + 1, cancellationToken).ConfigureAwait(false);
+                foreach (var id in removals)
+                {
+                    updates.Add(new RecordUpdate<TDocument>(id, existing =>
+                        existing is { MissingAfterReset: false } && (existing.IsDirty || existing.Conflict is not null)
+                            ? existing with { MissingAfterReset = true, Generation = generation }
+                            : null));
+                }
+
+                Notify(new SyncChange(SyncChangeKind.Remote, removals));
+            }
+
             foreach (var change in result.Changes)
             {
                 // Keep the local clock ahead of every timestamp observed from other replicas.
@@ -681,7 +776,18 @@ public sealed class SyncEngine<TDocument>
 
             var next = cursor with { Checkpoint = result.Checkpoint };
             var results = await CommitAsync(SyncChangeKind.Remote, updates, next, cancellationToken).ConfigureAwait(false);
-            var changed = results.Count(static r => r.Changed);
+
+            // D4: tombstones the server has purged are kept by nobody else; drop this replica's clean copies too, so they
+            // do not accumulate forever. Versions compare only within the current generation.
+            if (result.Features?.Contains(SyncFeatures.Retention, StringComparer.Ordinal) == true
+                && result.RetentionHorizon is { } horizon && horizon > Interlocked.Read(ref _compactedThrough) && !next.Resnapshot)
+            {
+                compacted += await _store.PurgeTombstonesAsync(horizon, generation, cancellationToken).ConfigureAwait(false);
+                Interlocked.Exchange(ref _compactedThrough, horizon);
+            }
+            // The removal updates come first in the batch, then one per change.
+            removed += results.Take(removals.Count).Count(static r => r.Changed);
+            var changed = results.Skip(removals.Count).Count(static r => r.Changed);
             applied += changed;
             SyncDiagnostics.PulledChanges.Add(changed, _nameTag);
             cursor = next;
@@ -696,11 +802,13 @@ public sealed class SyncEngine<TDocument>
                     ResetPerformed = reset,
                     MissingAfterReset = swept.Hidden,
                     PurgedAfterReset = swept.Purged,
+                    Removed = removed,
+                    Compacted = compacted,
                 };
             }
         }
 
-        return new SyncResult(applied, 0, 0) { HasRemainingWork = true, ResetPerformed = reset };
+        return new SyncResult(applied, 0, 0) { HasRemainingWork = true, ResetPerformed = reset, Removed = removed, Compacted = compacted };
     }
 
     /// <summary>
@@ -744,6 +852,61 @@ public sealed class SyncEngine<TDocument>
         }
     }
 
+    /// <summary>
+    /// Sends a batch. When the server refuses it as too large (<c>payload-too-large</c>, nothing applied), sends each half
+    /// separately, down to a single document or dependency group. One that is too large on its own is parked locally with
+    /// a <see cref="PushErrorCodes.PayloadTooLarge"/> rejection, so the rest of the queue keeps moving (I19); after making
+    /// it smaller, <see cref="RetryRejectedAsync"/> sends it as a new operation.
+    /// </summary>
+    private async Task<List<PushOutcome<TDocument>>> SendSplittingAsync(IReadOnlyList<PushOperation<TDocument>> operations, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _transport.PushAsync(new PushRequest<TDocument>(operations), cancellationToken).ConfigureAwait(false);
+            return response?.Outcomes is { } outcomes ? [.. outcomes] : throw new SyncProtocolException("The server returned no push result.");
+        }
+        catch (SyncTransportException tooLarge) when (tooLarge.ErrorCode == SyncErrorCodes.PayloadTooLarge && !tooLarge.IsTransient)
+        {
+            // A group is never split: its members are applied together or not at all (protocol §4.1).
+            var units = operations
+                .Select((operation, index) => (operation, key: operation.Group ?? "\0" + index.ToString(CultureInfo.InvariantCulture)))
+                .GroupBy(pair => pair.key, StringComparer.Ordinal)
+                .Select(unit => unit.Select(pair => pair.operation).ToList())
+                .ToList();
+            if (units.Count == 1)
+            {
+                return [.. operations.Select(o => PushOutcome<TDocument>.Rejected(o.OperationId, PushErrorCodes.PayloadTooLarge, "Too large for the server, even on its own. Make it smaller, then retry it."))];
+            }
+
+            var half = units.Count / 2;
+            var first = await SendSplittingAsync([.. units.Take(half).SelectMany(u => u)], cancellationToken).ConfigureAwait(false);
+            var second = await SendSplittingAsync([.. units.Skip(half).SelectMany(u => u)], cancellationToken).ConfigureAwait(false);
+            return [.. first, .. second];
+        }
+    }
+
+    /// <summary>
+    /// Task D2: estimates the server's clock at the midpoint of the request. When this device's clock is ahead (by a second
+    /// or more, beyond network jitter), the local clock is corrected by the difference, so writes are stamped with times
+    /// the server accepts instead of being rejected with <c>clock-skew</c>. A clock that is behind is left alone: the server
+    /// accepts its writes, and origin timestamps stay the device's own.
+    /// </summary>
+    private void CorrectClock(long serverTime, long sent, long received)
+    {
+        _serverTimeKnown = true;
+        var offset = serverTime - (sent + ((received - sent) / 2));
+        _clock.PhysicalOffset = offset <= -1_000 ? TimeSpan.FromMilliseconds(offset) : TimeSpan.Zero;
+    }
+
+    /// <summary>The response features this replica understands, sent with every pull.</summary>
+    private static readonly IReadOnlyList<string> ReplicaFeatures = [SyncFeatures.Removals];
+
+    // The configured batch sizes, clamped to the limits the server advertised (feature "limits"), so a replica never
+    // sends a push the server must refuse as too large.
+    private int PullBatchSize => _serverLimits is { } limits ? Math.Min(_options.PullBatchSize, limits.MaxPageSize) : _options.PullBatchSize;
+
+    private int PushBatchSize => _serverLimits is { } limits ? Math.Min(_options.PushBatchSize, limits.MaxOperationsPerPush) : _options.PushBatchSize;
+
     private void ValidatePullPage(PullResult<TDocument>? result, Checkpoint requested)
     {
         if (result?.Changes is null)
@@ -751,7 +914,7 @@ public sealed class SyncEngine<TDocument>
             throw new SyncProtocolException("The server returned no pull result.");
         }
 
-        if (result.Changes.Count > _options.PullBatchSize)
+        if (result.Changes.Count > PullBatchSize)
         {
             throw new SyncProtocolException("The server returned more changes than requested.");
         }
@@ -774,13 +937,36 @@ public sealed class SyncEngine<TDocument>
                 throw new SyncProtocolException($"The server returned document '{change.Document.Id}' twice in one page.");
             }
         }
+
+        foreach (var id in result.Removals ?? [])
+        {
+            if (!SyncIds.IsValid(id) || !ids.Add(id))
+            {
+                throw new SyncProtocolException("The server returned a malformed or repeated removal.");
+            }
+        }
+
+        if (ids.Count > PullBatchSize)
+        {
+            throw new SyncProtocolException("The server returned more entries than requested.");
+        }
+    }
+
+    private void EnsureWritable()
+    {
+        if (_options.Mode == SyncMode.PullOnly)
+        {
+            throw new SyncReadOnlyException();
+        }
     }
 
     private SyncRecord<TDocument>? ApplyRemote(SyncRecord<TDocument>? existing, RemoteChange<TDocument> change, long generation)
     {
+        // A pull-only replica never edits, so it never needs the base copy that conflict detection and merges use.
+        var pullOnly = _options.Mode == SyncMode.PullOnly;
         if (existing is null)
         {
-            return new SyncRecord<TDocument>(_clone(change.Document), _clone(change.Document), IsDirty: false)
+            return new SyncRecord<TDocument>(_clone(change.Document), pullOnly ? null : _clone(change.Document), IsDirty: false)
             {
                 BaseVersion = change.Version,
                 Generation = generation,
@@ -800,13 +986,18 @@ public sealed class SyncEngine<TDocument>
         // moves past it.
         if (existing.IsDirty)
         {
-            return existing with { Observed = _clone(change.Document), ObservedVersion = change.Version, Generation = generation };
+            // A dirty record hidden because it had left the caller's view (ADR-015) is visible again once it is back.
+            return existing with { Observed = _clone(change.Document), ObservedVersion = change.Version, Generation = generation, MissingAfterReset = false };
         }
 
+        // A kept conflict that shows the local edit keeps showing it; the newer server state becomes the base the decision
+        // is made against (D7).
+        var showLocal = existing.Conflict is not null && _options.KeptConflictView == KeptConflictView.Local;
         return existing with
         {
-            Current = _clone(change.Document),
-            Base = _clone(change.Document),
+            Current = showLocal ? existing.Current : _clone(change.Document),
+            Conflict = showLocal ? existing.Conflict! with { Server = _clone(change.Document), ServerVersion = change.Version } : existing.Conflict,
+            Base = pullOnly ? null : _clone(change.Document),
             BaseVersion = change.Version,
             Observed = null,
             ObservedVersion = null,
@@ -843,8 +1034,9 @@ public sealed class SyncEngine<TDocument>
             };
     }
 
-    private async Task<SyncResult> PushCoreAsync(CancellationToken cancellationToken)
+    private async Task<SyncResult> PushCoreAsync(CancellationToken cancellationToken, bool afterRestamp = false)
     {
+        var skewed = 0;
         var pushed = 0;
         var conflicts = 0;
         var rejected = 0;
@@ -857,13 +1049,20 @@ public sealed class SyncEngine<TDocument>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var candidates = await _store.GetPendingAsync(_options.PushBatchSize, excluded, cancellationToken).ConfigureAwait(false);
+            var candidates = await _store.GetPendingAsync(PushBatchSize, excluded, cancellationToken).ConfigureAwait(false);
             if (candidates.Count == 0)
             {
                 break;
             }
 
             candidates = await ExpandGroupsAsync(candidates, excluded, cancellationToken).ConfigureAwait(false);
+            if (_options.ReadyToPush is { } ready && candidates.Count > 0)
+            {
+                var before = candidates.Count;
+                candidates = await HoldBackAsync(candidates, ready, excluded, cancellationToken).ConfigureAwait(false);
+                deferred += before - candidates.Count;
+            }
+
             if (candidates.Count == 0)
             {
                 continue;
@@ -875,9 +1074,7 @@ public sealed class SyncEngine<TDocument>
                 continue;
             }
 
-            var response = await _transport
-                .PushAsync(new PushRequest<TDocument>(operations), cancellationToken)
-                .ConfigureAwait(false);
+            var response = new PushResult<TDocument>(await SendSplittingAsync(operations, cancellationToken).ConfigureAwait(false));
             var outcomes = CorrelateOutcomes(operations, response);
             if (SyncDiagnostics.Operations.Enabled)
             {
@@ -920,16 +1117,26 @@ public sealed class SyncEngine<TDocument>
                         _clock.Update(outcome.Document!.UpdatedAt);
                         acknowledgements.Add(new RecordUpdate<TDocument>(
                             operation.DocumentId,
-                            existing => ApplyAccepted(existing, operation.OperationId, outcome, generation)));
+                            existing => ApplyAccepted(existing, operation.OperationId, outcome, generation))
+                        {
+                            Pure = true,
+                            ResultUnused = true,
+                            Adopt = true,
+                        });
                         pushed++;
                         break;
 
                     case PushOutcomeKind.Rejected:
                         acknowledgements.Add(new RecordUpdate<TDocument>(
                             operation.DocumentId,
-                            existing => ApplyRejected(existing, operation.OperationId, outcome)));
+                            existing => ApplyRejected(existing, operation.OperationId, outcome))
+                        {
+                            Pure = true,
+                            ResultUnused = true,
+                        });
                         excluded.Add(operation.DocumentId);
                         rejected++;
+                        skewed += outcome.ErrorCode == PushErrorCodes.ClockSkew ? 1 : 0;
                         if (operation.Group is not null)
                         {
                             failedGroups.Add(operation.DocumentId);
@@ -985,6 +1192,23 @@ public sealed class SyncEngine<TDocument>
             }
         }
 
+        // ADR-017 part 2: writes rejected only because this device's clock ran ahead get new timestamps and go again at once.
+        if (skewed > 0 && !afterRestamp && _options.RestampSkewedWrites && _serverTimeKnown)
+        {
+            var restamped = await RestampSkewedAsync(cancellationToken).ConfigureAwait(false);
+            if (restamped > 0)
+            {
+                var again = await PushCoreAsync(cancellationToken, afterRestamp: true).ConfigureAwait(false);
+                return again with
+                {
+                    Pushed = pushed + again.Pushed,
+                    Conflicts = conflicts + again.Conflicts,
+                    Rejected = rejected - restamped + again.Rejected,
+                    Deferred = deferred + again.Deferred,
+                };
+            }
+        }
+
         var remaining = await _store.GetPendingAsync(1, cancellationToken: cancellationToken).ConfigureAwait(false);
         return new SyncResult(0, pushed, conflicts)
         {
@@ -992,6 +1216,111 @@ public sealed class SyncEngine<TDocument>
             Deferred = deferred,
             HasRemainingWork = remaining.Count > 0,
         };
+    }
+
+    /// <summary>
+    /// ADR-017 part 2. A write rejected with <c>clock-skew</c> carries a timestamp above anything the server accepted, so
+    /// no peer has seen it. Moves the clock back to the newest timestamp this replica holds that is not above the server's
+    /// time (plus the default allowance), gives the skew-rejected writes (and group members parked with them) new
+    /// timestamps in their original order as new operations, and lowers the stored high-water mark so a restart does not
+    /// jump ahead again. Returns the number of records re-stamped.
+    /// </summary>
+    private async Task<int> RestampSkewedAsync(CancellationToken cancellationToken)
+    {
+        var rejected = await _store.GetRejectedAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        var groups = rejected.Where(static r => r.Rejection?.ErrorCode == PushErrorCodes.ClockSkew && r.Group is not null)
+            .Select(static r => r.Group!.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var targets = rejected
+            .Where(r => r.Rejection?.ErrorCode == PushErrorCodes.ClockSkew
+                || (r.Rejection?.ErrorCode == PushErrorCodes.GroupFailed && r.Group is { } g && groups.Contains(g.Id)))
+            .OrderBy(static r => r.Current.UpdatedAt)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            return 0;
+        }
+
+        var ids = targets.Select(static r => r.Current.Id).ToHashSet(StringComparer.Ordinal);
+        var bound = _clock.PhysicalMilliseconds() + (long)_clock.PhysicalOffset.TotalMilliseconds + (long)SkewAllowance.TotalMilliseconds;
+        var floor = HlcTimestamp.MinValue;
+        foreach (var document in await _store.QueryAsync(includeDeleted: true, cancellationToken).ConfigureAwait(false))
+        {
+            if (!ids.Contains(document.Id) && document.UpdatedAt.WallTime <= bound && document.UpdatedAt > floor)
+            {
+                floor = document.UpdatedAt;
+            }
+        }
+
+        _clock.Rewind(floor);
+        var updates = targets.Select(target => new RecordUpdate<TDocument>(target.Current.Id, existing =>
+        {
+            if (existing is not { IsDirty: true, Rejection: { } rejection } || existing.LocalRevision != target.LocalRevision
+                || rejection.ErrorCode is not (PushErrorCodes.ClockSkew or PushErrorCodes.GroupFailed))
+            {
+                return null; // changed meanwhile: a new edit already has a new timestamp
+            }
+
+            var current = _clone(existing.Current);
+            current.UpdatedAt = _clock.Now();
+            return existing with { Current = current, Rejection = null, Pending = null };
+        })).ToList();
+        var results = await CommitAsync(SyncChangeKind.Sync, updates, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var highWater = floor;
+        foreach (var document in await _store.QueryAsync(includeDeleted: true, cancellationToken).ConfigureAwait(false))
+        {
+            if (document.UpdatedAt > highWater)
+            {
+                highWater = document.UpdatedAt;
+            }
+        }
+
+        try
+        {
+            await _store.ResetClockHighWaterAsync(highWater > _clock.Last ? highWater : _clock.Last, cancellationToken).ConfigureAwait(false);
+        }
+        catch (NotSupportedException)
+        {
+            // The store keeps its higher mark; only a restart before real time catches up is affected.
+        }
+
+        return results.Count(static r => r.Changed);
+    }
+
+    /// <summary>The servers' default <c>MaxClockSkew</c>: timestamps up to this far ahead were acceptable.</summary>
+    private static readonly TimeSpan SkewAllowance = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Removes candidates that <see cref="SyncOptions{TDocument}.ReadyToPush"/> holds back, with every member of their
+    /// dependency groups, and excludes them from the rest of this run.
+    /// </summary>
+    private static async Task<IReadOnlyList<SyncRecord<TDocument>>> HoldBackAsync(
+        IReadOnlyList<SyncRecord<TDocument>> candidates,
+        Func<TDocument, CancellationToken, ValueTask<bool>> ready,
+        HashSet<string> excluded,
+        CancellationToken cancellationToken)
+    {
+        var held = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var candidate in candidates)
+        {
+            if (!await ready(candidate.Current, cancellationToken).ConfigureAwait(false))
+            {
+                held.Add(candidate.Current.Id);
+                if (candidate.Group is { } group)
+                {
+                    held.UnionWith(group.Members);
+                }
+            }
+        }
+
+        if (held.Count == 0)
+        {
+            return candidates;
+        }
+
+        excluded.UnionWith(held);
+        return candidates.Where(c => !held.Contains(c.Current.Id)).ToList();
     }
 
     /// <summary>
@@ -1095,7 +1424,10 @@ public sealed class SyncEngine<TDocument>
                     {
                         Pending = new PendingOperation<TDocument>(operationId, existing.LocalRevision, existing.BaseVersion, existing.Current) { Group = group, GroupSize = size },
                     }
-                    : null));
+                    : null)
+            {
+                Pure = true,
+            });
         }
 
         var results = await CommitAsync(SyncChangeKind.Sync, updates, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -1161,10 +1493,12 @@ public sealed class SyncEngine<TDocument>
             return null;
         }
 
+        // Base and current share one document: documents in records are never mutated in place. The outcome's document
+        // is this engine's alone (the transport deserialized or copied it), and the store copies what it keeps (D9).
         var confirmed = outcome.Document!;
         var rebased = existing with
         {
-            Base = _clone(confirmed),
+            Base = confirmed,
             BaseVersion = outcome.Version,
             Pending = null,
             Generation = generation,
@@ -1173,7 +1507,7 @@ public sealed class SyncEngine<TDocument>
 
         // Only the revision that was sent becomes clean; a later local edit stays dirty on the new base.
         return Settle(existing.LocalRevision == pending.Revision
-            ? rebased with { Current = _clone(confirmed), IsDirty = false, Rejection = null }
+            ? rebased with { Current = confirmed, IsDirty = false, Rejection = null }
             : rebased);
     }
 
@@ -1190,7 +1524,7 @@ public sealed class SyncEngine<TDocument>
             ? existing with { Pending = null, Base = null, BaseVersion = null, Observed = null, ObservedVersion = null }
             : existing with { Pending = null };
         return existing.LocalRevision == pending.Revision
-            ? forgotten with { Rejection = new SyncRejection(pending.Revision, outcome.ErrorCode ?? "rejected", outcome.Message) }
+            ? forgotten with { Rejection = new SyncRejection(pending.Revision, outcome.ErrorCode ?? "rejected", outcome.Message) { Arguments = outcome.Arguments } }
             : forgotten;
     }
 
@@ -1251,7 +1585,7 @@ public sealed class SyncEngine<TDocument>
                     ConflictOutcome.KeepFork => rebased with { IsDirty = true },
                     ConflictOutcome.Defer => rebased with
                     {
-                        Current = _clone(master),
+                        Current = _options.KeptConflictView == KeptConflictView.Local ? existing.Current : _clone(master),
                         IsDirty = false,
                         Rejection = null,
                         Conflict = new SyncConflict<TDocument>(_clone(master), masterVersion, _clone(existing.Current), existing.Base is { } ancestor ? _clone(ancestor) : null),

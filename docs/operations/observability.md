@@ -29,6 +29,9 @@ name. The default is the document type name.
 | `bsync.run.duration` | histogram | s | `bsync.name`, `bsync.operation` (`sync`, `pull`, `push`), `bsync.result` (`complete`, `incomplete`, `error`), `error.type` | Duration of replication runs. |
 | `bsync.queue.depth` | observable gauge | documents | `bsync.name` | Documents with unconfirmed local changes, as of the engine's last run. |
 | `bsync.queue.oldest_age` | observable gauge | s | `bsync.name` | Age of the oldest change waiting for upload, by its authoring time, as of the last run. |
+| `bsync.issues` | observable gauge | documents | `bsync.name`, `bsync.issue` (`conflict`, `rejected`, `blocked`) | Documents waiting for a person's decision, as of the last run: kept conflicts, rejected changes, and group members parked because another member failed (disjoint; their sum is the total). |
+| `bsync.blob.bytes` | counter | By | `bsync.direction` (`upload`, `download`) | Attachment bytes sent or received by `HttpBlobTransfer` (task F1), including presigned uploads and redirected downloads. |
+| `bsync.blob.transfers` | counter | transfers | `bsync.direction`, `bsync.result` (`complete`, `failed`, `corrupt`) | Attachment transfers by result. `corrupt` means the bytes did not match the hash and were discarded; `failed` covers network errors and refusals (retried by the caller). |
 
 The queue gauges cost two small store reads per run. They are measured only while a listener subscribes to
 them.
@@ -55,6 +58,10 @@ The DI recipes (`AddLocalSyncCollection`, `AddBrowserSyncCollection`) use the co
 |---|---|---|
 | `bsync.server.requests` | `bsync.collection`, `bsync.endpoint` (`pull`, `push`, `hints`), `bsync.result` (`ok` or a problem code) | Every protocol request. |
 | `bsync.server.push.operations` | `bsync.collection`, `bsync.outcome`, `bsync.duplicate` | Operations decided by the authority. |
+| `bsync.server.blob.bytes` | `bsync.direction` (`upload`, `download`) | Attachment bytes received in chunks and served by the blob routes. Presigned uploads and downloads (object storage) do not pass through the server and are not counted. |
+| `bsync.server.blob.requests` | `bsync.endpoint` (`start`, `append`, `finish`, `read`), `bsync.result` (`ok`, `redirect`, `offset-mismatch`, a code such as `blob-hash-mismatch` or `blob-too-large`, or the status code) | Every blob request. |
+
+Blob metrics carry no hashes, file names or scopes.
 
 Logs:
 
@@ -65,6 +72,16 @@ Logs:
 
 ASP.NET Core's own `http.server.*` metrics and request logs cover transport-level details.
 
+## Replica acknowledgements (optional audit)
+
+With `SyncEndpointOptions.ReplicaAudit` set, the endpoints record, for every pull that leaves nothing more to fetch,
+which checkpoint a replica reached: replica (its clock node id, sent as the optional `replica` member of pull requests
+by 0.2.0 replicas), caller name, collection, scope, checkpoint and time. A repeated checkpoint is recorded once.
+`InMemorySyncReplicaAudit` keeps them in memory; `SqlServerReplicaAudit` in the table
+`bsync.replica_acknowledgements` (created on first use; purge it by age like any log table). Query with
+`GetAsync(replica)`. This proves which revision of the content a device held, and when. Replicas older than 0.2.0 send
+no id and are not recorded. Tested: `ReplicaAuditTests`, `SqlServerAuthorityTests.ReplicaAudit`.
+
 ## What to alert on
 
 - `bsync.queue.oldest_age` growing on devices you collect telemetry from: uploads are not getting through.
@@ -74,6 +91,8 @@ ASP.NET Core's own `http.server.*` metrics and request logs cover transport-leve
 - `bsync.resets` by reason, which is expected after a restore or a permission change and suspicious
   otherwise.
 - `bsync.server.requests{result="unavailable"}` together with `SyncAuthorityFailed` logs.
+- `bsync.blob.transfers{result="corrupt"}` or `bsync.server.blob.requests{result="blob-hash-mismatch"}`: content
+  damaged in transit or on a device's disk.
 
 ## Evidence
 
@@ -82,6 +101,8 @@ ASP.NET Core's own `http.server.*` metrics and request logs cover transport-leve
 - `ServerObservabilityTests`: request and operation counters, refusal logs, and the retryable 503 without
   leaked details.
 - `BlazorIntegrationTests.UnexpectedFailureIsReportedAndRecovers` and `RecipeUsesContainerLogging`.
+- `BlobRouteTests.TransfersAreMeasured`: client and server blob bytes and transfers by direction, endpoint and
+  result (including a hash mismatch), with no content hash in any tag.
 
 - `OpenTelemetryExportTests`: the documented `AddSource`/`AddMeter` wiring exports the spans and the client and
   server metrics through the OpenTelemetry SDK (1.18.0, in-memory exporter).

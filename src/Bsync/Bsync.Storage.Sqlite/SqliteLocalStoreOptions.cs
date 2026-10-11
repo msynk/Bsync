@@ -23,4 +23,13 @@ public sealed class SqliteLocalStoreOptions
 
     /// <summary>How long a writer waits for another connection's write lock. Default 30 seconds.</summary>
     public TimeSpan BusyTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The 32-byte key the database is encrypted with (SQLCipher, ADR-016), or <see langword="null"/> for a plain
+    /// database. Keep it in the platform's protected store (DPAPI, Keystore, Keychain), never next to the file. Opening
+    /// with a wrong or missing key fails with <see cref="SqliteStoreUnreadableException"/>; it never creates a new replica.
+    /// Needs the SQLCipher native library: the application references <c>SQLitePCLRaw.bundle_e_sqlcipher</c> instead of
+    /// <c>SQLitePCLRaw.bundle_e_sqlite3</c>; with the plain library, opening with a key throws.
+    /// </summary>
+    public byte[]? EncryptionKey { get; init; }
 }

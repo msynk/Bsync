@@ -14,6 +14,8 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
     where TDocument : class, ISyncEntity
 {
     private readonly Dictionary<string, SyncRecord<TDocument>> _records = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> _ids = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (SyncIndex<TDocument> Index, SortedSet<SyncIndexCursor> Entries, Dictionary<string, string> Keys)> _indexes = new(StringComparer.Ordinal);
     private readonly Func<TDocument, TDocument> _clone;
     private readonly object _gate = new();
     private ReplicaCursor _cursor = ReplicaCursor.Initial;
@@ -29,9 +31,19 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
 
     /// <summary>Creates a store using the supplied deep-clone function.</summary>
     public InMemoryLocalStore(Func<TDocument, TDocument> cloner)
+        : this(cloner, null)
+    {
+    }
+
+    /// <summary>Creates a store using the supplied deep-clone function, maintaining <paramref name="indexes"/> (ADR-018).</summary>
+    public InMemoryLocalStore(Func<TDocument, TDocument> cloner, IEnumerable<SyncIndex<TDocument>>? indexes)
     {
         ArgumentNullException.ThrowIfNull(cloner);
         _clone = cloner;
+        foreach (var index in LocalStoreIndexing.Validate(indexes))
+        {
+            _indexes[index.Name] = (index, new SortedSet<SyncIndexCursor>(EntryOrder.Instance), new Dictionary<string, string>(StringComparer.Ordinal));
+        }
     }
 
     /// <inheritdoc />
@@ -57,7 +69,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         {
             // Compute every new state first so that a throwing transform commits nothing.
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            var staged = new List<(string Id, SyncRecord<TDocument>? Record, bool Changed)>(updates.Count);
+            var staged = new List<(string Id, SyncRecord<TDocument>? Record, bool Changed, bool ResultUnused)>(updates.Count);
             foreach (var update in updates)
             {
                 ArgumentNullException.ThrowIfNull(update);
@@ -66,12 +78,27 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                     throw new ArgumentException($"Duplicate record id '{update.Id}' in one update.", nameof(updates));
                 }
 
-                var existing = _records.TryGetValue(update.Id, out var stored) ? CloneRecord(stored) : null;
+                var owned = new HashSet<TDocument>(ReferenceEqualityComparer.Instance);
+                SyncRecord<TDocument>? existing = null;
+                if (_records.TryGetValue(update.Id, out var stored))
+                {
+                    if (update.Pure)
+                    {
+                        // The transform only reads its input: it gets the stored record, whose documents are this store's.
+                        existing = stored;
+                        Own(stored, owned);
+                    }
+                    else
+                    {
+                        existing = CloneRecord(stored, owned);
+                    }
+                }
+
                 var next = update.Transform(existing);
                 if (next is null)
                 {
                     // Report the committed state, not the transform's working copy (it may have mutated it).
-                    staged.Add((update.Id, stored, false));
+                    staged.Add((update.Id, stored, false, update.ResultUnused));
                     continue;
                 }
 
@@ -81,19 +108,27 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                         $"Transform for '{update.Id}' returned a record with id '{next.Current.Id}'.");
                 }
 
-                staged.Add((update.Id, CloneRecord(next), true));
+                // Documents the transform took from its input are copies this store made; only the others need copying.
+                if (update.Adopt)
+                {
+                    Own(next, owned);
+                }
+
+                staged.Add((update.Id, CloneRecord(next, reuse: owned), true, update.ResultUnused));
             }
 
             var results = new List<RecordUpdateResult<TDocument>>(staged.Count);
-            foreach (var (id, record, changed) in staged)
+            foreach (var (id, record, changed, resultUnused) in staged)
             {
                 if (changed)
                 {
                     _records[id] = record!;
+                    _ids.Add(id);
+                    Reindex(id, record);
                     ObserveTimestamps(record!);
                 }
 
-                results.Add(new RecordUpdateResult<TDocument>(record is null ? null : CloneRecord(record), changed));
+                results.Add(new RecordUpdateResult<TDocument>(record is null || resultUnused ? null : CloneRecord(record), changed));
             }
 
             if (cursor is { } committed)
@@ -119,7 +154,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .OrderBy(static r => r.Current.UpdatedAt)
                 .ThenBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(pending);
@@ -132,6 +167,36 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         lock (_gate)
         {
             return Task.FromResult(_records.Values.Count(static r => r.IsDirty));
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<int> PurgeTombstonesAsync(long throughVersion, long generation, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var gone = _records
+                .Where(kv => kv.Value is { IsDirty: false, Conflict: null, Current.Deleted: true, BaseVersion: { } version } record && version <= throughVersion && record.Generation == generation)
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var id in gone)
+            {
+                Remove(id);
+            }
+
+            return Task.FromResult(gone.Count);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<SyncIssueCounts> CountIssuesAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            return Task.FromResult(new SyncIssueCounts(
+                _records.Values.Count(static r => r.Conflict is not null),
+                _records.Values.Count(static r => r.IsDirty && r.Rejection is not null),
+                _records.Values.Count(static r => r.IsDirty && r.Rejection?.ErrorCode == Protocol.PushErrorCodes.GroupFailed)));
         }
     }
 
@@ -155,9 +220,12 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         lock (_gate)
         {
-            var documents = _records.Values
-                .Where(r => !r.MissingAfterReset && (includeDeleted || !r.Current.Deleted) && (afterId is null || string.CompareOrdinal(r.Current.Id, afterId) > 0))
-                .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
+            // The ids are kept sorted, so a page costs its own size, not the collection's.
+            var ids = afterId is null ? _ids : _ids.GetViewBetween(afterId, _ids.Max ?? afterId);
+            var documents = ids
+                .Where(id => afterId is null || string.CompareOrdinal(id, afterId) > 0)
+                .Select(id => _records[id])
+                .Where(r => !r.MissingAfterReset && (includeDeleted || !r.Current.Deleted))
                 .Take(limit)
                 .Select(r => _clone(r.Current))
                 .ToList();
@@ -184,7 +252,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .Where(static r => r.Conflict is not null)
                 .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(conflicts);
         }
@@ -200,9 +268,117 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .Where(static r => r.Rejection is not null)
                 .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(rejected);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<TDocument>> QueryIndexAsync(SyncIndexQuery<TDocument> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        lock (_gate)
+        {
+            if (!_indexes.TryGetValue(query.Index.Name, out var index) || index.Index.Version != query.Index.Version)
+            {
+                return LocalStoreIndexing.QueryAsync(this, query, after, limit, cancellationToken);
+            }
+
+            var documents = Range(index.Entries, query, after)
+                .Take(limit)
+                .Select(e => _clone(_records[e.Id].Current))
+                .ToList();
+            return Task.FromResult<IReadOnlyList<TDocument>>(documents);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<int> CountIndexAsync(SyncIndexQuery<TDocument> query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        lock (_gate)
+        {
+            return !_indexes.TryGetValue(query.Index.Name, out var index) || index.Index.Version != query.Index.Version
+                ? LocalStoreIndexing.CountAsync(this, query, cancellationToken)
+                : Task.FromResult(Range(index.Entries, query, null).Count());
+        }
+    }
+
+    private static IEnumerable<SyncIndexCursor> Range(SortedSet<SyncIndexCursor> entries, SyncIndexQuery<TDocument> query, SyncIndexCursor? after)
+    {
+        if (entries.Count == 0)
+        {
+            return [];
+        }
+
+        // Every entry with key K sorts between (K, "") and (K + U+FFFF, ""). The view narrows the set; Contains decides.
+        var low = query.Lower is null ? entries.Min : new SyncIndexCursor(query.Lower, string.Empty);
+        var high = query.Upper is null ? entries.Max : new SyncIndexCursor(query.UpperExclusive ? query.Upper : query.Upper + '\uffff', string.Empty);
+        if (after is { } resume)
+        {
+            // Continue from the last entry returned instead of skipping everything before it.
+            if (query.IsDescending && EntryOrder.Instance.Compare(resume, high) < 0)
+            {
+                high = resume;
+            }
+            else if (!query.IsDescending && EntryOrder.Instance.Compare(resume, low) > 0)
+            {
+                low = resume;
+            }
+        }
+
+        if (EntryOrder.Instance.Compare(low, high) > 0)
+        {
+            return [];
+        }
+
+        // SortedSet<T>.Reverse streams the view backwards (LINQ's Reverse would copy it first).
+        var set = entries.GetViewBetween(low, high);
+        var view = (query.IsDescending ? set.Reverse() : set).Where(e => query.Contains(e.Key));
+        return after is { } position ? view.Where(e => query.Compare(e, position) > 0) : view;
+    }
+
+    private void Reindex(string id, SyncRecord<TDocument>? record)
+    {
+        foreach (var (index, entries, keys) in _indexes.Values)
+        {
+            if (keys.Remove(id, out var old))
+            {
+                entries.Remove(new SyncIndexCursor(old, id));
+            }
+
+            if (record is { MissingAfterReset: false, Current.Deleted: false })
+            {
+                var key = index.KeyOf(record.Current);
+                keys[id] = key;
+                entries.Add(new SyncIndexCursor(key, id));
+            }
+        }
+    }
+
+    private bool Remove(string id)
+    {
+        if (!_records.Remove(id))
+        {
+            return false;
+        }
+
+        _ids.Remove(id);
+        Reindex(id, null);
+        return true;
+    }
+
+    /// <summary>Ordinal order of index entries: key, then id.</summary>
+    private sealed class EntryOrder : IComparer<SyncIndexCursor>
+    {
+        public static EntryOrder Instance { get; } = new();
+
+        public int Compare(SyncIndexCursor x, SyncIndexCursor y)
+        {
+            var c = string.CompareOrdinal(x.Key, y.Key);
+            return c != 0 ? c : string.CompareOrdinal(x.Id, y.Id);
         }
     }
 
@@ -216,7 +392,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
             var removed = 0;
             foreach (var id in ids)
             {
-                if (_records.TryGetValue(id, out var record) && !record.IsDirty && record.Conflict is null && record.Generation < generation && _records.Remove(id))
+                if (_records.TryGetValue(id, out var record) && !record.IsDirty && record.Conflict is null && record.Generation < generation && Remove(id))
                 {
                     removed++;
                 }
@@ -236,7 +412,7 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
                 .Where(r => !r.IsDirty && !r.MissingAfterReset && r.Generation < generation)
                 .OrderBy(static r => r.Current.Id, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(CloneRecord)
+                .Select(r => CloneRecord(r))
                 .ToList();
 
             return Task.FromResult<IReadOnlyList<SyncRecord<TDocument>>>(stale);
@@ -249,6 +425,16 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         lock (_gate)
         {
             return Task.FromResult(_highWater);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task ResetClockHighWaterAsync(HlcTimestamp value, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            _highWater = value;
+            return Task.CompletedTask;
         }
     }
 
@@ -265,13 +451,56 @@ public sealed class InMemoryLocalStore<TDocument> : ILocalStore<TDocument>
         }
     }
 
-    private SyncRecord<TDocument> CloneRecord(SyncRecord<TDocument> record) =>
-        record with
+    private static void Own(SyncRecord<TDocument> record, HashSet<TDocument> owned)
+    {
+        owned.Add(record.Current);
+        AddIfAny(record.Base);
+        AddIfAny(record.Observed);
+        AddIfAny(record.Pending?.Payload);
+        if (record.Conflict is { } conflict)
         {
-            Current = _clone(record.Current),
-            Base = record.Base is { } b ? _clone(b) : null,
-            Observed = record.Observed is { } o ? _clone(o) : null,
-            Conflict = record.Conflict is { } c ? c with { Server = _clone(c.Server), Local = _clone(c.Local), Base = c.Base is { } cb ? _clone(cb) : null } : null,
-            Pending = record.Pending is { } p ? p with { Payload = _clone(p.Payload) } : null,
+            owned.Add(conflict.Server);
+            owned.Add(conflict.Local);
+            AddIfAny(conflict.Base);
+        }
+
+        void AddIfAny(TDocument? document)
+        {
+            if (document is not null)
+            {
+                owned.Add(document);
+            }
+        }
+    }
+
+    // One copy per distinct document instance: a record often holds the same document as current, base and pending
+    // payload, and documents in records are never mutated in place, so the copy is shared within the copied record (D9).
+    private SyncRecord<TDocument> CloneRecord(SyncRecord<TDocument> record, HashSet<TDocument>? owned = null, HashSet<TDocument>? reuse = null)
+    {
+        var copies = new Dictionary<TDocument, TDocument>(4, ReferenceEqualityComparer.Instance);
+        TDocument Copy(TDocument document)
+        {
+            if (reuse is not null && reuse.Contains(document))
+            {
+                return document;
+            }
+
+            if (!copies.TryGetValue(document, out var copy))
+            {
+                copies[document] = copy = _clone(document);
+                owned?.Add(copy);
+            }
+
+            return copy;
+        }
+
+        return record with
+        {
+            Current = Copy(record.Current),
+            Base = record.Base is { } b ? Copy(b) : null,
+            Observed = record.Observed is { } o ? Copy(o) : null,
+            Conflict = record.Conflict is { } c ? c with { Server = Copy(c.Server), Local = Copy(c.Local), Base = c.Base is { } cb ? Copy(cb) : null } : null,
+            Pending = record.Pending is { } p ? p with { Payload = Copy(p.Payload) } : null,
         };
+    }
 }

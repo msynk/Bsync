@@ -19,7 +19,7 @@ public sealed class RecoveryTests(ITestOutputHelper output) : IDisposable
     public void Dispose() => _database.Dispose();
 
     private static InMemorySyncServerRef Rejecting(Func<bool> reject) =>
-        new(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (op, _) => reject() && op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
+        new(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (_, op, _) => reject() && op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
 
     [Fact(DisplayName = "I19: rejected changes are listed and can be retried as a new operation once the cause is fixed")]
     public async Task RetryRejected()

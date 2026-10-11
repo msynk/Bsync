@@ -38,6 +38,8 @@
     <ItemGroup>
         <ProjectReference Include="..\Bsync.Samples.Shared\Bsync.Samples.Shared.csproj" />
         <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite\Bsync.Storage.Sqlite.csproj" />
+        <!-- The store leaves the native SQLite build to the application. -->
+        <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
         <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
     </ItemGroup>
 

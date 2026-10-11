@@ -36,6 +36,15 @@ public sealed class SplitStore<T>(ILocalStore<T> writer, ILocalStore<T> reader) 
     public Task<IReadOnlyList<T>> QueryAsync(bool includeDeleted = false, CancellationToken cancellationToken = default) =>
         reader.QueryAsync(includeDeleted, cancellationToken);
 
+    public Task<IReadOnlyList<T>> QueryIndexAsync(SyncIndexQuery<T> query, SyncIndexCursor? after, int limit, CancellationToken cancellationToken = default) =>
+        reader.QueryIndexAsync(query, after, limit, cancellationToken);
+
+    public Task<int> CountIndexAsync(SyncIndexQuery<T> query, CancellationToken cancellationToken = default) =>
+        reader.CountIndexAsync(query, cancellationToken);
+
+    public Task ResetClockHighWaterAsync(Bsync.Clocks.HlcTimestamp value, CancellationToken cancellationToken = default) =>
+        writer.ResetClockHighWaterAsync(value, cancellationToken);
+
     public Task<ReplicaCursor> GetCursorAsync(CancellationToken cancellationToken = default) => reader.GetCursorAsync(cancellationToken);
 
     public Task<Clocks.HlcTimestamp> GetClockHighWaterAsync(CancellationToken cancellationToken = default) => reader.GetClockHighWaterAsync(cancellationToken);

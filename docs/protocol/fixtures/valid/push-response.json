@@ -32,7 +32,8 @@
       "operationId": "0192f0a1b2c37d4e8f9a0b1c2d3e4f52",
       "kind": "rejected",
       "errorCode": "forbidden",
-      "message": "Not allowed."
+      "message": "Not allowed.",
+      "arguments": { "field": "title", "max": "200" }
     },
     {
       "operationId": "0192f0a1b2c37d4e8f9a0b1c2d3e4f53",

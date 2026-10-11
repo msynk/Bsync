@@ -1,6 +1,7 @@
 # ADR-004: Durable store operations and ownership
 
-- **Status:** Accepted for the contract; provider details pending Phases 3 and 5 (2026-09-27)
+- **Status:** Accepted (2026-09-27); implemented by the in-memory, SQLite (Phase 3) and IndexedDB (Phase 5) stores, which
+  pass `LocalStoreConformance`
 - **Invariants:** I01, I02, I03, I15
 
 ## Context

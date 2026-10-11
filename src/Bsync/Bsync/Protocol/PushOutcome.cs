@@ -33,6 +33,14 @@ public sealed record PushOutcome<TDocument>(
     public string? Message { get; init; }
 
     /// <summary>
+    /// Values that complete <see cref="ErrorCode"/> (task C5), for example the limit a value exceeded. Optional; replicas
+    /// that do not know the member ignore it.
+    /// </summary>
+    [JsonPropertyName("arguments")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, string>? Arguments { get; init; }
+
+    /// <summary>
     /// <see langword="true"/> when the server had already decided this operation and is replaying the
     /// stored outcome without applying anything again.
     /// </summary>

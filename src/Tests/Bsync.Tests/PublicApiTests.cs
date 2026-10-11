@@ -17,8 +17,8 @@ public sealed class PublicApiTests
         "Bsync.Blazor",
         "Bsync.Server.AspNetCore",
         "Bsync.Server.PostgreSql",
+        "Bsync.Server.SqlServer",
         "Bsync.Storage.Sqlite",
-        "Bsync.Testing",
     ];
 
     [Theory(DisplayName = "The public API matches the reviewed baseline")]

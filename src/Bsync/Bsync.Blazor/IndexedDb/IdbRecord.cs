@@ -42,6 +42,8 @@ internal sealed class IdbRecord
 
     public string? RejectionMessage { get; set; }
 
+    public Dictionary<string, string>? RejectionArguments { get; set; }
+
     public string? Observed { get; set; }
 
     public string? ObservedVersion { get; set; }
@@ -65,4 +67,13 @@ internal sealed class IdbRecord
     public string? PendingGroup { get; set; }
 
     public int? PendingGroupSize { get; set; }
+
+    /// <summary>Encoded keys of the declared indexes (ADR-018), by index name.</summary>
+    public Dictionary<string, string>? IndexKeys { get; set; }
 }
+
+/// <summary>A live record as read for an index rebuild.</summary>
+internal sealed record IdbLiveRecord(string Id, string Stamp, string Current);
+
+/// <summary>Index keys to store for a record, if it still has <see cref="Stamp"/>.</summary>
+internal sealed record IdbIndexKeys(string Id, string Stamp, Dictionary<string, string> IndexKeys);

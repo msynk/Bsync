@@ -8,11 +8,12 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsAotCompatible>true</IsAotCompatible>
-    <Description>Durable SQLite local store for Bsync on native hosts (MAUI, WPF, WinForms, console). Not for Blazor WebAssembly.</Description>
+    <Description>Durable SQLite local store for Bsync on native hosts (MAUI, WPF, WinForms, console), with optional encryption at rest (SQLCipher, ADR-016). The application chooses the native library: add SQLitePCLRaw.bundle_e_sqlite3 for plain databases or SQLitePCLRaw.bundle_e_sqlcipher for encrypted ones. Not for Blazor WebAssembly.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <!-- No native bundle: the application adds bundle_e_sqlite3 or bundle_e_sqlcipher (they cannot be combined). -->
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

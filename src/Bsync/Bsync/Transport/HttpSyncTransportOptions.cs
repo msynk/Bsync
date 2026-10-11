@@ -23,4 +23,10 @@ public sealed class HttpSyncTransportOptions
 
     /// <summary>Per-request timeout. A timed-out push has an unknown outcome and is retried. Default 30 seconds.</summary>
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Shared by the transports of one account's collections in a server group: their pulls go in one request when the
+    /// server offers <c>pull-batch</c> (task C3). <see langword="null"/>: each collection pulls on its own.
+    /// </summary>
+    public HttpPullBatch? PullBatch { get; init; }
 }

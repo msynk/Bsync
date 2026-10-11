@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Bsync.Tests" />
+    <InternalsVisibleTo Include="Bsync.Tests.BrowserHost" />
   </ItemGroup>
 
 </Project>

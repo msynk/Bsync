@@ -16,6 +16,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite\Bsync.Storage.Sqlite.csproj" />
+    <!-- The store leaves the native SQLite build to the application. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.PostgreSql\Bsync.Server.PostgreSql.csproj" />
   </ItemGroup>
 
 </Project>

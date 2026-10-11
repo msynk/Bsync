@@ -38,4 +38,16 @@ public static class PushErrorCodes
 
     /// <summary>Replica-side rejection: the server does not support dependency groups, so the group cannot be sent atomically.</summary>
     public const string GroupsUnsupported = "groups-unsupported";
+
+    /// <summary>
+    /// The write refers to something the server does not have yet (for example a parent document another replica has not
+    /// uploaded). Sent with <see cref="PushOutcomeKind.RetryLater"/>: the replica resends the same operation with backoff.
+    /// </summary>
+    public const string DependencyMissing = "dependency-missing";
+
+    /// <summary>
+    /// Replica-only: the operation was too large for the server even on its own (HTTP 413), so it was parked locally and
+    /// never applied. Make the document smaller, then retry it.
+    /// </summary>
+    public const string PayloadTooLarge = "payload-too-large";
 }

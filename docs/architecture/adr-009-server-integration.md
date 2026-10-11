@@ -21,10 +21,10 @@ ordinary API endpoints, background jobs, admin tools, raw SQL.
 
 - v1 uses (1). The same service is called by the HTTP endpoints and by in-process callers (Blazor Server,
   background jobs), so authorization and validation are identical (I18).
-- One relational provider first: **PostgreSQL** via EF Core (`Bsync.Server.EntityFrameworkCore`),
-  chosen for transactional DDL, `xid8`/snapshot functions usable for the feed watermark (ADR-005),
+- One relational provider first: **PostgreSQL**, chosen for transactional DDL, `xid8`/snapshot functions usable for the feed watermark (ADR-005),
   robust unique constraints for receipts, and wide hosting availability. SQL Server is the likely second
-  provider.
+  provider. (This decision originally named an EF Core package, `Bsync.Server.EntityFrameworkCore`; it was never
+  created. The provider uses Npgsql directly; see Implementation below.)
 - Writes that bypass the service (raw SQL, bulk tools, other applications) are **unsupported** until a
   tested capture mechanism (2 or 3) exists; documentation says so explicitly.
 - Correctness never relies on a process lock; concurrency is enforced by conditional `UPDATE … WHERE
@@ -37,6 +37,11 @@ ordinary API endpoints, background jobs, admin tools, raw SQL.
   dependency and change tracking without helping with the locking.
 - Applications that keep their domain model in EF Core call the authority (in-process or over HTTP) for
   synchronized collections. Writes that bypass it stay unsupported, as decided above.
+
+## SQL Server (2026-10-05)
+
+ADR-014 adds the second provider, `Bsync.Server.SqlServer`, on the application's own database, with a write handler
+in the authority's transaction and a publisher for server-originated writes (both also part of alternative 1).
 
 Implementation details:
 - Documents are stored as their exact JSON text, per (collection, scope, id).

@@ -58,7 +58,7 @@ public static class LocalStoreConformance
                 BaseVersion = 9_007_199_254_740_993,
                 LocalRevision = 7,
                 Pending = pending,
-                Rejection = new SyncRejection(7, "forbidden", "no"),
+                Rejection = new SyncRejection(7, "forbidden", "no") { Arguments = new Dictionary<string, string> { ["limit"] = "200", ["field"] = "títle" } },
                 Observed = new ConformanceDocument { Id = "n1", Title = "observed", UpdatedAt = new HlcTimestamp(6, 0, "c") },
                 ObservedVersion = long.MaxValue,
                 Generation = 3,
@@ -368,6 +368,24 @@ public static class LocalStoreConformance
             await store.UpdateAsync([Put(Dirty("b", 1))]);
             await Check.Throws<ConformanceFault>(() => store.UpdateAsync([Put(Dirty("c", 50)), new("d", _ => throw new ConformanceFault("x"))]));
             Check.Equal(new HlcTimestamp(9, 0, "n"), await store.GetClockHighWaterAsync());
+        }),
+
+        new("Store ADR-017 I12: the clock high-water mark can be lowered explicitly and stays lowered across reads (or the store says it cannot)", async create =>
+        {
+            var store = await create();
+            await store.UpdateAsync([Put(Dirty("a", 90_000))]);
+            try
+            {
+                await store.ResetClockHighWaterAsync(new HlcTimestamp(40, 0, "n"));
+            }
+            catch (NotSupportedException)
+            {
+                return;
+            }
+
+            Check.Equal(new HlcTimestamp(40, 0, "n"), await store.GetClockHighWaterAsync());
+            await store.UpdateAsync([Put(Dirty("b", 50))]);
+            Check.Equal(new HlcTimestamp(50, 0, "n"), await store.GetClockHighWaterAsync()); // rises again from the new mark
         }),
 
         new("Store T59: non-ASCII and maximum-length ids are stored and compared ordinally", async create =>

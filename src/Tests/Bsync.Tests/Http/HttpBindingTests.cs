@@ -246,12 +246,17 @@ public sealed class HttpBindingTests
         var server = Server();
         var slow = new SlowAuthority(server, TimeSpan.FromSeconds(2)) { DelayAfterCommit = true };
         await using var host = await SyncTestHost.StartAsync(slow);
-        var client = new TestReplica(InMemorySyncServerRef.Create(), "a", transport: _ => host.Transport(timeout: TimeSpan.FromMilliseconds(300)));
+
+        // Only the first push gets the short timeout. The retry must not race it on a loaded machine: it would time
+        // out too, which is correct behaviour but not what this test is about.
+        var transport = new SwitchableTransport(host.Transport(timeout: TimeSpan.FromMilliseconds(300)));
+        var client = new TestReplica(InMemorySyncServerRef.Create(), "a", transport: _ => transport);
         await client.Engine.WriteAsync(new Note { Id = "n1", Title = "once" });
 
         var timeout = await Assert.ThrowsAsync<SyncTransportException>(() => client.Engine.PushAsync());
         Assert.True(timeout.IsTransient);
         slow.Delay = TimeSpan.Zero;
+        transport.Current = host.Transport();
         var retry = await client.Engine.PushAsync();
 
         Assert.True(retry.IsComplete);
@@ -327,6 +332,20 @@ public sealed class HttpBindingTests
 
             return result;
         }
+    }
+
+    private sealed class SwitchableTransport(ISyncTransport<Note> initial) : ISyncTransport<Note>
+    {
+        public ISyncTransport<Note> Current { get; set; } = initial;
+
+        public Task<PullResult<Note>> PullAsync(PullRequest request, CancellationToken cancellationToken = default) =>
+            Current.PullAsync(request, cancellationToken);
+
+        public Task<PushResult<Note>> PushAsync(PushRequest<Note> request, CancellationToken cancellationToken = default) =>
+            Current.PushAsync(request, cancellationToken);
+
+        public IAsyncEnumerable<StreamEvent<Note>> StreamAsync(Checkpoint since, CancellationToken cancellationToken = default) =>
+            Current.StreamAsync(since, cancellationToken);
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler

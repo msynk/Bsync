@@ -20,15 +20,18 @@
 
   <ItemGroup>
     <None Include="..\..\..\docs\protocol\fixtures\**\*.json" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\*.db" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite\Bsync.Storage.Sqlite.csproj" />
+    <!-- The store leaves the native SQLite build to the application. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <ProjectReference Include="..\Bsync.Tests.CrashHost\Bsync.Tests.CrashHost.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.AspNetCore\Bsync.Server.AspNetCore.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.PostgreSql\Bsync.Server.PostgreSql.csproj" />
-    <ProjectReference Include="..\..\Bsync\Bsync.Testing\Bsync.Testing.csproj" />
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Blazor\Bsync.Blazor.csproj" />
   </ItemGroup>
 

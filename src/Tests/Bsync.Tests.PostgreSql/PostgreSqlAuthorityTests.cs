@@ -25,6 +25,37 @@ public sealed class PostgreSqlAuthorityTests : IAsyncLifetime
     private static TestReplica Replica(ISyncAuthority<Note> authority, string node, IConflictHandler<Note>? handler = null, SyncCallContext? context = null, SyncOptions<Note>? options = null) =>
         new(InMemorySyncServerRef.Create(), node, handler, options, SystemPhysicalClock.Instance, transport: _ => new InProcessTransport<Note>(authority, context));
 
+    [Fact(DisplayName = "D5 F18: the retention service reads every feed's head and purges each scope by age")]
+    public async Task RetentionPurgesEachScope()
+    {
+        await using var authority = await _database.AuthorityAsync();
+        var tenant = new SyncCallContext(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "u")], "test")), "tenant-a");
+        var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        var retention = new SyncRetention(new SyncRetentionOptions { MaxOfflineHorizon = TimeSpan.FromDays(45), TimeProvider = time }, [authority]);
+        foreach (var context in new[] { SyncCallContext.Anonymous, tenant })
+        {
+            var writer = Replica(authority, $"w-{context.Scope}", context: context);
+            await writer.Engine.WriteAsync(new Note { Id = "gone", UpdatedAt = new HlcTimestamp(SystemPhysicalClock.Instance.NowMilliseconds(), 0, "n") });
+            await writer.Engine.SyncAsync();
+            await writer.Engine.DeleteAsync("gone");
+            await writer.Engine.SyncAsync();
+        }
+
+        var heads = await authority.GetFeedHeadsAsync();
+        var first = await retention.RunOnceAsync();
+        time.Advance(TimeSpan.FromDays(44));
+        var early = await retention.RunOnceAsync();
+        time.Advance(TimeSpan.FromDays(2));
+        var late = await retention.RunOnceAsync();
+
+        Assert.Equal(["default", "tenant-a"], heads.Keys.Order());
+        Assert.All(heads.Values, head => Assert.Equal(2, head));
+        Assert.Equal((0, 0), first);
+        Assert.Equal((0, 0), early);
+        Assert.Equal((2, 4), late); // one tombstone and two receipts per scope
+        Assert.Equal(2, (await authority.PullAsync(tenant, new PullRequest(Checkpoint.Start, 10))).RetentionHorizon);
+    }
+
     [Fact(DisplayName = "T24 I05 I06: concurrent writers on two instances never lose updates, and a concurrent reader never skips a version")]
     public async Task ConcurrentInstancesKeepCommittedPrefix()
     {
@@ -44,12 +75,14 @@ public sealed class PostgreSqlAuthorityTests : IAsyncLifetime
             var checkpoint = Checkpoint.Start;
             while (true)
             {
+                // Read the flag before pulling: the last drain must start after every write committed.
+                var stopping = stop.IsCancellationRequested;
                 var page = await two.PullAsync(SyncCallContext.Anonymous, new PullRequest(checkpoint, 7));
                 seen.AddRange(page.Changes.Select(c => c.Version));
                 checkpoint = page.Checkpoint;
                 if (!page.HasMore)
                 {
-                    if (stop.IsCancellationRequested)
+                    if (stopping)
                     {
                         return;
                     }
@@ -120,7 +153,7 @@ public sealed class PostgreSqlAuthorityTests : IAsyncLifetime
 
         Assert.True(result.IsComplete);
         Assert.False(result.ResetPerformed);
-        Assert.Equal(1, afterRestart.Transport.PushLog.Single().Operations.Count); // the lost response is replayed from the receipt
+        Assert.Single(afterRestart.Transport.PushLog.Single().Operations); // the lost response is replayed from the receipt
         await again.Engine.SyncAsync();
         Assert.Equal("durable", (await again.RecordAsync("n1")).Current.Title);
     }

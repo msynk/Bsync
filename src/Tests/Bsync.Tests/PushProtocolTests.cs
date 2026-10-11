@@ -34,7 +34,7 @@ public sealed class PushProtocolTests
     [Fact(DisplayName = "T05 I08 I19: mixed accepted, conflicting and rejected rows report residual status")]
     public async Task MixedOutcomes()
     {
-        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
+        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (_, op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
         var other = new TestReplica(server, "b");
         await other.Engine.WriteAsync(new Note { Id = "c", Title = "server" });
         await other.Engine.SyncAsync();
@@ -60,7 +60,7 @@ public sealed class PushProtocolTests
     [Fact(DisplayName = "T57 I19: a rejected record does not block later records and is retried after a new edit")]
     public async Task RejectedRecordDoesNotStarveQueue()
     {
-        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
+        var server = new InMemorySyncServerRef(new Server.InMemorySyncServer<Note>(NoteJson.ServerOptions(validator: (_, op, _) => op.Document.Title == "bad" ? PushErrorCodes.Forbidden : null)));
         var client = new TestReplica(server, "a", options: new SyncOptions<Note> { PushBatchSize = 1 });
         await client.Engine.WriteAsync(new Note { Id = "a-first", Title = "bad" }); // oldest, head of queue
         for (var i = 0; i < 3; i++)

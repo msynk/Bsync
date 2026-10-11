@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Description>Tests of the SQL Server authority. Requires BSYNC_SQLSERVER, a connection string to a server where the user may create databases (LocalDB, a container or Azure SQL).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
+    <ProjectReference Include="..\Bsync.Tests\Bsync.Tests.csproj" />
+    <ProjectReference Include="..\..\Samples\Bsync.Samples.Tasks.Server\Bsync.Samples.Tasks.Server.csproj" />
+    <ProjectReference Include="..\..\Samples\Bsync.Samples.Tasks.Console\Bsync.Samples.Tasks.Console.csproj" />
+  </ItemGroup>
+
+</Project>

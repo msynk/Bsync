@@ -45,7 +45,10 @@ public static class MauiProgram
             LiveHints = true,
             Interval = TimeSpan.FromSeconds(10),
             MaxBackoff = TimeSpan.FromSeconds(10),
-        });
+
+            // Native lifecycle (ADR-007, task G1): sync when the network returns; no replication while the app is in the
+            // background; resuming syncs at once.
+        }.UseMauiLifecycle());
 
         return builder.Build();
     }

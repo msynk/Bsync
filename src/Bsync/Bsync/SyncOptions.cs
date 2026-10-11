@@ -37,6 +37,32 @@ public sealed class SyncOptions<TDocument>
     /// </summary>
     public string DiagnosticsName { get; init; } = typeof(TDocument).Name;
 
+    /// <summary>
+    /// What a record shows while a conflict is kept by the default (<c>Defer</c>) policy: the server's state (default) or
+    /// the local edit (F20). Either way the conflict is listed and nothing is lost.
+    /// </summary>
+    public Conflicts.KeptConflictView KeptConflictView { get; init; } = Conflicts.KeptConflictView.Server;
+
+    /// <summary>Two-way (default) or pull-only (read-only replica that stores only current states).</summary>
+    public SyncMode Mode { get; init; } = SyncMode.TwoWay;
+
+    /// <summary>
+    /// Decides, before each push, whether a pending document may be sent now. Return <see langword="false"/> to hold it
+    /// back: it stays pending and is offered again on the next run, and it counts in <see cref="SyncResult.Deferred"/>,
+    /// so a session backs off instead of retrying at once. A held member holds its whole dependency group. Use it when a
+    /// document must not reach the server before something else does, for example the bytes of an attachment it names
+    /// (task F1). Default: every pending document is ready.
+    /// </summary>
+    public Func<TDocument, CancellationToken, ValueTask<bool>>? ReadyToPush { get; init; }
+
+    /// <summary>
+    /// Whether writes the server rejected with <c>clock-skew</c> are re-stamped and sent again once the server's time is
+    /// known (ADR-017 part 2). Their timestamps never left this device, so the clock is moved back and they get new,
+    /// acceptable timestamps in their original order. Default <see langword="true"/>. Turn it off if the application
+    /// relies on <see cref="ISyncEntity.UpdatedAt"/> values it read before a write was uploaded.
+    /// </summary>
+    public bool RestampSkewedWrites { get; init; } = true;
+
     /// <summary>Throws <see cref="ArgumentOutOfRangeException"/> if any value is out of range.</summary>
     public void Validate()
     {
@@ -46,5 +72,9 @@ public sealed class SyncOptions<TDocument>
         ArgumentOutOfRangeException.ThrowIfLessThan(PushBatchSize, 1, nameof(PushBatchSize));
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxPushBatches, 1, nameof(MaxPushBatches));
         ArgumentOutOfRangeException.ThrowIfLessThan(MaxConflictRetries, 1, nameof(MaxConflictRetries));
+        if (!Enum.IsDefined(Mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Mode));
+        }
     }
 }

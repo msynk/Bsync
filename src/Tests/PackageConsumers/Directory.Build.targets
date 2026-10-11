@@ -1,0 +1,3 @@
+<Project>
+  <!-- Stops src/Directory.Build.targets (package README) from applying to the consumers. -->
+</Project>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Bsync.Storage;
 using Bsync.Testing;
 using Microsoft.Playwright;
 using Xunit;
@@ -40,11 +41,90 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
         var (context, page) = await NewDeviceAsync(browser);
         await using var _ = context;
 
-        var json = await page.CallAsync("RunStoreConformance", Unique("conformance"));
+        var json = await page.CallAsync("RunStoreConformance", Unique("conformance"), false);
         var results = JsonSerializer.Deserialize<List<CaseResult>>(json, Web)!;
 
-        Assert.Equal(LocalStoreConformance.Cases.Count, results.Count);
+        Assert.Equal(LocalStoreConformance.Cases.Count + LocalStoreIndexConformance.Cases.Count, results.Count);
         Assert.All(results, r => Assert.True(r.Passed, $"{r.Name}: {r.Error}"));
+    }
+
+    [Theory(DisplayName = "ADR-016: an encrypted IndexedDB replica passes the shared store and index conformance cases")]
+    [MemberData(nameof(Browsers))]
+    public async Task EncryptedStoreConformance(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+
+        var json = await page.CallAsync("RunStoreConformance", Unique("encrypted"), true);
+        var results = JsonSerializer.Deserialize<List<CaseResult>>(json, Web)!;
+
+        Assert.Equal(LocalStoreConformance.Cases.Count + LocalStoreIndexConformance.Cases.Count, results.Count);
+        Assert.All(results, r => Assert.True(r.Passed, $"{r.Name}: {r.Error}"));
+    }
+
+    [Theory(DisplayName = "ADR-016: IndexedDB stores documents sealed (AES-GCM); a missing or wrong key is refused, never treated as an empty replica")]
+    [MemberData(nameof(Browsers))]
+    public async Task EncryptionAtRest(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var database = Unique("sealed");
+
+        var steps = (await page.CallAsync("RunEncryptionChecks", database)).Split(" ;; ");
+        var raw = await page.Page.EvaluateAsync<string>(
+            """
+            name => new Promise((resolve, reject) => {
+              const open = indexedDB.open(name);
+              open.onerror = () => reject(open.error);
+              open.onsuccess = () => {
+                const all = open.result.transaction("records").objectStore("records").getAll();
+                all.onsuccess = () => { open.result.close(); resolve(JSON.stringify(all.result)); };
+              };
+            })
+            """,
+            database);
+
+        Assert.Equal(["none:key", "wrong:key", "right:secret-title-0123456789"], steps);
+        Assert.Contains("enc1:", raw, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-title", raw, StringComparison.Ordinal);
+    }
+
+    [Theory(DisplayName = "F1: the browser blob store reads back imported content, refuses a corrupted transfer, continues a transfer after a reload, and wipes")]
+    [MemberData(nameof(Browsers))]
+    public async Task BrowserBlobStore(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var name = Unique("blobs");
+
+        var checks = (await page.CallAsync("RunBlobChecks", name)).Split(" ;; ");
+        var sha = await page.CallAsync("BlobFirstHalf", name + "-resume");
+        await page.Page.ReloadAsync();
+        await page.Page.WaitForFunctionAsync("() => window.bsyncReady === true", null, new PageWaitForFunctionOptions { Timeout = 60_000 });
+        var resumed = (await page.CallAsync("BlobSecondHalf", name + "-resume", sha)).Split(" ;; ");
+
+        Assert.Equal(["import:True", "corrupt:False|True|0", "list:True", "wiped:0"], checks);
+        Assert.Equal(["kept:1048576", "completed:True", $"size:{2 * 1024 * 1024}"], resumed);
+    }
+
+    [Theory(DisplayName = "ADR-018: IndexedDB keeps and uses index keys, falls back when another writer makes them unusable, and rebuilds on the next open")]
+    [MemberData(nameof(Browsers))]
+    public async Task IndexLifecycle(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var signature = LocalStoreIndexing.Signature(LocalStoreIndexConformance.Indexes);
+
+        var steps = (await page.CallAsync("RunIndexLifecycle", Unique("index"))).Split(" ;; ");
+
+        Assert.Equal(
+            [
+                $"rebuilt:{signature}|b,a",
+                $"maintained:{signature}|c,b,a|3",
+                "invalidated:!|c,d,b,a",
+                $"reopened:{signature}|c,d,b,a",
+            ],
+            steps);
     }
 
     [Theory(DisplayName = "T51 T52 I01 I13 I20: offline edits survive a reload, upload on reconnect and reach another device")]
@@ -209,7 +289,7 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
         var newTab = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
         Assert.Equal("ok", await oldTab.CallAsync("OpenReplica", database, "old"));
 
-        // Any version above the current schema (3) stands in for a newer application.
+        // Any version above the current schema (4) stands in for a newer application.
         var upgrade = await newTab.Page.EvaluateAsync<string>(
             """
             name => new Promise(resolve => {
@@ -226,7 +306,7 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
         Assert.Equal("error:store:outdated", await oldTab.CallAsync("OpenReplica", database, "old"));
     }
 
-    [Theory(DisplayName = "I01 I17: a schema 1 browser database with pending work upgrades to the current schema (3) and still uploads it once")]
+    [Theory(DisplayName = "I01 I17: a schema 1 browser database with pending work upgrades to the current schema (4) and still uploads it once")]
     [MemberData(nameof(Browsers))]
     public async Task SchemaOneUpgradeKeepsPendingWork(string browser)
     {
@@ -279,7 +359,7 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
         Assert.Equal(1, (await page.SyncAsync()).Pushed);
         Assert.Equal("written by schema 1", fixture.Authority.Server.Snapshot().Single().Title);
         Assert.Equal(1, fixture.Authority.Server.ReceiptCount);
-        Assert.Equal(3, await page.Page.EvaluateAsync<int>(
+        Assert.Equal(4, await page.Page.EvaluateAsync<int>(
             "name => new Promise(ok => { const r = indexedDB.open(name); r.onsuccess = () => { const v = r.result.version; r.result.close(); ok(v); }; })",
             database));
     }

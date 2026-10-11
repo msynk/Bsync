@@ -135,7 +135,10 @@ public sealed class BaselineRegressionTests
     {
         var world = new ManualClock(1_000_000);
         var server = InMemorySyncServerRef.Create(world);
-        var evil = new TestReplica(server, "evil", physicalClock: new ManualClock(world.NowMilliseconds() + TimeSpan.FromDays(365).Ticks / TimeSpan.TicksPerMillisecond));
+        var future = new ManualClock(world.NowMilliseconds() + TimeSpan.FromDays(365).Ticks / TimeSpan.TicksPerMillisecond);
+
+        // The server refuses the timestamp (shown with re-stamping off, so the rejection stays on the record).
+        var evil = new TestReplica(server, "evil", physicalClock: future, options: new SyncOptions<Note> { RestampSkewedWrites = false });
         var good = new TestReplica(server, "good", physicalClock: world);
 
         await evil.Engine.WriteAsync(new Note { Id = "evil" });
@@ -147,6 +150,16 @@ public sealed class BaselineRegressionTests
         Assert.Equal("clock-skew", (await evil.RecordAsync("evil")).Rejection!.ErrorCode);
         Assert.DoesNotContain(server.Server.Snapshot(), n => n.Id == "evil");
         Assert.True(server.Get("good").UpdatedAt.WallTime <= world.NowMilliseconds());
+
+        // By default (ADR-017 part 2) the replica re-stamps the write from the server's time and uploads it: the far-future
+        // timestamp still never reaches the server or any other replica.
+        var fixedUp = new TestReplica(server, "fixed", physicalClock: future);
+        await fixedUp.Engine.WriteAsync(new Note { Id = "restamped" });
+        var fixedResult = await fixedUp.Engine.SyncAsync();
+
+        Assert.Equal((1, 0), (fixedResult.Pushed, fixedResult.Rejected));
+        Assert.True(server.Get("restamped").UpdatedAt.WallTime <= world.NowMilliseconds() + 5_000);
+        Assert.All(server.Server.Snapshot(), n => Assert.True(n.UpdatedAt.WallTime <= world.NowMilliseconds() + 5_000));
     }
 
     [Fact(DisplayName = "S06 T22 I12: counter overflow is rejected or carried into wall time")]
