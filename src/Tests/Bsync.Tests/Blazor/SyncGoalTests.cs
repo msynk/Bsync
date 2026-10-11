@@ -147,7 +147,7 @@ public sealed class SyncGoalTests
         var wait = setup.Notes.SyncAsync(SyncGoal.Accepted("doc", second.LocalRevision), TimeSpan.FromSeconds(10));
 
         setup.Transport.PushGate.SetResult(); // revision 1 is acknowledged
-        await WaitUntil(() => engine.GetAsync("doc").Result!.Pending is null || engine.GetAsync("doc").Result!.Pending!.Revision == second.LocalRevision, "revision 1 acknowledged");
+        await WaitUntil(() => engine.GetAsync("doc").Result!.Pending is not { } pending || pending.Revision == second.LocalRevision, "revision 1 acknowledged");
         var completedEarly = wait.IsCompletedSuccessfully && (await wait).Reached && setup.Server.Get("doc").Title != "v2";
         setup.Transport.PushGate = null;
         var result = await wait;
