@@ -1,5 +1,14 @@
 <Project>
 
+  <!-- Older clones retain the pre-rename Git remote. Canonicalize only that known repository alias,
+       preserving the SDK-selected commit and every other source root (including future submodules). -->
+  <Target Name="CanonicalizeBsyncSourceLink" BeforeTargets="_GenerateSourceLinkFile">
+    <ItemGroup>
+      <SourceRoot Update="@(SourceRoot)"
+                  SourceLinkUrl="$([System.String]::Copy('%(SourceRoot.SourceLinkUrl)').Replace('https://raw.githubusercontent.com/msynk/BlazorSync/', 'https://raw.githubusercontent.com/msynk/Bsync/'))" />
+    </ItemGroup>
+  </Target>
+
   <!-- Every package carries the repository README (evaluated after the project, so IsPackable is final). -->
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Visible="false" />

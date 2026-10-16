@@ -28,7 +28,7 @@ public class LocalQuery
 
     private static readonly SyncQuery<BenchDocument> IndexedRange = new() { Index = Workload.Due.Between(Workload.Start.AddDays(100), Workload.Start.AddDays(200)), Skip = 50, Limit = 50 };
 
-    [Params(10_000, 50_000)]
+    [Params(10_000, 50_000, 100_000)]
     public int Count { get; set; }
 
     [Params("memory", "sqlite-full")]
@@ -47,6 +47,7 @@ public class LocalQuery
             OpenReplica = (_, _) => Task.FromResult(new LocalReplica<BenchDocument>(store, "reader")),
             CreateTransport = _ => new InProcessTransport<BenchDocument>(server),
             Interval = TimeSpan.FromHours(1),
+            StartReplication = false,
         });
         _collection = new LocalSyncCollection<BenchDocument>(_session, _ => Task.FromResult("bench"));
         await _collection.QueryAsync(); // opens the replica

@@ -5,12 +5,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Bsync" Version="$(BsyncPackageVersion)" />
-    <PackageReference Include="Bsync.Blazor" Version="$(BsyncPackageVersion)" />
-    <PackageReference Include="Bsync.Server.AspNetCore" Version="$(BsyncPackageVersion)" />
-    <PackageReference Include="Bsync.Server.SqlServer" Version="$(BsyncPackageVersion)" />
-    <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageReference Include="Bsync" />
+    <PackageReference Include="Bsync.Blazor" />
+    <PackageReference Include="Bsync.Server.AspNetCore" />
+    <PackageReference Include="Bsync.Server.PostgreSql" />
+    <PackageReference Include="Bsync.Server.SqlServer" />
+    <PackageReference Include="Bsync.Storage.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
 
 </Project>

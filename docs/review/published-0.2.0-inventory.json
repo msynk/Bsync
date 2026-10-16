@@ -1,0 +1,78 @@
+{
+  "checkedOn": "2026-10-16",
+  "source": "https://api.nuget.org/v3-flatcontainer/",
+  "packages": [
+    {
+      "package": "Bsync",
+      "version": "0.2.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "54047855b2edbedd55487f033f4206beb7d42a7a"
+      },
+      "sha256": "6a6887192d6eb6bcd28ab53c9bac58205be75a172576b238f98e4be260ad659f",
+      "matchesLocal": false
+    },
+    {
+      "package": "Bsync.Blazor",
+      "version": "0.2.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "54047855b2edbedd55487f033f4206beb7d42a7a"
+      },
+      "sha256": "62eeb4b757aa49bf4f83bfc98450a13275d8172bd1e50c73d1ea4626d4a4155e",
+      "matchesLocal": false
+    },
+    {
+      "package": "Bsync.Server.AspNetCore",
+      "version": "0.2.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "54047855b2edbedd55487f033f4206beb7d42a7a"
+      },
+      "sha256": "cd1d4da763b3f5db6b66bbd169f52642c72400ba7529f309a1684198a1d9b886",
+      "matchesLocal": false
+    },
+    {
+      "package": "Bsync.Server.PostgreSql",
+      "version": "0.2.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "54047855b2edbedd55487f033f4206beb7d42a7a"
+      },
+      "sha256": "935068bade3dca5813a5928f68292d3356cb0b272161975f71165939c7b475dd",
+      "matchesLocal": false
+    },
+    {
+      "package": "Bsync.Server.SqlServer",
+      "version": "0.2.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "54047855b2edbedd55487f033f4206beb7d42a7a"
+      },
+      "sha256": "978f8dfd02a4e8f946f4febda279602d8e9a308811473683e481d436f84a01ea",
+      "matchesLocal": false
+    },
+    {
+      "package": "Bsync.Storage.Sqlite",
+      "version": "0.2.0",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "54047855b2edbedd55487f033f4206beb7d42a7a"
+      },
+      "sha256": "d7f49982fec72eea9a6ebfcf58e672456306712b8be1e86d0e4bb2f62f015f0d",
+      "matchesLocal": false
+    }
+  ]
+}

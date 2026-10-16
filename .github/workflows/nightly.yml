@@ -28,10 +28,21 @@ jobs:
           dotnet-version: 10.0.x
       - name: Pack with a dated preview suffix
         run: |
-          suffix="preview.$(date -u +%Y%m%d).${{ github.run_number }}"
+          suffix="preview.$(date -u +%Y%m%d).${{ github.run_id }}.${{ github.run_attempt }}"
           for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite; do
             dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=$suffix || exit 1
           done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify package identity and record provenance
+        run: |
+          version=$(ls artifacts/packages/Bsync.Storage.Sqlite.*.nupkg | sed -E 's|.*/Bsync\.Storage\.Sqlite\.(.*)\.nupkg|\1|')
+          python scripts/release.py manifest --version "$version"
+      - name: Verify distributed symbols and Source Link
+        run: dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages "$(git rev-parse HEAD)"
+      - name: Reject mismatched and missing packaged symbols
+        run: python scripts/verify_symbols_test.py artifacts/packages -v
       - uses: actions/upload-artifact@v4
         with:
           name: preview-packages

@@ -1,0 +1,15 @@
+<Project>
+  <!-- Exercise central package management without overriding the SQL Server package's security minimum. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Bsync" Version="$(BsyncPackageVersion)" />
+    <PackageVersion Include="Bsync.Blazor" Version="$(BsyncPackageVersion)" />
+    <PackageVersion Include="Bsync.Server.AspNetCore" Version="$(BsyncPackageVersion)" />
+    <PackageVersion Include="Bsync.Server.PostgreSql" Version="$(BsyncPackageVersion)" />
+    <PackageVersion Include="Bsync.Server.SqlServer" Version="$(BsyncPackageVersion)" />
+    <PackageVersion Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+</Project>

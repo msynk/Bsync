@@ -27,6 +27,7 @@ sealed class Bsync.Server.SqlServer.SqlServerSyncAuthorityOptions<TDocument> whe
 sealed class Bsync.Server.SqlServer.SqlServerSyncAuthority<TDocument> : Bsync.Server.ISyncAuthority<TDocument>, Bsync.Server.ISyncCommitNotifier, Bsync.Server.ISyncDocumentReader<TDocument>, Bsync.Server.ISyncPublisher<TDocument>, Bsync.Server.ISyncRetentionTarget, System.IAsyncDisposable where TDocument : class, Bsync.ISyncEntity
   Bsync.Server.AuthorityLimits Limits { get; }
   System.String Epoch { get; }
+  System.Threading.Tasks.Task AcquirePublicationLockAsync(System.String scope, System.Data.Common.DbTransaction transaction, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task BeginNewEpochAsync(System.Int64 versionFloor, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PullResult<TDocument>> PullAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PullRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Protocol.PushResult<TDocument>> PushAsync(Bsync.Server.SyncCallContext context, Bsync.Protocol.PushRequest<TDocument> request, System.Data.Common.DbTransaction transaction, System.Threading.CancellationToken cancellationToken = default)

@@ -283,6 +283,23 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         return PublishAsync([scope], transaction, (write, ct) => PublishOneAsync(write, document, null, ct), [document.Id], cancellationToken);
     }
 
+    /// <summary>
+    /// Acquires this collection/scope's feed lock in the caller's transaction before domain rows are read or changed.
+    /// Use the same feed-before-domain order as replication handlers. For multiple feeds, establish one application-wide
+    /// collection/scope order and acquire all locks in that order. No publication, commit or notification occurs here.
+    /// The transaction must use this authority's database and a supported isolation level.
+    /// </summary>
+    public Task AcquirePublicationLockAsync(string scope, DbTransaction transaction, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        if (!SyncIds.IsValid(scope)) throw new ArgumentException("Scope must be a valid identifier.", nameof(scope));
+        return InTransactionAsync(transaction, async (connection, active) =>
+        {
+            _ = await LockFeedAsync(connection, active, scope, cancellationToken).ConfigureAwait(false);
+            return true;
+        }, cancellationToken);
+    }
+
     /// <inheritdoc />
     public Task<SyncPublishResult> DeleteAsync(string scope, string id, DbTransaction? transaction = null, CancellationToken cancellationToken = default)
     {

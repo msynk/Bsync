@@ -63,7 +63,11 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
         Queries.Validate(query);
         if (query.Order is not null)
         {
-            return query.Apply(await engine.QueryAsync(cancellationToken: cancellationToken).ConfigureAwait(false));
+            var documents = await engine.QueryAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            Queries.Materialized(documents.Count, "full-sort");
+            var result = query.Apply(documents);
+            Queries.Returned(result.Count, "full-sort");
+            return result;
         }
 
         // Both the default (id) order and an index are store order: walk it in pages and stop at the limit, so memory
@@ -85,6 +89,7 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
             }
         }
 
+        Queries.Returned(matches.Count, query.Index is null ? "id-page" : "index-page");
         return matches;
     }
 
@@ -101,7 +106,9 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
 
         if (query.Order is not null)
         {
-            return (await engine.QueryAsync(cancellationToken: cancellationToken).ConfigureAwait(false)).Count(d => query.Where?.Invoke(d) ?? true);
+            var documents = await engine.QueryAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            Queries.Materialized(documents.Count, "full-count");
+            return documents.Count(d => query.Where?.Invoke(d) ?? true);
         }
 
         var count = 0;
@@ -123,6 +130,7 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
             var page = query.Index is { } index
                 ? await engine.QueryIndexAsync(index, afterEntry, Queries.PageSize, cancellationToken).ConfigureAwait(false)
                 : await engine.QueryPageAsync(afterId, Queries.PageSize, cancellationToken: cancellationToken).ConfigureAwait(false);
+            Queries.Materialized(page.Count, query.Index is null ? "id-page" : "index-page");
             foreach (var document in page)
             {
                 if (query.Where?.Invoke(document) ?? true)

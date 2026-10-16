@@ -1,5 +1,50 @@
 # Compatibility policy and migration notes
 
+## Offline orchestration additions (unreleased)
+
+New account lifecycle, orchestration stores, transfer/cache/package managers, workflow/background/read-model contracts and the
+SQL Server publication-lock method are additive. Existing session opens still construct transports normally;
+`StartReplication=false` and coordinator offline opening defer construction until replication is enabled.
+The public API baselines and package-only smoke consumer include these additions.
+
+Immutable intent request/registration and separate execution/status contracts are additive; payload metadata must be
+explicitly generated/registered. Embedding them is an application document-schema decision, not a protocol extension.
+The Tasks adapter preserves its existing schema-1 wire representation and ledger fingerprints; new oversized/malformed
+requests receive `intent-request-invalid`. There is no implicit migration of historical command identities.
+Managed reimports now verify existing bytes and repair corruption by verified atomic replacement, retaining pins.
+Replacement requires capacity for old and staged bytes. FileBlobCache promotion now replaces an existing object;
+open handles retain their original content. Custom blob providers must honor verified promotion or refuse repair.
+
+Orchestration tables have independent schema version 1 and do not change the document database `user_version`.
+Manifests, jobs, cache entries, workflow progress, read-model metadata and background requests independently reject unsupported versions.
+Transfer schema 1 adds optional `CreatedUtc`; old records retain unknown age. Package verification observations have
+their own schema 1 and are advisory: they must not be mistaken for current content verification after external loss.
+Account outcomes add `CredentialsRequired` (local data remains open) and `Migrating` (host-deferred opening).
+Local key access adds an optional host provider with exact account/key/version identity; existing encrypted store formats
+and key import options are unchanged. There is no automatic key provisioning, rotation or ciphertext migration.
+Whole-account resource locks are optional; omitting the option preserves host-managed lifetime exclusion. With the option
+enabled, deletion closes the coordinator even when it refuses pending work, and requires exclusive access against every
+other registered participant. Reopen explicitly after a refusal. `AccountOpenState.InUse` reports exclusive ownership.
+Additional resources without `InspectPendingAsync` now contribute unknown pending work. Default deletion refuses
+unknown resources; configure inspection or choose explicit export/discard. Existing resource constructors remain valid.
+Read-model schema versions belong to the host; a rebuild stages a separate immutable generation. Older readers must
+not interpret a newer projection payload with an incompatible serializer. Retired/staging data remains until account deletion.
+No replication wire extension is enabled. Published 0.1.0/0.2.0 SQLite fixtures preserve pending IDs, groups,
+conflicts, parked rejections and unknown document fields in migration tests.
+
+Rollback must preserve new metadata and cache bytes. An older application that directly evicts the same cache cannot
+honor new pins; do not enable its eviction against managed content. There is no destructive automatic downgrade.
+The Tasks sample adds application-owned command-ledger/outbox tables and a request-schema field. Production apps
+need explicit migrations and historical-command replay/backfill policy before adopting that recipe.
+The optional external-effect recipe has a separate `ExternalEffectOutbox` table and initializer; it is not installed
+or dispatched automatically. Terminal identities remain retained, and receiver idempotency must outlive every possible
+retry. Enabling this recipe requires an application migration, a host worker and a transactional result publisher.
+
+Managed cache readers use reserved `reader-v2/`/`snapshot-v2/` pins and unique physical lifetime locks. Older custom
+`IBlobCacheLock` implementations remain source-compatible through a default nonblocking probe that retains pins;
+implement the probe to enable dead-owner reclamation. Custom providers must accept the documented `lifetime-` names.
+Old reader pins remain retained rather than being guessed dead. Use asynchronous disposal for timely release.
+
 ## Policy
 
 - Bsync is pre-1.0. `0.1.0` is published on NuGet; current release status is in the
@@ -18,14 +63,18 @@
 
 1. Every user-visible change adds a line to `CHANGELOG.md` under *Unreleased* in the same change; breaking ones also
    get an entry in this file.
-2. A release sets `VersionPrefix` in `src/Directory.Build.props`, renames *Unreleased* to the version and date, and
-   packs from a clean tree whose CI run is green, including the package-consumer job.
+2. A release sets `VersionPrefix` in `src/Directory.Build.props`, adds a heading `## <version> - YYYY-MM-DD`, and
+   packs from a clean tree at the protected `v<version>` tag whose qualification runs are green, including
+   package consumers. [Release validation](operations/releases.md) checks tag, commit, package metadata and
+   changelog agreement and records checksums, toolchain details and Source Link build maps (ADR-019).
 3. Publishing to NuGet is a separate, explicitly authorized step (ADR-012); no workflow in this repository publishes.
 4. Previews: `.github/workflows/nightly.yml` packs `X.Y.Z-preview.YYYYMMDD.N` every night as a build artifact only.
 
-## Unreleased (0.2.0)
+## 0.2.0 source baseline (published artifact provenance unresolved)
 
-Changes after 0.1.0, not yet on NuGet. Breaks the package set, two signatures and one status behaviour (the first five rows).
+The six 0.2.0 packages are published, but identify an earlier source commit; exact source equivalence
+is unproven ([inventory](review/release-baseline-2026-10-16.md)). The following describes the source
+baseline after 0.1.0, including changes to the package set, two signatures and one status behaviour.
 
 | Change | Why | Migration |
 |---|---|---|

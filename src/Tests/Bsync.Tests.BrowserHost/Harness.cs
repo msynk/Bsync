@@ -22,11 +22,196 @@ public static class Harness
     private static Uri _baseAddress = null!;
     private static Replica? _replica;
     private static IndexedDbReplicaLease? _lease;
+    private static IAsyncDisposable? _cacheLock;
+    private static Stream? _managedReader;
+    private static Bsync.Blobs.PackageSnapshot? _managedSnapshot;
+    private static readonly List<IAsyncDisposable> AccountLocks = [];
+
+    [JSInvokable(nameof(AccountResourceCheck))]
+    public static async Task<string> AccountResourceCheck(string accountName, bool exclusive, bool hold)
+    {
+        var locks = await BrowserAccountResourceLock.OpenAsync(_js);
+        var acquired = await locks.TryAcquireAsync(new("tests", "browser", accountName), exclusive);
+        if (acquired is null) { await locks.DisposeAsync(); return "blocked"; }
+        if (hold) { AccountLocks.Add(locks); AccountLocks.Add(acquired); }
+        else { await acquired.DisposeAsync(); await locks.DisposeAsync(); }
+        return "acquired";
+    }
+
+    [JSInvokable(nameof(ReaderRecoveryChecks))]
+    public static async Task<string> ReaderRecoveryChecks(string accountName, bool hold)
+    {
+        var account = new Bsync.Client.AccountScope("tests", "browser", accountName);
+        var metadata = await IndexedDbOrchestrationStore.OpenAsync(_js, account);
+        var locks = await Bsync.Blazor.Blobs.BrowserBlobCacheLock.OpenAsync(_js, account);
+        var bytes = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, account.StorageKey);
+        var cache = new Bsync.Blobs.ManagedBlobCache(bytes, metadata, locks, 8, 8);
+        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new byte[] { 1 }));
+        if (hold)
+        {
+            // Deliberately keep the readers/resources alive until the test terminates this entire tab.
+            var jobs = new Bsync.Blobs.BlobTransferManager(metadata, cache, new(new HttpClient { BaseAddress = _baseAddress }));
+            var packages = new Bsync.Blobs.OfflinePackageManager(metadata, cache, jobs, locks, (_, _) => Task.FromResult(true));
+            await cache.ImportPinnedAsync(new MemoryStream([1]), "pending/work");
+            await packages.StageAsync(new(1, "manual", "one", null, [new("page", hash, 1, true, [])]));
+            if (!await packages.TryActivateAsync("manual", "one")) throw new Exception("Activation failed.");
+            _managedSnapshot = await packages.OpenActiveAsync("manual");
+            _managedReader = await _managedSnapshot.OpenAsync("page");
+            return "held";
+        }
+        try
+        {
+            await cache.ReconcileAsync();
+            var owners = (await cache.GetEntryAsync(hash)).Owners;
+            if (!owners.Contains("pending/work") || !owners.Any(p => p.StartsWith("package/", StringComparison.Ordinal))) throw new Exception("Durable work pin was reclaimed.");
+            return owners.Count(p => p.StartsWith("reader-v2/", StringComparison.Ordinal) || p.StartsWith("snapshot-v2/", StringComparison.Ordinal)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        finally { await metadata.DisposeAsync(); await locks.DisposeAsync(); }
+    }
+
+    [JSInvokable(nameof(ReadModelChecks))]
+    public static async Task<string> ReadModelChecks(string accountName, bool reopen)
+    {
+        await using var store = await IndexedDbOrchestrationStore.OpenAsync(_js, new("tests", "browser", accountName));
+        var model = new Bsync.Client.LocalReadModel(store, "catalog");
+        static async IAsyncEnumerable<Bsync.Client.ReadModelRow> Rows(int count, bool fail)
+        {
+            for (var i = 0; i < count; i++) yield return new(i.ToString(System.Globalization.CultureInfo.InvariantCulture), "derived");
+            await Task.CompletedTask;
+            if (fail) throw new IOException("Interrupted build.");
+        }
+        if (!reopen)
+        {
+            if (!await model.RebuildAsync("1", "snapshot1", Rows(3, false), TimeSpan.FromSeconds(15))) throw new Exception("Initial build failed.");
+            try { await model.RebuildAsync("2", "snapshot2", Rows(130, true), TimeSpan.FromSeconds(15)); }
+            catch (IOException) { return "ok"; }
+            throw new Exception("Interrupted build unexpectedly completed.");
+        }
+        var status = await model.GetStatusAsync();
+        if (status.Active?.RowCount != 3 || status.AppliedRows != 128 || status.BuildingGeneration is null) throw new Exception("Durable build progress lost.");
+        var old = (await model.OpenActiveAsync())!;
+        if (!await model.RebuildAsync("2", "new-epoch/snapshot", Rows(1, false), TimeSpan.FromSeconds(15))) throw new Exception("Rebuild failed.");
+        if ((await old.ReadPageAsync(10)).Rows.Count != 3 || (await (await model.OpenActiveAsync())!.ReadPageAsync(10)).Rows.Count != 1)
+            throw new Exception("Reader mixed generations or removal was not reconciled.");
+        var report = await Bsync.Diagnostics.OfflineDiagnosticExport.ExportJsonAsync(store);
+        if (report.Contains("new-epoch", StringComparison.Ordinal)) throw new Exception("Diagnostic report leaked source identity.");
+        await store.DeleteAllAsync();
+        return "ok";
+    }
+
+    [JSInvokable(nameof(CacheLockCheck))]
+    public static async Task<string> CacheLockCheck(string accountName, bool hold)
+    {
+        if (hold && _cacheLock is not null) throw new InvalidOperationException("This test tab already holds the cache lock.");
+        var locks = await Bsync.Blazor.Blobs.BrowserBlobCacheLock.OpenAsync(_js, new("tests", "browser", accountName));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        try
+        {
+            var acquired = await locks.AcquireAsync("metadata", timeout.Token);
+            if (hold) _cacheLock = acquired;
+            else { await acquired.DisposeAsync(); await locks.DisposeAsync(); }
+            return "acquired";
+        }
+        catch (OperationCanceledException) { await locks.DisposeAsync(); return "blocked"; }
+    }
+
+    [JSInvokable(nameof(OrchestrationChecks))]
+    public static async Task<string> OrchestrationChecks(string accountName, bool reopen)
+    {
+        await using var store = await IndexedDbOrchestrationStore.OpenAsync(_js, new("tests", "browser", accountName));
+        if (reopen)
+        {
+            if ((await store.ReadAsync("jobs/a"))?.Payload != "durable") throw new Exception("Metadata did not survive reload.");
+            await store.DeleteAllAsync();
+            return "ok";
+        }
+        if (!await store.TryWriteAsync([new("jobs/a", null, "durable"), new("jobs/b", null, "b")])) throw new Exception("Initial write failed.");
+        if (await store.TryWriteAsync([new("jobs/c", null, "partial"), new("jobs/a", null, "wrong")])) throw new Exception("Stale batch succeeded.");
+        if (await store.ReadAsync("jobs/c") is not null) throw new Exception("Partial batch committed.");
+        var first = (await store.ReadPageAsync("jobs/", null, 1)).Single();
+        if (first.Key != "jobs/a" || (await store.ReadPageAsync("jobs/", first.Key, 1)).Single().Key != "jobs/b") throw new Exception("Bad page order.");
+        if (!await store.TryWriteAsync([new("lease", null, "old", 1)])) throw new Exception("Lease setup failed.");
+        if (await store.TryWriteAsync([new("stale", null, "bad")], new("lease", "old"))) throw new Exception("Expired owner committed.");
+        await using var other = await IndexedDbOrchestrationStore.OpenAsync(_js, new("tests", "browser", accountName + "-other"));
+        if (await other.ReadAsync("jobs/a") is not null) throw new Exception("Account leak.");
+        await other.DeleteAllAsync();
+        return "ok";
+    }
 
     public static void Initialize(IJSRuntime js, Uri baseAddress)
     {
         _js = js;
         _baseAddress = baseAddress;
+    }
+
+    [JSInvokable(nameof(CacheRepairChecks))]
+    public static async Task<string> CacheRepairChecks(string accountName, bool repair)
+    {
+        var account = new Bsync.Client.AccountScope("tests", "browser", accountName);
+        await using var metadata = await IndexedDbOrchestrationStore.OpenAsync(_js, account);
+        await using var locks = await Bsync.Blazor.Blobs.BrowserBlobCacheLock.OpenAsync(_js, account);
+        var bytes = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, account.StorageKey);
+        var cache = new Bsync.Blobs.ManagedBlobCache(bytes, metadata, locks, 8, 8);
+        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 1, 1, 1 }));
+        if (!repair)
+        {
+            await cache.ImportPinnedAsync(new MemoryStream([1, 1, 1, 1]), "pending/work");
+            return account.StorageKey + "/" + hash;
+        }
+        await cache.ImportAsync(new MemoryStream([1, 1, 1, 1]));
+        await using (var content = await cache.OpenReadAsync(hash))
+        {
+            var buffer = new byte[4];
+            await content!.ReadExactlyAsync(buffer);
+            if (buffer.Any(b => b != 1)) throw new Exception("Reimport did not repair corrupted bytes.");
+        }
+        if (!(await cache.GetEntryAsync(hash)).Owners.Contains("pending/work")) throw new Exception("Repair lost pending pin.");
+        await metadata.DeleteAllAsync();
+        await Bsync.Blazor.Blobs.BrowserBlobStore.DeleteAllAsync(_js, account.StorageKey);
+        return "ok";
+    }
+
+    [JSInvokable(nameof(PackageChecks))]
+    public static async Task<string> PackageChecks(string accountName, bool reopen)
+    {
+        var account = new Bsync.Client.AccountScope("tests", "browser", accountName);
+        await using var metadata = await IndexedDbOrchestrationStore.OpenAsync(_js, account);
+        await using var locks = await Bsync.Blazor.Blobs.BrowserBlobCacheLock.OpenAsync(_js, account);
+        var bytes = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, account.StorageKey);
+        var estimate = await bytes.EstimateStorageAsync();
+        if (estimate.QuotaBytes < 0 || estimate.UsageBytes < 0) throw new Exception("Invalid browser storage estimate.");
+        var cache = new Bsync.Blobs.ManagedBlobCache(bytes, metadata, locks, 8, 8);
+        var transfer = new Bsync.Blobs.BlobTransferManager(metadata, cache, new(new HttpClient { BaseAddress = _baseAddress }));
+        var packages = new Bsync.Blobs.OfflinePackageManager(metadata, cache, transfer, locks, (_, _) => Task.FromResult(true));
+        static Bsync.Blobs.OfflinePackageManifest Manifest(string revision, byte value) => new(1, "manual", revision, null,
+            [new("page", Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new[] { value })), 1, true, [])]);
+        if (!reopen)
+        {
+            await packages.StageAsync(Manifest("one", 1));
+            await cache.ImportAsync(new MemoryStream([1]));
+            if (!await packages.TryActivateAsync("manual", "one")) throw new Exception("Complete candidate did not activate.");
+            await packages.StageAsync(Manifest("two", 2));
+            if (await packages.TryActivateAsync("manual", "two")) throw new Exception("Incomplete candidate activated.");
+            return "ok";
+        }
+        if ((await packages.GetStatusAsync("manual")).ActiveRevision != "one") throw new Exception("Active revision lost across reload.");
+        if ((await packages.GetLastVerificationAsync("manual"))?.ActiveRevision != "one") throw new Exception("Cached verification missing.");
+        using (var metrics = new Bsync.Diagnostics.OfflineMetrics(metadata))
+            if ((await metrics.RefreshAsync()).Counts["package.last_verified.ReadyKnownOutdated"] != 1) throw new Exception("Package diagnostic count missing.");
+        await using (var snapshot = await packages.OpenActiveAsync("manual"))
+        {
+            await cache.ImportAsync(new MemoryStream([2]));
+            if (!await packages.TryActivateAsync("manual", "two")) throw new Exception("New candidate did not activate.");
+            await packages.RemoveRetiredAsync("manual", "one");
+            await using var content = await snapshot.OpenAsync("page");
+            var buffer = new byte[1];
+            if (await content!.ReadAsync(buffer) != 1 || buffer[0] != 1) throw new Exception("Reader mixed revisions.");
+        }
+        await bytes.DeleteAsync(Manifest("two", 2).Items[0].Sha256);
+        if ((await packages.GetStatusAsync("manual")).Readiness != Bsync.Blobs.OfflinePackageReadiness.Incomplete) throw new Exception("Storage loss still reported ready.");
+        await metadata.DeleteAllAsync();
+        await Bsync.Blazor.Blobs.BrowserBlobStore.DeleteAllAsync(_js, account.StorageKey);
+        return "ok";
     }
 
     [JSInvokable(nameof(RunStoreConformance))]

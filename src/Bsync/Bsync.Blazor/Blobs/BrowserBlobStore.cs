@@ -12,7 +12,7 @@ namespace Bsync.Blazor.Blobs;
 /// a reload. Quota and availability failures surface as <see cref="Storage.LocalStoreUnavailableException"/> (reasons
 /// <c>quota</c>, <c>unavailable</c>), never as silent success. Use one store per account and delete it on sign-out.
 /// </summary>
-public sealed class BrowserBlobStore : IBlobCache
+public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
 {
     private const string ModulePath = "./_content/Bsync.Blazor/bsync-blobs.js";
     private const int ReadChunk = 1024 * 1024;
@@ -27,6 +27,21 @@ public sealed class BrowserBlobStore : IBlobCache
 
     /// <summary>The store's name (for example <c>bsync-{account}</c>).</summary>
     public string Name { get; }
+
+    /// <inheritdoc />
+    public Task<long> GetStoredBytesAsync(CancellationToken cancellationToken = default) =>
+        IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<long>("storedBytes", cancellationToken, Name));
+
+    /// <summary>Origin-wide approximate usage/quota hints. Null means unavailable; estimates never guarantee a write will fit.</summary>
+    public async Task<BrowserStorageEstimate> EstimateStorageAsync(CancellationToken cancellationToken = default)
+    {
+        var values = await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<long[]>("estimateStorage", cancellationToken)).ConfigureAwait(false);
+        return new(values[0] < 0 ? null : values[0], values[1] < 0 ? null : values[1]);
+    }
+
+    /// <summary>Requests origin persistence. Browser refusal is normal; a grant cannot prevent user deletion or guarantee durability.</summary>
+    public Task<bool> RequestPersistenceAsync(CancellationToken cancellationToken = default) =>
+        IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<bool>("requestPersistence", cancellationToken));
 
     /// <summary>Opens the store. Call only after the browser runtime is interactive.</summary>
     public static async Task<BrowserBlobStore> OpenAsync(IJSRuntime js, string name, CancellationToken cancellationToken = default)
@@ -191,3 +206,8 @@ public sealed class BrowserBlobStore : IBlobCache
         public bool Deleted { get; set; }
     }
 }
+
+/// <summary>Approximate origin-wide storage hints, separate from managed payload accounting.</summary>
+/// <param name="UsageBytes">Estimated usage, if exposed by the browser.</param>
+/// <param name="QuotaBytes">Estimated quota, if exposed by the browser.</param>
+public sealed record BrowserStorageEstimate(long? UsageBytes, long? QuotaBytes);

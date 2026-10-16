@@ -6,6 +6,14 @@ using Bsync.Diagnostics;
 
 namespace Bsync.Blobs;
 
+/// <summary>A transient transfer observation. Partial bytes are durable/acknowledged but not verified complete content.</summary>
+/// <param name="Sha256">Application content identity; never emitted as a metric tag.</param>
+/// <param name="Direction">Transfer direction.</param>
+/// <param name="AvailableBytes">Current cache/server offset, including bytes from prior attempts; it may regress after repair.</param>
+/// <param name="TotalBytes">Expected content length.</param>
+/// <param name="Verified">True only after local hash verification or the authority's completed-upload acknowledgement.</param>
+public sealed record BlobTransferProgress(string Sha256, BlobTransferDirection Direction, long AvailableBytes, long TotalBytes, bool Verified);
+
 /// <summary>Options of <see cref="HttpBlobTransfer"/>.</summary>
 public sealed class HttpBlobTransferOptions
 {
@@ -54,6 +62,23 @@ public sealed class HttpBlobTransfer
         _base = _options.BasePath.Trim('/');
     }
 
+    /// <summary>The absolute blob route identity, used to partition durable transfer jobs. Contains no presigned URLs.</summary>
+    public Uri Endpoint => Uri.TryCreate(_base, UriKind.Absolute, out var absolute) ? absolute
+        : new Uri(_http.BaseAddress ?? throw new InvalidOperationException("Configure an absolute HttpClient.BaseAddress for managed transfers."), _base + "/");
+
+    /// <summary>Best-effort progress for UI observers. Notifications can be lost; durable offsets/job states remain authoritative. Throwing observers are isolated.</summary>
+    public event Action<BlobTransferProgress>? Progress;
+
+    private void Report(string hash, BlobTransferDirection direction, long available, long total, bool verified = false)
+    {
+        if (available < 0 || available > total) throw new InvalidDataException("Invalid transfer progress offset.");
+        if (verified) VerifiedBytes.Add(total, direction == BlobTransferDirection.Upload ? Up : Down);
+        if (Progress is not { } observers) return;
+        var value = new BlobTransferProgress(hash, direction, available, total, verified);
+        foreach (Action<BlobTransferProgress> observer in observers.GetInvocationList())
+        { try { observer(value); } catch (Exception) { /* UI observers cannot affect a durable transfer. */ } }
+    }
+
     /// <summary>
     /// Uploads <paramref name="source"/> as <paramref name="sha256"/>, continuing a partial upload, and finishes it. A finish
     /// whose response was lost is safe to repeat: the server keeps one object per hash. Returns the bytes sent by this call.
@@ -62,7 +87,9 @@ public sealed class HttpBlobTransfer
     public async Task<long> UploadAsync(string sha256, IBlobSource source, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfNegative(source.Length);
         var sent = 0L;
+        var refreshedDirectUrl = false;
         var result = "failed";
         try
         {
@@ -70,6 +97,8 @@ public sealed class HttpBlobTransfer
             var buffer = new byte[(int)Math.Min(_options.ChunkSize, Math.Max(source.Length, 1))];
             while (!status.Complete)
             {
+                if (status.Received < 0 || status.Received > source.Length) throw new InvalidDataException("The server returned an invalid upload offset.");
+                Report(sha256, BlobTransferDirection.Upload, status.Received, source.Length);
                 if (status.UploadUrl is { } direct && status.Received == 0 && _options.DirectUploads)
                 {
                     // Straight to the object store, in one request; the server verifies the hash at finish as usual.
@@ -79,6 +108,13 @@ public sealed class HttpBlobTransfer
                         whole.Headers.ContentLength = source.Length;
                         whole.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                         using var stored = await (_options.DirectClient ?? SharedDirectClient.Value).PutAsync(direct, whole, cancellationToken).ConfigureAwait(false);
+                        if (stored.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                        {
+                            if (refreshedDirectUrl) throw new IOException("The refreshed object-store upload URL was refused.");
+                            refreshedDirectUrl = true;
+                            status = await StatusAsync(await _http.PostAsync($"{_base}/{sha256}/uploads?size={source.Length}", null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                            continue;
+                        }
                         stored.EnsureSuccessStatusCode();
                     }
 
@@ -107,6 +143,8 @@ public sealed class HttpBlobTransfer
                     count = await stream.ReadAtLeastAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, source.Length - status.Received)), 1, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
                 }
 
+                if (count == 0) throw new EndOfStreamException("The upload source ended before its declared length.");
+
                 using var content = new ByteArrayContent(buffer, 0, count);
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 var response = await _http.PutAsync($"{_base}/{sha256}/uploads/{status.Received}", content, cancellationToken).ConfigureAwait(false);
@@ -120,6 +158,8 @@ public sealed class HttpBlobTransfer
                 status = await StatusAsync(response, cancellationToken, HttpStatusCode.Conflict).ConfigureAwait(false);
             }
 
+            if (status.Received != source.Length) throw new InvalidDataException("Completed upload has an unexpected length.");
+            Report(sha256, BlobTransferDirection.Upload, status.Received, source.Length, verified: true);
             result = "complete";
             return sent;
         }
@@ -146,8 +186,15 @@ public sealed class HttpBlobTransfer
     public async Task<long> DownloadAsync(IBlobCache cache, string sha256, long size, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(cache);
-        if (await cache.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) is not null)
+        ArgumentOutOfRangeException.ThrowIfNegative(size);
+        if (await cache.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) is { } existing)
         {
+            if (existing != size) throw new BlobCorruptedException("Existing content length disagrees with the requested blob length; content was retained.");
+            await using var verified = await cache.OpenReadAsync(sha256, cancellationToken).ConfigureAwait(false);
+            if (verified is null || verified.Length != size ||
+                Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(verified, cancellationToken).ConfigureAwait(false)) != sha256)
+                throw new BlobCorruptedException("Existing content failed verification; content was retained for explicit repair.");
+            Report(sha256, BlobTransferDirection.Download, size, size, verified: true);
             return 0;
         }
 
@@ -161,6 +208,7 @@ public sealed class HttpBlobTransfer
                 await cache.DiscardPartialAsync(sha256, cancellationToken).ConfigureAwait(false);
                 held = 0;
             }
+            Report(sha256, BlobTransferDirection.Download, held, size);
 
             if (held < size)
             {
@@ -192,6 +240,7 @@ public sealed class HttpBlobTransfer
                     held += read;
                     received += read;
                     Bytes.Add(read, Down);
+                    Report(sha256, BlobTransferDirection.Download, held, size);
                 }
 
                 if (held < size)
@@ -200,6 +249,7 @@ public sealed class HttpBlobTransfer
                 }
             }
 
+            if (size == 0) await cache.AppendPartialAsync(sha256, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
             if (!await cache.CompletePartialAsync(sha256, cancellationToken).ConfigureAwait(false))
             {
                 result = "corrupt";
@@ -207,6 +257,7 @@ public sealed class HttpBlobTransfer
             }
 
             result = "complete";
+            Report(sha256, BlobTransferDirection.Download, size, size, verified: true);
             return received;
         }
         finally
@@ -220,6 +271,9 @@ public sealed class HttpBlobTransfer
 
     private static readonly System.Diagnostics.Metrics.Counter<long> Bytes = SyncDiagnostics.Meter.CreateCounter<long>(
         "bsync.blob.bytes", "By", "Attachment bytes transferred, by direction (upload, download).");
+
+    private static readonly System.Diagnostics.Metrics.Counter<long> VerifiedBytes = SyncDiagnostics.Meter.CreateCounter<long>(
+        "bsync.blob.verified_bytes", "By", "Bytes locally hash-verified or acknowledged complete by the upload authority; repeat verification is counted again.");
 
     private static readonly System.Diagnostics.Metrics.Counter<long> Transfers = SyncDiagnostics.Meter.CreateCounter<long>(
         "bsync.blob.transfers", "{transfer}", "Attachment transfers, by direction and result (complete, failed, corrupt).");

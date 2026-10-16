@@ -1,0 +1,106 @@
+@using Bsync.Client
+@using Bsync.Blazor.IndexedDb
+@using Bsync.Documents
+@using Bsync.Storage
+@using System.Security.Cryptography
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<details>
+    <summary>Offline unlock example</summary>
+    <p>This separate local notebook uses a 32-byte recovery key that you keep outside this browser.
+        Enter the same base64 key after restarting. Browser code can read unlocked data; record IDs and indexes remain visible.</p>
+    @if (_session is null)
+    {
+        <label>Recovery key <input type="password" autocomplete="off" @bind="_enteredKey" disabled="@_busy" /></label>
+        <button @onclick="UnlockAsync" disabled="@_busy">Unlock locally</button>
+        <p>First use creates an encrypted notebook with the supplied key. No network sign-in is required.</p>
+    }
+    else
+    {
+        <label>Local note <input @bind="_text" disabled="@_busy" /></label>
+        <button @onclick="SaveAsync" disabled="@_busy">Save on this device</button>
+        <button @onclick="LockAsync" disabled="@_busy">Lock</button>
+    }
+    <p role="status" data-testid="unlock-status">@_status</p>
+</details>
+
+@code {
+    private static readonly LocalKeyReference Reference = new(new("notes-unlock-sample", "demo", "local-user"), "notebook", 1);
+    private readonly OfflineUnlockKeys _keys = new(Reference);
+    private SyncSession<Note>? _session;
+    private string _enteredKey = "", _text = "", _status = "Locked";
+    private bool _busy;
+
+    private async Task UnlockAsync()
+    {
+        _busy = true;
+        byte[]? entered = null;
+        try
+        {
+            entered = Convert.FromBase64String(_enteredKey);
+            _keys.Unlock(entered);
+            _session = new SyncSession<Note>(new()
+            {
+                StartReplication = false,
+                Cloner = DocumentCloner.Json(NotesJson.Default.Note),
+                CreateTransport = _ => throw new InvalidOperationException("This isolated unlock example has no network transport."),
+                OpenReplica = async (_, token) =>
+                {
+                    using var access = await _keys.AcquireAsync(Reference, token);
+                    var copy = access.Key.ToArray();
+                    try
+                    {
+                        var store = await IndexedDbLocalStore<Note>.OpenAsync(JS, new()
+                        {
+                            DatabaseName = "unlock-" + Reference.Account.StorageKey, Collection = "notes", EncryptionKey = copy,
+                        }, NotesJson.Default.Note, token);
+                        try
+                        {
+                            var identity = await store.GetReplicaIdentityAsync(token);
+                            return new LocalReplica<Note>(store, identity.Incarnation);
+                        }
+                        catch { await store.DisposeAsync(); throw; }
+                    }
+                    finally { CryptographicOperations.ZeroMemory(copy); }
+                },
+            });
+            var engine = await _session.GetEngineAsync(Reference.Account.StorageKey);
+            _text = (await engine.GetAsync("local-note"))?.Current.Text ?? "";
+            _status = "Unlocked locally. Changes remain pending on this device.";
+        }
+        catch (Exception error) when (error is FormatException or ArgumentException or LocalStoreUnavailableException or ReplicaKeyUnavailableException)
+        {
+            await CloseAsync();
+            _status = "Unable to unlock. Check the original 32-byte base64 key; stored data was retained.";
+        }
+        finally
+        {
+            if (entered is not null) CryptographicOperations.ZeroMemory(entered);
+            _enteredKey = "";
+            _busy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            await (await _session!.GetEngineAsync(Reference.Account.StorageKey)).WriteAsync(new Note { Id = "local-note", Text = _text });
+            _status = "Saved locally; no server acceptance or execution is implied.";
+        }
+        catch (LocalStoreUnavailableException) { _status = "Local storage is unavailable. The edit was not confirmed saved."; }
+        finally { _busy = false; }
+    }
+
+    private async Task CloseAsync()
+    {
+        if (_session is not null) { await _session.DisposeAsync(); _session = null; }
+        _keys.Lock(); _text = ""; _enteredKey = "";
+    }
+
+    private async Task LockAsync() { _busy = true; try { await CloseAsync(); _status = "Locked"; } finally { _busy = false; } }
+    public async ValueTask DisposeAsync() { await CloseAsync(); _keys.Dispose(); }
+}

@@ -9,7 +9,7 @@ namespace Bsync.Client;
 /// parents before children, a shared backoff when the server is unreachable), listens to one multiplexed hint stream
 /// for all of them, and reports one aggregate status. Join a session with <see cref="SyncSessionOptions{TDocument}.Coordination"/>.
 /// </summary>
-public sealed class SyncCoordinator : IAsyncDisposable
+public sealed partial class SyncCoordinator : IAsyncDisposable
 {
     private static readonly SyncState[] Severity =
     [
@@ -137,6 +137,7 @@ public sealed class SyncCoordinator : IAsyncDisposable
     /// <summary>Stops the shared hint listener. The sessions are disposed by their owners.</summary>
     public async ValueTask DisposeAsync()
     {
+        if (_account is not null) await CloseAccountAsync().ConfigureAwait(false);
         await _stopping.CancelAsync().ConfigureAwait(false);
         Task? hints;
         lock (_gate)
@@ -432,6 +433,27 @@ public sealed class SyncCoordinator : IAsyncDisposable
 /// <summary>Options for <see cref="SyncCoordinator"/>.</summary>
 public sealed class SyncCoordinatorOptions
 {
+    /// <summary>Durable application-scoped deletion journal, outside the account resources being deleted.</summary>
+    public Storage.IOrchestrationStore? AccountCatalog { get; init; }
+
+    /// <summary>
+    /// Physical shared access/exclusive deletion lock for all account participants. Configure the same provider namespace
+    /// in every coordinator/worker, outside deleted resources. Null retains legacy host-managed lifetime exclusion.
+    /// </summary>
+    public IAccountResourceLock? AccountResourceLock { get; init; }
+
+    /// <summary>Additional account resources (blob stores, scheduler jobs, keys). Stable names and idempotent delete callbacks are required.</summary>
+    public IReadOnlyList<AccountResource> AccountResources { get; init; } = [];
+
+    /// <summary>Durably exports pending work before deletion with ExportPending. Called with network work stopped.</summary>
+    public Func<AccountScope, CancellationToken, Task>? ExportAccountWork { get; init; }
+
+    /// <summary>
+    /// Optional host check/renewal for the exact account before enabling replication. Runs after prior network work is
+    /// joined; false preserves local access and reports credentials required. Offline opening never invokes it.
+    /// Bind credentials to account-specific transports; this callback does not authorize a client-selected server scope.
+    /// </summary>
+    public Func<AccountScope, CancellationToken, Task<bool>>? CheckNetworkCredentialsAsync { get; init; }
     /// <summary>How many collections may sync at the same time. Default 2.</summary>
     public int MaxConcurrency { get; init; } = 2;
 
@@ -480,6 +502,10 @@ public sealed record SyncCoordinatorStatus(SyncState State, int Pending, int Con
 /// <summary>What the coordinator needs from a session (implemented by <see cref="SyncSession{TDocument}"/>).</summary>
 internal interface ICoordinatedSession
 {
+    Task OpenAsync(string account, CancellationToken token);
+    Task SetReplicationEnabledAsync(bool enabled, CancellationToken cancellationToken);
+    Task<AccountPendingWork> PendingWorkAsync(CancellationToken token);
+    Task StopAsync();
     event Action? Changed;
 
     SyncStatus Status { get; }

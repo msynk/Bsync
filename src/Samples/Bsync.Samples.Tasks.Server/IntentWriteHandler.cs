@@ -8,14 +8,16 @@ namespace Bsync.Samples.Tasks.Server;
 /// <summary>
 /// Executes intents (task F3) in the sync authority's transaction: the intent's acceptance, the change to
 /// <c>dbo.Tasks</c> and the published task document commit together or not at all. That is what makes execution happen
-/// exactly once: a replica whose response was lost resends the same operation, and the authority answers it from the
-/// receipt of the first one without calling this handler again.
+/// at most once for a retained command identity. Transport receipts cover retries of one operation; the independent
+/// command ledger also refuses re-execution after transport receipts/result documents are purged. Keep ledger identities.
 /// </summary>
 public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> tasks) : ISyncWriteHandler<TaskIntent>
 {
     public async ValueTask<SyncWriteDecision<TaskIntent>> HandleAsync(SyncWriteContext<TaskIntent> write, CancellationToken cancellationToken)
     {
         var intent = write.Submitted;
+        if (intent.RequestSchema != 1) return SyncWriteDecision<TaskIntent>.Reject(IntentCodes.UnsupportedSchema);
+        if (intent.Deleted) return SyncWriteDecision<TaskIntent>.Reject(IntentCodes.Immutable);
 
         // Intents are immutable: a client may create one, never change or delete it.
         if (write.Current is not null)
@@ -30,6 +32,16 @@ public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> task
 
         await using var db = TasksDb.Enlist(write.Connection!, write.Transaction!);
         var tenant = write.Caller.Scope;
+        // Global order in this sample: intent feed, task feed, domain rows. Ordinary task writes start at task feed.
+        await tasks.AcquirePublicationLockAsync(tenant, write.Transaction!, cancellationToken);
+        var fingerprint = IntentLedger.Fingerprint(intent, write.Caller.Principal.FindFirst("sub")?.Value);
+        var prior = await IntentLedger.ReadAsync(write, cancellationToken);
+        if (prior.Found)
+        {
+            if (prior.Hash != fingerprint) return SyncWriteDecision<TaskIntent>.Reject(IntentCodes.Immutable);
+            if (prior.Result is null) return SyncWriteDecision<TaskIntent>.Reject(IntentCodes.ResultExpired);
+            return SyncWriteDecision<TaskIntent>.Accept(System.Text.Json.JsonSerializer.Deserialize(prior.Result, TasksJson.Default.TaskIntent)!);
+        }
         var row = await db.Tasks.SingleOrDefaultAsync(t => t.Tenant == tenant && t.Id == intent.TaskId, cancellationToken);
         if (row is null)
         {
@@ -53,17 +65,26 @@ public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> task
             // Accepted (it is kept and replicated) but not executed: the code stays on the intent for the UI.
             intent.State = IntentStates.Rejected;
             intent.Code = rejection;
+            await IntentLedger.SaveAsync(write, fingerprint, cancellationToken);
             return SyncWriteDecision<TaskIntent>.Accept(intent);
         }
 
-        if (intent.Kind == IntentKinds.Complete)
+        // The immutable request snapshot and payload decoding use explicit generated registrations. This adapter
+        // preserves the existing sample wire format and ledger fingerprint for previously accepted commands.
+        Bsync.Client.IntentRequest request;
+        try { request = TaskIntentDefinitions.Capture(intent); }
+        catch (Exception error) when (error is ArgumentException or System.Text.Json.JsonException)
+        { return SyncWriteDecision<TaskIntent>.Reject(IntentCodes.InvalidRequest); }
+        if (TaskIntentDefinitions.Complete.Matches(request))
         {
+            _ = TaskIntentDefinitions.Complete.ReadPayload(request);
             row.Done = true;
         }
         else
         {
-            row.Title = intent.Title!;
-            row.Slug = TaskRules.Slug(intent.Title!);
+            var payload = TaskIntentDefinitions.Rename.ReadPayload(request);
+            row.Title = payload.Title!;
+            row.Slug = TaskRules.Slug(payload.Title!);
         }
 
         row.Revision++;
@@ -74,6 +95,7 @@ public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> task
 
         intent.State = IntentStates.Executed;
         intent.ExecutedBy = row.ChangedBy;
+        await IntentLedger.SaveAsync(write, fingerprint, cancellationToken);
         return SyncWriteDecision<TaskIntent>.Accept(intent);
     }
 }

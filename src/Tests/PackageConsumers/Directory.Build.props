@@ -15,6 +15,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904;NU1905;NU1900</WarningsAsErrors>
   </PropertyGroup>
 
   <Target Name="RequireBsyncPackageVersion" BeforeTargets="CollectPackageReferences" Condition="'$(BsyncPackageVersion)' == ''">

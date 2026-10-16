@@ -22,6 +22,7 @@ namespace Bsync.Tests.Http;
 /// <see cref="FileSystemBlobStore"/>, <see cref="SyncBlobCollector"/> and the blob metrics (task H). The tests of this
 /// class run one at a time, so the meters see only their transfers.
 /// </summary>
+[Collection("Blob metric isolation")]
 public sealed class BlobRouteTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "bsync-blobs-" + Guid.NewGuid().ToString("N"));
@@ -394,3 +395,7 @@ public sealed class BlobRouteTests : IDisposable
             ValueTask.FromResult<Stream>(new MemoryStream(bytes, (int)offset, bytes.Length - (int)offset));
     }
 }
+
+// These assertions intentionally sum process-wide counters. Other transfer tests must not contribute concurrently.
+[CollectionDefinition("Blob metric isolation", DisableParallelization = true)]
+public sealed class BlobMetricIsolation;

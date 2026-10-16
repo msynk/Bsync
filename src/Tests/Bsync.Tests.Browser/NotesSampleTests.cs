@@ -59,6 +59,68 @@ public sealed class NotesSampleTests(BrowserFixture fixture) : IAsyncLifetime
 
     private static ILocatorAssertions Expect(ILocator locator) => Assertions.Expect(locator);
 
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task ServiceWorkerBypassesNonManifestApiBlobAndHintRequests(string browser)
+    {
+        await using var context = await (await fixture.BrowserAsync(browser)).NewContextAsync();
+        var page = await OpenControlledAppAsync(context);
+        // Even an old/accidentally seeded shell cache must not supply data/API responses.
+        var outcomes = await page.EvaluateAsync<string[]>("""
+            async () => {
+                const name = (await caches.keys()).find(k => k.startsWith('offline-cache-'));
+                const cache = await caches.open(name);
+                const paths = ['/api/private-probe', '/sync/blobs/private-probe', '/sync/private-probe/hints'];
+                for (const path of paths) await cache.put(path, new Response('stale private data', { status: 200 }));
+                return await Promise.all(paths.map(async path => (await fetch(path, { cache: 'no-store' })).text()));
+            }
+            """);
+        // The sample server's SPA fallback may answer 200 HTML; the worker must never return the seeded data.
+        Assert.All(outcomes, body => Assert.DoesNotContain("stale private data", body));
+        // Remove the actual server rather than depending on WebKit's unsupported offline/service-worker emulation.
+        await StopServerAsync();
+        var offline = await page.EvaluateAsync<bool[]>("""
+            async () => await Promise.all(['/api/private-probe', '/sync/blobs/private-probe', '/sync/private-probe/hints']
+                .map(async path => {
+                    const stop = new AbortController();
+                    const deadline = setTimeout(() => stop.abort(), 2000);
+                    try { await fetch(path, { cache: 'no-store', signal: stop.signal }); return true; }
+                    catch { return false; }
+                    finally { clearTimeout(deadline); }
+                }))
+            """);
+        Assert.All(offline, responded => Assert.False(responded));
+    }
+
+    [Theory]
+    [MemberData(nameof(OfflineReloadBrowsers))]
+    public async Task RecoveryKeyUnlocksOfflineAfterReloadAndWrongKeyRetainsNotebook(string browser)
+    {
+        await using var context = await (await fixture.BrowserAsync(browser)).NewContextAsync();
+        var page = await OpenControlledAppAsync(context);
+        var key = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        await page.GetByText("Offline unlock example", new() { Exact = true }).ClickAsync();
+        await page.GetByLabel("Recovery key").FillAsync(key);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Unlock locally" }).ClickAsync();
+        await Expect(page.GetByTestId("unlock-status")).ToContainTextAsync("Unlocked locally");
+        await page.GetByLabel("Local note", new() { Exact = true }).FillAsync("private offline note");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save on this device" }).ClickAsync();
+        await Expect(page.GetByTestId("unlock-status")).ToContainTextAsync("Saved locally");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Lock", Exact = true }).ClickAsync();
+        await Expect(page.GetByTestId("unlock-status")).ToHaveTextAsync("Locked");
+        await context.SetOfflineAsync(true);
+        await page.ReloadAsync();
+        await page.GetByText("Offline unlock example", new() { Exact = true }).ClickAsync(new() { Timeout = 60_000 });
+        await page.GetByLabel("Recovery key").FillAsync(Convert.ToBase64String(new byte[32]));
+        await page.GetByRole(AriaRole.Button, new() { Name = "Unlock locally" }).ClickAsync();
+        await Expect(page.GetByTestId("unlock-status")).ToContainTextAsync("stored data was retained");
+        await page.GetByLabel("Recovery key").FillAsync(key);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Unlock locally" }).ClickAsync();
+        await Expect(page.GetByLabel("Local note", new() { Exact = true })).ToHaveValueAsync("private offline note");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Lock", Exact = true }).ClickAsync();
+        await Expect(page.GetByLabel("Recovery key")).ToHaveValueAsync("");
+    }
+
     [Theory(DisplayName = "T51 I01 I13: the published PWA reloads offline with its notes and uploads offline notes on reconnect")]
     [MemberData(nameof(OfflineReloadBrowsers))]
     public async Task WorksOfflineAfterReload(string browser)
@@ -168,13 +230,18 @@ public sealed class NotesSampleTests(BrowserFixture fixture) : IAsyncLifetime
         await using var _ = context;
         var page = await OpenAppAsync(context);
         await AddNoteAsync(page, $"synced {browser}");
+        // The aggregate pending counter can still display its initial zero while the newly saved row appears.
+        // Wait for that specific row's persisted clean state before declaring it acknowledged.
+        await Expect(page.GetByTestId("note").Filter(new() { HasText = $"synced {browser}" }).GetByTestId("note-status"))
+            .ToHaveCountAsync(0, new() { Timeout = 20_000 });
         await Expect(page.GetByTestId("pending")).ToHaveTextAsync("0", new() { Timeout = 20_000 });
 
-        await context.SetOfflineAsync(true);
-        await AddNoteAsync(page, $"unsynced {browser}");
+        // Stop the real endpoint; WebKit's emulated offline mode is not reliable for all worker requests.
         await StopServerAsync();
+        await AddNoteAsync(page, $"unsynced {browser}");
+        await Expect(page.GetByTestId("note").Filter(new() { HasText = $"unsynced {browser}" }).GetByTestId("note-status"))
+            .ToContainTextAsync("not synced yet");
         await StartServerAsync();
-        await context.SetOfflineAsync(false);
 
         try
         {

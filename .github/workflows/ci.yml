@@ -16,6 +16,16 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
+  release-tooling:
+    name: Release provenance failure tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s scripts -p "test_*.py" -v
+
   test:
     name: Unit, conformance, process-kill and HTTP tests (${{ matrix.os }})
     strategy:
@@ -138,7 +148,7 @@ jobs:
     env:
       CI: true
       # A prerelease suffix per run, so the consumers below can never restore the published 0.x packages instead.
-      BSYNC_PACKAGE_SUFFIX: ci.${{ github.run_number }}
+      BSYNC_PACKAGE_SUFFIX: ci.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,6 +161,15 @@ jobs:
           do dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=$BSYNC_PACKAGE_SUFFIX || exit 1; done
       - name: Resolve the packed version
         run: echo "BSYNC_PACKAGE_VERSION=$(ls artifacts/packages/Bsync.Storage.Sqlite.*.nupkg | sed -E 's|.*/Bsync\.Storage\.Sqlite\.(.*)\.nupkg|\1|')" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify package identity and record provenance
+        run: python scripts/release.py manifest --version "$BSYNC_PACKAGE_VERSION"
+      - name: Verify distributed symbols and Source Link
+        run: dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages "$(git rev-parse HEAD)"
+      - name: Reject mismatched and missing packaged symbols
+        run: python scripts/verify_symbols_test.py artifacts/packages -v
       # Only PackageReference from artifacts/packages (src/Tests/PackageConsumers/nuget.config maps Bsync.* to that feed).
       - name: Public conformance suites from the Bsync package (namespace Bsync.Testing)
         run: dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION --logger "trx;LogFileName=package-consumer.trx"
@@ -168,3 +187,38 @@ jobs:
         with:
           name: package-consumer-results
           path: src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests/TestResults
+
+  package-browser:
+    name: Packaged WebAssembly conformance (Chromium, Firefox, WebKit)
+    needs: pack
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages
+      - name: Resolve exact artifact version
+        shell: pwsh
+        run: |
+          $version = (Get-Content artifacts/packages/provenance.json -Raw | ConvertFrom-Json).packageVersion
+          "BSYNC_PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Build browser test runner
+        run: dotnet build src/Tests/Bsync.Tests.Browser -c Release
+      - name: Publish package-only WebAssembly harness
+        shell: pwsh
+        run: dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Browser -c Release "-p:BsyncPackageVersion=$env:BSYNC_PACKAGE_VERSION" -o artifacts/package-browser
+      - run: pwsh src/Tests/Bsync.Tests.Browser/bin/Release/net10.0/playwright.ps1 install --with-deps chromium firefox webkit
+      - name: Execute packaged client assets in all three engines
+        shell: pwsh
+        run: |
+          $env:BSYNC_BROWSER_HOST = (Resolve-Path artifacts/package-browser/wwwroot).Path
+          dotnet test src/Tests/Bsync.Tests.Browser -c Release --no-build --filter FullyQualifiedName~IndexedDbBrowserTests --logger "trx;LogFileName=package-browser.trx" --blame-hang-timeout 3m --blame-hang-dump-type none
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-browser-results
+          path: src/Tests/Bsync.Tests.Browser/TestResults

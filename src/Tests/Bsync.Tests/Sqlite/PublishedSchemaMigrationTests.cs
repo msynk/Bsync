@@ -11,14 +11,11 @@ using Xunit;
 namespace Bsync.Tests.Sqlite;
 
 /// <summary>
-/// Task G2: a replica written by the published 0.1.0 packages (Fixtures/replica-0.1.0.db, made by
-/// src/Tests/Bsync.Fixtures.V010) opens with the current store and keeps everything.
+/// Replicas written by published 0.1.0 and 0.2.0 packages open with the current store and preserve durable work.
 /// </summary>
 public sealed class PublishedSchemaMigrationTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"bsync-v010-{Guid.NewGuid():N}.db");
-
-    public PublishedSchemaMigrationTests() => File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "replica-0.1.0.db"), _path);
 
     public void Dispose()
     {
@@ -45,9 +42,12 @@ public sealed class PublishedSchemaMigrationTests : IDisposable
         return ids;
     }
 
-    [Fact(DisplayName = "G2 I01 I11 I17 I19: a 0.1.0 replica upgrades in place and keeps pending work, a kept conflict, a rejection, a group and unknown members")]
-    public async Task UpgradesAndKeepsEverything()
+    [Theory(DisplayName = "Published replicas preserve pending work, conflicts, rejections, groups and unknown members")]
+    [InlineData("0.1.0")]
+    [InlineData("0.2.0")]
+    public async Task UpgradesAndKeepsEverything(string version)
     {
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", $"replica-{version}.db"), _path);
         var before = await OperationIdsAsync();
         var store = await OpenAsync();
         var cursor = await store.GetCursorAsync();

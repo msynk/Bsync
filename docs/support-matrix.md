@@ -5,6 +5,26 @@ not executed; **Planned** = not implemented. Nothing here is Verified unless the
 
 Release status: [README](../README.md#status).
 
+2026-10-16 R0 update: [baseline and validation evidence](review/release-baseline-2026-10-16.md).
+The six 0.2.0 packages are published, with an unresolved source-provenance mismatch. Older rows below
+are historical run records; their "unreleased" labels do not describe current publication status.
+No new provider, browser or physical-device qualification is implied by the release-tooling change.
+
+Later 2026-10-16 offline implementation: [executed evidence and open gates](review/offline-implementation-2026-10-16.md).
+Core (713), SQLCipher (31), PostgreSQL 17.11 (44), SQL Server (87, including isolated Moto 5.2.4 S3 emulation) and exact-preview package consumers (53) passed.
+An earlier full browser suite passed 91 tests with one PostgreSQL skip; additional lock termination/read-model/diagnostic
+reload tests passed in Chromium, Firefox and WebKit. New capabilities remain under
+qualification: this does not establish encrypted blobs, Android/iOS background delivery, native Safari, or complete
+read-model/projection reconciliation support. See the evidence record for full-browser and process/tab termination runs.
+The recovery-key PWA UI passed offline reload/wrong-key retention in Chromium/Firefox. The native protected-store
+recipe compiled for Windows MAUI; this does not qualify locked-device key access. Account resource locks are opt-in
+and require every participating coordinator/worker to share the same namespace.
+The package-only WebAssembly harness passed all 63 IndexedDB/browser contract cases in Chromium, Firefox and WebKit
+against preview `0.2.0-offline.20261016.4`, including packaged static assets. This is separate from the source sample suite.
+The final source browser/WPF suite passed 114 tests with zero skips, including SQL Server and PostgreSQL scenarios.
+Preview .6 passed 66 packaged browser cases; nine lifetime/repair cases passed again after correcting async polling.
+Earlier failed runs and their corrections remain in the evidence record; this is one local qualification run, not ten green CI runs.
+
 Last full run of every suite: 2026-09-28, Windows 10 x64, .NET SDK 10.0.401, workloads `wasm-tools` 10.0.112 and
 `maui-windows` 10.0.20, PostgreSQL 17.6 (portable build, local), WebView2 154.
 Partial run 2026-10-05 (0.2.0 work), Windows 10 Enterprise 10.0.19045 x64, .NET SDK 10.0.401, no PostgreSQL:

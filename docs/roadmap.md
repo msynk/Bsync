@@ -14,6 +14,14 @@ workloads and targets: ADR-012. Explicit non-goals: see the README.
 
 ## Status
 
+Current work: [offline improvement plan](Improvement-Plan.md), release integrity and portable orchestration/content
+implementation. Audited consumers/provenance checks, lifecycle/persistence, transfers/pins/packages, local workflows,
+portable background dispatch, read-model generations, redacted diagnostics and SQL Server publication recipes are implemented under continuing qualification
+([ADRs 019–024](architecture/README.md)). Full workstream exit gates remain open.
+The 0.2.0 packages are published, but their source metadata does not establish equivalence to this
+checkout. See the [2026-10-16 inventory](review/release-baseline-2026-10-16.md). The phase table below
+records historical implementation work; its older release labels are not current publication evidence.
+
 | Phase | Status | Summary |
 |---|---|---|
 | 0: Evidence and decisions | **Done** | `docs/review/baseline.md`, ADR-001–012, support matrix, compatibility policy, this roadmap. |

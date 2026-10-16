@@ -37,6 +37,13 @@ sealed class Bsync.Storage.Sqlite.SqliteLocalStore<TDocument> : Bsync.Storage.IL
   const System.Int32 SchemaVersion = 5
   static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteLocalStore<TDocument>> OpenAsync(Bsync.Storage.Sqlite.SqliteLocalStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Collections.Generic.IEnumerable<Bsync.Storage.SyncIndex<TDocument>> indexes, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteLocalStore<TDocument>> OpenAsync(Bsync.Storage.Sqlite.SqliteLocalStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Storage.Sqlite.SqliteOrchestrationStore : Bsync.Storage.IOrchestrationStore, System.IAsyncDisposable
+  System.Threading.Tasks.Task DeleteAllAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.OrchestrationRecord> ReadAsync(System.String key, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> TryWriteAsync(System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationMutation> mutations, Bsync.Storage.OrchestrationFence fence = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationRecord>> ReadPageAsync(System.String prefix, System.String afterKey, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  static System.Threading.Tasks.Task<Bsync.Storage.Sqlite.SqliteOrchestrationStore> OpenAsync(System.String dataSource, Bsync.Client.AccountScope account, System.Byte[] encryptionKey = null, System.TimeProvider timeProvider = null, System.Threading.CancellationToken cancellationToken = default)
 record Bsync.Storage.Sqlite.SqliteRebuildReport
   System.Boolean Complete { get; }
   System.Boolean Equals(Bsync.Storage.Sqlite.SqliteRebuildReport other)

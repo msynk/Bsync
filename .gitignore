@@ -4,6 +4,9 @@
 # MacOS files
 .DS_Store
 
+# Python release-tool bytecode.
+__pycache__/
+
 # User-specific files
 *.suo
 *.user

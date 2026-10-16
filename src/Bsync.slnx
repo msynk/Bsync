@@ -30,4 +30,7 @@
     <Project Path="Tests/Bsync.Tests.SqliteEncrypted/Bsync.Tests.SqliteEncrypted.csproj" />
     <Project Path="Tests/Bsync.Tests/Bsync.Tests.csproj" />
   </Folder>
+  <Folder Name="/Tools/">
+    <Project Path="Tools/Bsync.PackageVerifier/Bsync.PackageVerifier.csproj" />
+  </Folder>
 </Solution>

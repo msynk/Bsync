@@ -22,6 +22,23 @@ public sealed class EncryptedStoreTests : IDisposable
 
     private string NewPath() => Path.Combine(_directory, $"replica-{Interlocked.Increment(ref _next)}.db");
 
+    [Fact]
+    public async Task OrchestrationMetadataRequiresOriginalKeyAndSharesDocumentDatabase()
+    {
+        var path = NewPath();
+        var account = new Bsync.Client.AccountScope("app", "test", "alice");
+        var documents = await OpenAsync(path, _key);
+        await documents.UpdateAsync([Pending("pending", "keep-work")]);
+        await using (var metadata = await SqliteOrchestrationStore.OpenAsync(path, account, _key))
+            Assert.True(await metadata.TryWriteAsync([new("work", null, "private-orchestration-marker")]));
+        SqliteStorePool.Release(path);
+        Assert.DoesNotContain("private-orchestration-marker", Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path)), StringComparison.Ordinal);
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => SqliteOrchestrationStore.OpenAsync(path, account, SqliteEncryption.NewKey()));
+        await using var reopened = await SqliteOrchestrationStore.OpenAsync(path, account, _key);
+        Assert.Equal("private-orchestration-marker", (await reopened.ReadAsync("work"))!.Payload);
+        Assert.Equal("keep-work", (await (await OpenAsync(path, _key)).GetAsync("pending"))!.Current.Title);
+    }
+
     private static Task<SqliteLocalStore<ConformanceDocument>> OpenAsync(string path, byte[]? key, IEnumerable<SyncIndex<ConformanceDocument>>? indexes = null) =>
         SqliteLocalStore<ConformanceDocument>.OpenAsync(
             new SqliteLocalStoreOptions { DataSource = path, Collection = "conformance", EncryptionKey = key },

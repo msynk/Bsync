@@ -149,6 +149,31 @@ export function list(name) {
   });
 }
 
+export function storedBytes(name) {
+  return run(name, db => new Promise((resolve, reject) => {
+    let total = 0;
+    const cursor = db.transaction('blobs', 'readonly').objectStore('blobs').openCursor();
+    cursor.onerror = () => reject(cursor.error);
+    cursor.onsuccess = () => {
+      const item = cursor.result;
+      if (!item) { resolve(total); return; }
+      total += sizeOf(item.value);
+      if (!Number.isSafeInteger(total)) { reject(new Error('Blob usage exceeds safe accounting range.')); return; }
+      item.continue();
+    };
+  }));
+}
+
+export async function estimateStorage() {
+  if (!navigator.storage?.estimate) return [-1, -1];
+  const value = await navigator.storage.estimate();
+  const safe = number => Number.isSafeInteger(number) && number >= 0 ? number : -1;
+  return [safe(value.usage), safe(value.quota)];
+}
+export async function requestPersistence() {
+  return !!(navigator.storage?.persist && await navigator.storage.persist());
+}
+
 export async function clear(name) {
   try {
     const db = databases.get(name);

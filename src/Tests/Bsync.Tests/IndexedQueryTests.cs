@@ -62,4 +62,33 @@ public sealed class IndexedQueryTests
 
         Assert.Equal(["x3", "x0"], query.Apply(documents).Select(n => n.Id));
     }
+
+    [Fact]
+    public async Task QueryMetricsDistinguishMaterializedPagesFromFullSortWithoutContentTags()
+    {
+        var (session, notes) = await CollectionAsync();
+        await using var _ = session;
+        var capture = new AsyncLocal<bool>();
+        var measurements = new List<(string Name, long Count, string Mode)>();
+        using var listener = new System.Diagnostics.Metrics.MeterListener();
+        listener.InstrumentPublished = (instrument, owner) =>
+        {
+            if (instrument.Meter.Name == "Bsync" && instrument.Name.StartsWith("bsync.query.", StringComparison.Ordinal)) owner.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, count, tags, _) =>
+        {
+            if (!capture.Value) return;
+            Assert.Equal(1, tags.Length);
+            Assert.Equal("bsync.query.mode", tags[0].Key);
+            measurements.Add((instrument.Name, count, (string)tags[0].Value!));
+        });
+        listener.Start();
+        capture.Value = true;
+        await notes.QueryAsync(new() { Index = ByTitle.All(), Limit = 1 });
+        await notes.QueryAsync(new() { Order = (a, b) => string.CompareOrdinal(a.Title, b.Title), Limit = 1 });
+        capture.Value = false;
+        Assert.Contains(("bsync.query.materialized", 200L, "index-page"), measurements);
+        Assert.Contains(("bsync.query.materialized", 449L, "full-sort"), measurements);
+        Assert.Contains(("bsync.query.returned", 1L, "full-sort"), measurements);
+    }
 }

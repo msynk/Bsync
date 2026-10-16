@@ -1,5 +1,21 @@
 # Observability
 
+## Redacted offline metadata export
+
+`await OfflineDiagnosticExport.ExportJsonAsync(accountMetadata, recordLimit: 1000)` returns source-generated JSON
+containing only allowlisted aggregate counts: transfer states, workflow states, background outcomes, cache reservations
+and pins, and read-model build/active counts. It omits account/document/blob identities, endpoints, pin-owner strings,
+payloads, source versions and error text. Unknown namespaces are not parsed; malformed/newer recognized records are
+counted without copying their content. This is separate from the explicit, content-bearing work-export API.
+
+The scan is bounded to 1..10000 records and reports `Truncated` when partial. Counts are a live metadata observation,
+not a transactional snapshot, byte inventory, source freshness proof or package-readiness check. Read-model rows can
+consume the scan budget even though their payloads are omitted. Capture a settled report with account work stopped
+when needed. SQLite/browser storage access failures still surface to the caller; the exporter never wipes data or
+contacts a server. Treat even aggregate business volume as application data when deciding where to send a report.
+
+## Runtime telemetry
+
 Bsync emits traces and metrics through the .NET built-ins (`ActivitySource`, `Meter`). It emits logs
 through `ILogger` in the packages that already depend on Microsoft.Extensions: the Blazor session and the
 ASP.NET Core endpoints. The core package takes no logging dependency.
@@ -84,6 +100,17 @@ no id and are not recorded. Tested: `ReplicaAuditTests`, `SqlServerAuthorityTest
 
 ## What to alert on
 
+Collection query counters `bsync.query.materialized` and `bsync.query.returned` use only the low-cardinality
+`bsync.query.mode` tag (`id-page`, `index-page`, `full-sort`, `full-count`). Materialized includes residual predicate
+misses and skipped records; a page fetch may materialize more than its returned limit. A high materialized/returned
+ratio identifies scan-heavy UI queries. These counters do not report database-internal index entries visited, and
+contain no account IDs, hashes, document IDs, predicate text or document content.
+
+Custom `Order` reads/sorts the full collection. Default ID and declared-index paths read keyset pages of 200 and stop
+after the requested number of matches, but a residual predicate or large Skip can still visit the entire range.
+Pages are not a cross-call snapshot: inserts, deletes and index-key edits between reads can change page membership.
+Use immutable package snapshots or a separately captured source generation when a stable read revision is required.
+
 - `bsync.queue.oldest_age` growing on devices you collect telemetry from: uploads are not getting through.
 - `bsync.push.operations{outcome="rejected"}` by `error.type`: validation or permission problems, or
   `clock-skew` on devices with a wrong clock.
@@ -108,3 +135,31 @@ no id and are not recorded. Tested: `ReplicaAuditTests`, `SqlServerAuthorityTest
   server metrics through the OpenTelemetry SDK (1.18.0, in-memory exporter).
 
 Not verified: an OTLP collector over the network, and browser-side telemetry export.
+
+## Managed offline metrics (unreleased)
+
+Create one `OfflineMetrics` per distinct account metadata store in a process and periodically call `RefreshAsync` with
+a bounded record limit. Dispose on account close. Metric callbacks read cached aggregates and never access storage.
+Multiple registrations for the same store double-count it; metadata in a separate application catalog needs its own
+registration. No metric includes account IDs, content hashes, endpoints, package names or user-defined tags.
+
+| Metric | Meaning |
+|---|---|
+| `bsync.transfer.backlog` | Nonterminal jobs, including paused/failed jobs requiring intervention |
+| `bsync.transfer.pending_expected_bytes` | Full expected job sizes, not remaining bytes or deduplicated storage |
+| `bsync.transfer.oldest_known_age`, `bsync.transfer.unknown_age` | Oldest timestamped pending job and number with unknown original enqueue time |
+| `bsync.cache.reserved_bytes`, `bsync.cache.pinned_reserved_bytes` | Conservative durable metadata reservations |
+| `bsync.cache.capacity_refusals` | Operations refused by the hard storage budget |
+| `bsync.blob.verified_bytes` | Locally verified download bytes or authority-acknowledged upload bytes; repeated verification counts again |
+| `bsync.package.last_verified{bsync.readiness}` | Last persisted verification observations, not proof of present completeness |
+| `bsync.background.pending`, `bsync.background.last_outcome{bsync.outcome}` | Durable request count and last outcomes, not execution totals |
+| `bsync.offline.snapshot.oldest_age`, `bsync.offline.snapshot.partial` | Snapshot staleness and count of truncated/unsupported snapshots |
+
+Always collect the snapshot-age/partial and unknown-age metrics with backlog metrics. Old schema-1 transfer records
+without `CreatedUtc` retain unknown age rather than inventing a timestamp. The redacted export contains the same
+allowlisted aggregates. These are live bounded scans; concurrent changes can make counts approximate.
+
+The Tasks outbox recipe emits `bsync.sample.publication.lag` on meter `Bsync.Samples.Tasks`, after commit, with no tags.
+Coalescing preserves the oldest unconsumed request time, so repeated updates do not hide backlog age. The histogram
+measures completed publications only: alert separately on retained/poisoned outbox rows. It cannot measure unregistered
+domain writes or a dispatcher that never runs. Full database capture lag remains outside this recipe.

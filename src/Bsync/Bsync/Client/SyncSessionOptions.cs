@@ -55,6 +55,9 @@ public sealed record SyncSessionOptions<TDocument>
     /// </summary>
     public bool LiveHints { get; init; }
 
+    /// <summary>Whether opening a replica starts network work. False supports offline cold open; enable later with SetReplicationEnabledAsync.</summary>
+    public bool StartReplication { get; init; } = true;
+
     /// <summary>
     /// Called when a replica opens; returns something to dispose when it closes. Hosts use it to connect platform
     /// events (browser <c>online</c>/visibility, native resume) to <see cref="SyncSession{TDocument}.RequestSync"/>.

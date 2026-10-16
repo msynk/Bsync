@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <!-- Reuse the same application-facing harness against distributed packages, not source project references. -->
+    <AssemblyName>Bsync.Tests.BrowserHost</AssemblyName>
+    <RootNamespace>Bsync.Tests.BrowserHost</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.12" />
+    <PackageReference Include="Bsync" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="Bsync.Blazor" Version="$(BsyncPackageVersion)" />
+    <Compile Include="..\..\Bsync.Tests.BrowserHost\*.cs" Link="%(Filename)%(Extension)" />
+    <Content Include="..\..\Bsync.Tests.BrowserHost\wwwroot\index.html" Link="wwwroot\index.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -10,11 +10,13 @@ bundle, and the library build needs no MAUI workloads.
 | `MauiSync.UseMauiLifecycle()` | Sets `SyncSessionOptions<T>.AttachLifecycle` (and keeps any lifecycle the options already had): sync when internet access returns, pause when the app's windows stop, resume and sync at once when they come back. |
 | `MauiSync.AttachAsync(session)` | The same subscription without the options helper. Disposing the result unsubscribes. |
 | `MauiSync.RunInBackgroundAsync(session, account, budget)` | One budgeted sync (`SyncEngine<T>.SyncForAsync`) for an Android `WorkManager` worker or an iOS `BGTaskScheduler` task. Pass `SyncResult.HasRemainingWork` on to the scheduler. |
-| `SecureReplicaKeys.GetOrCreateAsync(account)`, `Delete(account)` | A 32-byte key per account in MAUI `SecureStorage` (Keychain, Keystore, DPAPI), for an encrypted SQLite replica (ADR-016). |
+| `ProtectedLocalKeys.AcquireAsync(reference)` | Reads an existing, explicitly versioned account key from `SecureStorage`; unavailable keys preserve ciphertext. See [local unlock](local-unlock.md). |
+| `SecureReplicaKeys.GetOrCreateAsync(account)`, `Delete(account)` | Legacy first-provisioning helper. Do not use `GetOrCreateAsync` to reopen existing encrypted resources when their key may be unavailable. |
 
 ```csharp
 builder.Services.AddLocalSyncCollection<Note>(_ => new SyncSessionOptions<Note> { /* ... */ }.UseMauiLifecycle());
-var key = await SecureReplicaKeys.GetOrCreateAsync(account);          // with SQLitePCLRaw.bundle_e_sqlcipher
+using var key = await new ProtectedLocalKeys(SecureStorage.Default).AcquireAsync(keyReference);
+// Pass key.Key to the qualified encrypted-store integration; never replace an unavailable key.
 var result = await MauiSync.RunInBackgroundAsync(session, account, TimeSpan.FromSeconds(25));
 ```
 

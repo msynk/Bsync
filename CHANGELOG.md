@@ -4,9 +4,50 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
 [docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
 
-## Unreleased (0.2.0)
+## Unreleased
 
-Everything after 0.1.0, not yet on NuGet. Breaking: the package set, two signatures and one status behaviour (see Changed).
+- Added immutable intent request/payload registration and separate persistence, transport and business-outcome
+  contracts, with generated JSON registrations in the Tasks sample and restart coverage for two request kinds.
+- Added an optional application-transaction external-effect outbox recipe with stable receiver keys, fenced result
+  acknowledgement, bounded retries and poison isolation; receiver/worker integration remains application-owned.
+- Managed content reimport detects same-size corruption and promotes verified replacements while retaining pins;
+  repair accounts for both old and staged bytes and preserves existing native reader handles.
+
+- Added account lifecycle operations, renewable execution leases, and versioned orchestration metadata in SQLite
+  and IndexedDB; explicit offline opens defer transport construction and preserve pending work.
+- Added durable transfer jobs, managed cache pins/budgets, immutable package staging/activation and revision-bound
+  readers. Browser physical eviction uses Web Locks; native eviction uses exclusive file locks.
+- Added recoverable workflow and portable background-dispatch contracts. Native OS scheduler adapters remain unqualified.
+- Added full-reconciliation local read-model generations, atomic progress and immutable readers; hosts must capture a
+  stable source snapshot. Retired/staging generations are currently retained until account deletion.
+- Added explicit credential-required/migration-pending account outcomes and a bounded, aggregate-only diagnostic export.
+- Added optional shared account-resource lifetimes and exclusive deletion across processes/tabs, with pending work
+  rechecked under exclusive ownership; local key access contracts and a browser offline recovery-key example.
+- Added cached package-verification observations for UI polling and opt-in bounded backlog/storage/background metrics.
+- Added query materialization/return counters and a published-0.2.0 SQLite migration fixture.
+- Added SQL Server publication lock ordering and tested Tasks sample command-ledger/projection-outbox recipes.
+- Blob uploads refresh a refused presigned URL once; empty downloads are verified locally.
+- Blob progress distinguishes partial offsets from verified completion; mismatched announced lengths retain existing
+  content and fail explicitly. New reader/snapshot pins recover after process/tab termination using physical lifetime locks.
+
+These orchestration APIs remain under qualification; see [implementation progress](docs/Improvement-Plan.md).
+Blob encryption, automatic read-model reclamation, online/membership-aware server rebuilds, native scheduling adapters and full release gates are
+not claimed complete.
+
+- SQL Server packages now require `System.Security.Cryptography.Pkcs` >= 9.0.21, remediating
+  GHSA-846f-f764-76mx and GHSA-2fmv-rv2c-59x7 in the SQL Client dependency chain.
+- Sample WebAssembly servers use 10.0.13 for GHSA-g27p-qf6j-c96c and GHSA-qjpx-jqm5-h2c4;
+  the browser test project's separate SQL Client reference also receives the patched Pkcs minimum.
+- Release candidates require a clean version tag, matching changelog and package metadata, and emit
+  checksums/toolchain/Source Link build maps. CI and nightly artifacts also carry provenance.
+- Dependency auditing covers transitive packages and fails on findings or audit failures; the package-only
+  web consumer exercises central package management. See [release validation](docs/operations/releases.md).
+
+## 0.2.0 source baseline (published artifact provenance unresolved)
+
+Six 0.2.0 packages are published on NuGet. They identify an earlier source commit, so this source
+change list is not proof of exact binary contents ([inventory](docs/review/release-baseline-2026-10-16.md)).
+Breaking: the package set, two signatures and one status behaviour (see Changed).
 
 ### Added
 

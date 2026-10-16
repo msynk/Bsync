@@ -25,6 +25,114 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
 
     private static string Unique(string prefix) => $"{prefix}-{Guid.NewGuid():N}";
 
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task SharedAccountReadersExcludeDeletionUntilAllTabsClose(string browser)
+    {
+        var (context, first) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var second = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        var deleter = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        var account = Unique("account-lifetime");
+        Assert.Equal("acquired", await first.CallAsync("AccountResourceCheck", account, false, true));
+        Assert.Equal("acquired", await second.CallAsync("AccountResourceCheck", account, false, true));
+        Assert.Equal("blocked", await deleter.CallAsync("AccountResourceCheck", account, true, false));
+        await first.Page.CloseAsync();
+        Assert.Equal("blocked", await deleter.CallAsync("AccountResourceCheck", account, true, false));
+        await second.Page.CloseAsync();
+        // Tab closure and the browser lock-manager's release are separate asynchronous boundaries.
+        // Probe actual ownership; never infer it from elapsed time or forcibly remove another holder.
+        await WaitForProbeAsync(() => deleter.CallAsync("AccountResourceCheck", account, true, true), "acquired");
+        var later = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("blocked", await later.CallAsync("AccountResourceCheck", account, false, false));
+        await deleter.Page.CloseAsync();
+        await WaitForProbeAsync(() => later.CallAsync("AccountResourceCheck", account, false, false), "acquired");
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task DeadTabReaderPinsAreReclaimedWhileLiveReadersAndDurableWorkRemainProtected(string browser)
+    {
+        var (context, first) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var second = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        var account = Unique("reader-recovery");
+        Assert.Equal("held", await first.CallAsync("ReaderRecoveryChecks", account, true));
+        Assert.Equal("2", await second.CallAsync("ReaderRecoveryChecks", account, false));
+        await first.Page.CloseAsync();
+        await WaitForProbeAsync(() => second.CallAsync("ReaderRecoveryChecks", account, false), "0");
+    }
+
+    private static async Task WaitForProbeAsync(Func<Task<string>> probe, string expected)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        while (await probe().WaitAsync(deadline.Token) != expected)
+            await Task.Delay(25, deadline.Token);
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task ReadModelRebuildSurvivesReloadAndKeepsPriorGeneration(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var name = Unique("read-model");
+        Assert.Equal("ok", await page.CallAsync("ReadModelChecks", name, false));
+        await page.Page.CloseAsync();
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("ReadModelChecks", name, true));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task OrchestrationMetadataSurvivesReload(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var name = Unique("orchestration");
+        Assert.Equal("ok", await page.CallAsync("OrchestrationChecks", name, false));
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("OrchestrationChecks", name, true));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task CorruptBlobCanBeReimportedAfterReloadWithoutLosingPendingPins(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var name = Unique("cache-repair");
+        var identity = (await page.CallAsync("CacheRepairChecks", name, false))!.Split('/');
+        await page.Page.EvaluateAsync("""
+            ([name, hash]) => new Promise((resolve, reject) => {
+                const open = indexedDB.open('bsync-blobs-' + name);
+                open.onerror = () => reject(open.error);
+                open.onsuccess = () => {
+                    const db = open.result;
+                    const tx = db.transaction('blobs', 'readwrite', { durability: 'strict' });
+                    tx.objectStore('blobs').put(new Uint8Array([9, 9, 9, 9]).buffer, ['object', hash]);
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                    tx.onabort = () => { db.close(); reject(tx.error); };
+                };
+            })
+            """, identity);
+        await page.Page.CloseAsync();
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("CacheRepairChecks", name, true));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task PreparedPackageSurvivesReloadAndKeepsReaderRevision(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var name = Unique("packages");
+        Assert.Equal("ok", await page.CallAsync("PackageChecks", name, false));
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("PackageChecks", name, true));
+    }
+
     [Theory(DisplayName = "Records the browser engine version under test")]
     [MemberData(nameof(Browsers))]
     public async Task EngineVersion(string browser)
@@ -32,6 +140,20 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
         var version = (await fixture.BrowserAsync(browser)).Version;
         Assert.False(string.IsNullOrEmpty(version));
         Console.WriteLine($"BROWSER-VERSION {browser} {version}");
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task ManagedCacheLockExcludesAnotherTabAndReleasesOnTabTermination(string browser)
+    {
+        var (context, first) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var second = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        var account = Unique("cache-lock");
+        Assert.Equal("acquired", await first.CallAsync("CacheLockCheck", account, true));
+        Assert.Equal("blocked", await second.CallAsync("CacheLockCheck", account, false));
+        await first.Page.CloseAsync();
+        Assert.Equal("acquired", await second.CallAsync("CacheLockCheck", account, false));
     }
 
     [Theory(DisplayName = "T41-T45 I01-I03 I12: IndexedDB passes the shared store conformance cases")]

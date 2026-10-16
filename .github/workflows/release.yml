@@ -1,0 +1,70 @@
+# Produces reviewable release candidates only. No credentials or NuGet publication.
+name: release-candidate
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CI: true
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require clean tagged source and released changelog
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          test "$RELEASE_REF_TYPE" = tag
+          python scripts/release.py preflight --tag "$RELEASE_TAG"
+          echo "BSYNC_PACKAGE_VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+      - run: python -m unittest discover -s scripts -p "test_*.py" -v
+      - name: Core and encrypted SQLite qualification
+        run: |
+          dotnet test src/Tests/Bsync.Tests -c Release --logger "trx;LogFileName=core.trx"
+          dotnet test src/Tests/Bsync.Tests.SqliteEncrypted -c Release --logger "trx;LogFileName=encrypted.trx"
+      - name: Pack from tagged source
+        run: |
+          for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite; do
+            dotnet pack src/Bsync/$p -c Release -o artifacts/packages || exit 1
+          done
+      - name: Verify all artifacts and record source, checksums and toolchain
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/release.py manifest --version "$BSYNC_PACKAGE_VERSION" --tag "$RELEASE_TAG"
+      - name: Verify distributed assembly and portable PDB identities and Source Link
+        run: dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages "$(git rev-parse HEAD)" --verify-sources
+      - name: Reject mismatched and missing packaged symbols
+        run: python scripts/verify_symbols_test.py artifacts/packages -v
+      - name: Consume exact artifacts with auditing enabled
+        run: |
+          dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion="$BSYNC_PACKAGE_VERSION" --logger "trx;LogFileName=consumer.trx"
+          dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion="$BSYNC_PACKAGE_VERSION" -o artifacts/consumer-web
+          test -f artifacts/consumer-web/wwwroot/_content/Bsync.Blazor/bsync-indexeddb.js
+          dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          path: artifacts/packages
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-test-evidence
+          path: src/Tests/**/TestResults/*.trx

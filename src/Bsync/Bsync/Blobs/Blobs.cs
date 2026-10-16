@@ -65,7 +65,7 @@ public sealed class FileBlobSource : IBlobSource
     }
 }
 
-/// <summary>Thrown when transferred bytes do not hash to the expected SHA-256. Nothing was kept.</summary>
+/// <summary>Content failed hash/length verification. Corrupt partials are discarded; existing content is retained when an announced length disagrees.</summary>
 public sealed class BlobCorruptedException(string message) : IOException(message);
 
 /// <summary>
@@ -105,4 +105,11 @@ public interface IBlobCache
 
     /// <summary>The hashes of the verified content on this device.</summary>
     Task<IReadOnlyList<string>> ListAsync(CancellationToken cancellationToken = default);
+}
+
+/// <summary>Optional physical payload inventory required for managed capacity accounting.</summary>
+public interface IBlobCacheInventory
+{
+    /// <summary>Total stored payload bytes including complete objects, partials and abandoned import staging. Excludes filesystem/database overhead.</summary>
+    Task<long> GetStoredBytesAsync(CancellationToken cancellationToken = default);
 }

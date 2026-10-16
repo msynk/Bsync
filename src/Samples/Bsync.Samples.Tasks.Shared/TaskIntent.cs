@@ -23,6 +23,9 @@ public sealed class TaskIntent : ISyncEntity
     /// <summary>What to do: <see cref="IntentKinds.Complete"/> or <see cref="IntentKinds.Rename"/>.</summary>
     public string Kind { get; set; } = string.Empty;
 
+    /// <summary>Immutable request schema. Unknown versions are refused without execution.</summary>
+    public int RequestSchema { get; set; } = 1;
+
     /// <summary>The task to act on.</summary>
     public string TaskId { get; set; } = string.Empty;
 
@@ -90,4 +93,13 @@ public static class IntentCodes
 
     /// <summary>An intent was changed after it was created (a sync-level rejection: intents are immutable).</summary>
     public const string Immutable = "intent-immutable";
+
+    /// <summary>The retained command identity cannot execute again after its result retention expires.</summary>
+    public const string ResultExpired = "intent-result-expired";
+
+    /// <summary>The server cannot execute this request schema.</summary>
+    public const string UnsupportedSchema = "intent-schema-unsupported";
+
+    /// <summary>Request identity or payload exceeds the supported contract bounds.</summary>
+    public const string InvalidRequest = "intent-request-invalid";
 }

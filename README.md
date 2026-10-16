@@ -3,26 +3,34 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.1.0` is published on NuGet; this branch builds `0.2.0` (unreleased). Pre-1.0: minor versions may
+> **Status:** `0.2.0` is published on NuGet, with an unresolved source-provenance mismatch. This branch still uses
+> the `0.2.0` version prefix; development artifacts use preview suffixes. Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
 
 This section is the single source of truth for release and verification status; other documents link here.
 
-- **Packages.** Six packages are at `0.1.0` on NuGet.org (published 2026-09-28): `Bsync`, `Bsync.Blazor`,
-  `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Testing`. The repository
-  is at `0.2.0` (unreleased) with six packages: it adds `Bsync.Server.SqlServer` and merges `Bsync.Testing` into
-  `Bsync` (namespace `Bsync.Testing` unchanged). `Bsync.Storage.Sqlite` covers plain and encrypted (SQLCipher)
+- **Packages.** Six packages are at `0.2.0` on NuGet.org: `Bsync`, `Bsync.Blazor`,
+  `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Server.SqlServer`.
+  Checked 2026-10-16: all identify commit `5404785`, which predates release additions and declares 0.1.0.
+  Exact equivalence to a clean source commit is unproven; see the [inventory](docs/review/release-baseline-2026-10-16.md)
+  and [release validation](docs/operations/releases.md). `Bsync.Testing` is now in `Bsync`
+  (namespace unchanged). `Bsync.Storage.Sqlite` covers plain and encrypted (SQLCipher)
   replicas and leaves the native SQLite library to the application. S3 blob storage and the MAUI helpers are recipes
   in the samples, not packages ([attachments](docs/patterns/attachments.md), [MAUI](docs/patterns/maui.md)).
   Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
   ([compatibility policy](docs/compatibility.md#policy)).
 - **Authorities.** Durable: PostgreSQL (`Bsync.Server.PostgreSql`, released) and SQL Server
-  (`Bsync.Server.SqlServer`, unreleased; verified on SQL Server 2025 LocalDB). The in-memory authority is for tests
+  (`Bsync.Server.SqlServer`; source verified on SQL Server 2025 LocalDB). The in-memory authority is for tests
   and samples.
 - **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
+- **Offline orchestration (unreleased).** Account lifecycle, durable transfer jobs, pinned cache budgets,
+  immutable packages, workflow recovery, derived read-model generations and portable scheduling contracts are in progress. See
+  [managed content](docs/patterns/managed-content.md), [recoverable work](docs/patterns/recoverable-work.md),
+  [local unlock](docs/patterns/local-unlock.md), and the [improvement plan](docs/Improvement-Plan.md). This is not a claim that all roadmap work or native
+  background qualification is complete.
 - **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
   including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
   Windows machine.

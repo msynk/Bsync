@@ -53,6 +53,26 @@ public sealed class TasksDb(DbContextOptions<TasksDb> options) : DbContext(optio
                 ChangedBy nvarchar(256) NULL,
                 CONSTRAINT PK_Tasks PRIMARY KEY (Tenant, Id)
             );
+            IF OBJECT_ID(N'dbo.IntentExecutions', N'U') IS NULL
+            CREATE TABLE dbo.IntentExecutions (
+                Tenant nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                CommandId nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                RequestHash char(64) NOT NULL,
+                Result nvarchar(max) NULL,
+                ResultExpiresAt datetimeoffset NOT NULL,
+                CONSTRAINT PK_IntentExecutions PRIMARY KEY NONCLUSTERED (Tenant, CommandId)
+            );
+            IF OBJECT_ID(N'dbo.TaskProjectionOutbox', N'U') IS NULL
+            CREATE TABLE dbo.TaskProjectionOutbox (
+                Tenant nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                TaskId nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                Generation uniqueidentifier NOT NULL,
+                RequestedAt datetimeoffset NOT NULL,
+                Attempts int NOT NULL DEFAULT 0,
+                RetryAt datetimeoffset NULL,
+                Poisoned bit NOT NULL DEFAULT 0,
+                CONSTRAINT PK_TaskProjectionOutbox PRIMARY KEY NONCLUSTERED (Tenant, TaskId)
+            );
             IF OBJECT_ID(N'dbo.TenantBlobs', N'U') IS NULL
             CREATE TABLE dbo.TenantBlobs (
                 Tenant nvarchar(256) NOT NULL,

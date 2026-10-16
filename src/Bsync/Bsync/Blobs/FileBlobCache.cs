@@ -10,7 +10,7 @@ namespace Bsync.Blobs;
 /// <item><c>partial/&lt;sha256&gt;.part</c>: a transfer in progress, flushed after every append.</item>
 /// </list>
 /// </summary>
-public sealed class FileBlobCache : IBlobCache
+public sealed class FileBlobCache : IBlobCache, IBlobCacheInventory
 {
     private readonly string _objects;
     private readonly string _partial;
@@ -28,6 +28,14 @@ public sealed class FileBlobCache : IBlobCache
 
     /// <summary>The cache's directory.</summary>
     public string Directory { get; }
+
+    /// <inheritdoc />
+    public Task<long> GetStoredBytesAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(System.IO.Directory.EnumerateFiles(_objects, "*", SearchOption.AllDirectories)
+            .Concat(System.IO.Directory.EnumerateFiles(_partial)).Sum(path => new FileInfo(path).Length));
+    }
 
     /// <inheritdoc />
     public Task<long?> SizeAsync(string sha256, CancellationToken cancellationToken = default) =>
@@ -164,9 +172,14 @@ public sealed class FileBlobCache : IBlobCache
     {
         var target = ObjectPath(sha256);
         System.IO.Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        if (!File.Exists(target))
+        // The staging file is already flushed and hash-verified. Replace in one filesystem rename so a corrupt
+        // same-name object can be repaired without a missing-content interval. Existing readers allow delete sharing.
+        if (File.Exists(target)) File.Replace(verified, target, destinationBackupFileName: null);
+        else
         {
-            File.Move(verified, target);
+            try { File.Move(verified, target); }
+            catch (IOException) when (File.Exists(target))
+            { File.Replace(verified, target, destinationBackupFileName: null); }
         }
     }
 

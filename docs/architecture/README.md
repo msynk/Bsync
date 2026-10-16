@@ -1,6 +1,6 @@
 # Architecture
 
-- [Invariants I01–I20 and their current status](invariants.md)
+- [Invariants I01–I29 and their current status](invariants.md)
 
 ## Decision records
 
@@ -23,6 +23,12 @@
 | [017](adr-017-clock-correction.md) | Correcting a device clock that is ahead of the server | Accepted; parts 1 and 2 implemented |
 | [016](adr-016-encryption-at-rest.md) | Encryption at rest and replica wipe | Accepted; implemented (SQLCipher package, IndexedDB AES-GCM, wipe) |
 | [018](adr-018-local-secondary-indexes.md) | Declared secondary indexes in the local stores (task E2) | Accepted; implemented (in-memory, SQLite, IndexedDB) |
+| [019](adr-019-release-provenance.md) | Tagged release provenance and audited package consumers (R0) | Accepted; candidate tooling implemented, full qualification pending |
+| [020](adr-020-account-orchestration.md) | Account lifecycle, metadata transactions and execution fencing | Implementation in progress |
+| [021](adr-021-managed-content.md) | Managed transfers, pins and immutable package activation | Implementation in progress |
+| [022](adr-022-workflow-publication.md) | Recoverable workflows, command identity and controlled publication | Implementation in progress |
+| [023](adr-023-local-read-model-generations.md) | Full-reconciliation local read-model generations | Implemented primitive; host snapshot required |
+| [024](adr-024-sql-server-capture-gate.md) | Controlled publication after a bounded capture spike | Automatic capture deferred |
 | [014](adr-014-sql-server-authority.md) | SQL Server authority on the application's database: feed lock, transaction enlistment, write handler, publisher | Accepted; implemented (0.2.0, unreleased) |
 
 Operations: [disaster recovery and stuck replicas](../operations/disaster-recovery.md).

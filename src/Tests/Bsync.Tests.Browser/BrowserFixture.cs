@@ -34,7 +34,8 @@ public sealed class BrowserFixture : IAsyncLifetime
             throw new InvalidOperationException($"Playwright browser installation failed with exit code {exit}.");
         }
 
-        var webRoot = Path.Combine(AppContext.BaseDirectory, "browserhost", "wwwroot");
+        var webRoot = Environment.GetEnvironmentVariable("BSYNC_BROWSER_HOST") is { Length: > 0 } packagedHost
+            ? Path.GetFullPath(packagedHost) : Path.Combine(AppContext.BaseDirectory, "browserhost", "wwwroot");
         if (!File.Exists(Path.Combine(webRoot, "index.html")))
         {
             throw new InvalidOperationException($"The browser harness was not published to {webRoot}.");

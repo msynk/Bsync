@@ -70,6 +70,7 @@ public sealed class SqlServerPublisherTests(ITestOutputHelper output) : IAsyncLi
         authority.Committed += hints.Add;
         await using var connection = await _database.OpenAsync();
         await using var transaction = connection.BeginTransaction();
+        await authority.AcquirePublicationLockAsync("default", transaction);
         await using (var audit = new SqlCommand("INSERT INTO dbo.audit (what) VALUES ('price changed')", connection, transaction))
         {
             await audit.ExecuteNonQueryAsync();
@@ -104,5 +105,23 @@ public sealed class SqlServerPublisherTests(ITestOutputHelper output) : IAsyncLi
         await authority.UpsertAsync("default", new Note { Id = "n1", Title = "x" });
 
         Assert.Equal(["n1"], Assert.Single(hints).Ids); // the unchanged republish announces nothing
+    }
+
+    [Fact]
+    public async Task PublicationLockSerializesAnotherConnectionWithoutPublishingOrNotifying()
+    {
+        await using var authority = await _database.AuthorityAsync();
+        await using var other = await _database.AuthorityAsync(connectionString: _database.SecondProcessConnectionString);
+        var hints = new List<AuthorityCommit>(); authority.Committed += hints.Add;
+        await using var connection = await _database.OpenAsync();
+        await using var transaction = connection.BeginTransaction();
+        await authority.AcquirePublicationLockAsync("default", transaction);
+        var waiting = other.UpsertAsync("default", new Note { Id = "next", Title = "committed after release" });
+        await Task.Delay(100);
+        Assert.False(waiting.IsCompleted);
+        Assert.Empty(hints);
+        await transaction.RollbackAsync();
+        Assert.Equal(1, (await waiting.WaitAsync(TimeSpan.FromSeconds(10))).Written);
+        Assert.Equal(1, await authority.GetHighestVersionAsync("default"));
     }
 }

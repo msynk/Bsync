@@ -114,6 +114,8 @@ public static class TasksServer
             var document = new TaskDocument { Id = request.Id, Title = request.Title, Slug = TaskRules.Slug(request.Title) };
             await using var db = TasksDb.Open(connectionString);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            // Replication holds the feed before entering its domain handler. API writes use the same order.
+            await authority.AcquirePublicationLockAsync(tenant, transaction.GetDbTransaction(), cancellationToken);
             document.Revision = 1;
             db.Tasks.Add(new TaskEntity { Tenant = tenant, Id = document.Id, Title = document.Title, Slug = document.Slug, Revision = 1, ChangedBy = user.FindFirst("sub")?.Value });
             await db.SaveChangesAsync(cancellationToken);

@@ -1,20 +1,41 @@
-sealed class Bsync.Blazor.Blobs.BrowserBlobStore : Bsync.Blobs.IBlobCache
+sealed class Bsync.Blazor.Blobs.BrowserBlobCacheLock : Bsync.Blobs.IBlobCacheLock, System.IAsyncDisposable
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  System.Threading.Tasks.ValueTask<System.IAsyncDisposable> AcquireAsync(System.String name, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.ValueTask<System.IAsyncDisposable> TryAcquireAsync(System.String name, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<Bsync.Blazor.Blobs.BrowserBlobCacheLock> OpenAsync(Microsoft.JSInterop.IJSRuntime js, Bsync.Client.AccountScope account, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Blazor.Blobs.BrowserBlobStore : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheInventory
   System.IO.Stream OpenRead(System.String sha256, System.Int64 size)
   System.String Name { get; }
   System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.Byte[] chunk, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blazor.Blobs.BrowserStorageEstimate> EstimateStorageAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> RequestPersistenceAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> GetStoredBytesAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64> PartialLengthAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.ValueTuple<System.String, System.Int64>> ImportAsync(System.IO.Stream content, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task DeleteAllAsync(Microsoft.JSInterop.IJSRuntime js, System.String name, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Blazor.Blobs.BrowserBlobStore> OpenAsync(Microsoft.JSInterop.IJSRuntime js, System.String name, System.Threading.CancellationToken cancellationToken = default)
+record Bsync.Blazor.Blobs.BrowserStorageEstimate
+  System.Boolean Equals(Bsync.Blazor.Blobs.BrowserStorageEstimate other)
+  System.Int64? QuotaBytes { get; init; }
+  System.Int64? UsageBytes { get; init; }
+  System.Void Deconstruct(out System.Int64? UsageBytes, out System.Int64? QuotaBytes)
+  ctor(System.Int64? UsageBytes, System.Int64? QuotaBytes)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
 static class Bsync.Blazor.BsyncServiceCollectionExtensions
   static Microsoft.Extensions.DependencyInjection.IServiceCollection AddServerSyncCollection<TDocument>(Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, Bsync.Server.ISyncAuthority<TDocument>> authority, System.Func<TDocument, TDocument> cloner, System.Func<System.Security.Claims.ClaimsPrincipal, System.String> resolveScope = null) where TDocument : class, Bsync.ISyncEntity
+sealed class Bsync.Blazor.IndexedDb.BrowserAccountResourceLock : Bsync.Client.IAccountResourceLock, System.IAsyncDisposable
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  System.Threading.Tasks.ValueTask<System.IAsyncDisposable> TryAcquireAsync(Bsync.Client.AccountScope account, System.Boolean exclusive, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<Bsync.Blazor.IndexedDb.BrowserAccountResourceLock> OpenAsync(Microsoft.JSInterop.IJSRuntime js, System.Threading.CancellationToken cancellationToken = default)
 sealed class Bsync.Blazor.IndexedDb.BrowserLifecycleWatcher : System.IAsyncDisposable
   System.Threading.Tasks.ValueTask DisposeAsync()
   System.Void Wake()
@@ -42,6 +63,13 @@ sealed class Bsync.Blazor.IndexedDb.IndexedDbLocalStore<TDocument> : Bsync.Stora
   static System.Threading.Tasks.Task DeleteDatabaseAsync(Microsoft.JSInterop.IJSRuntime js, System.String databaseName, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Blazor.IndexedDb.IndexedDbLocalStore<TDocument>> OpenAsync(Microsoft.JSInterop.IJSRuntime js, Bsync.Blazor.IndexedDb.IndexedDbStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Collections.Generic.IEnumerable<Bsync.Storage.SyncIndex<TDocument>> indexes, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Blazor.IndexedDb.IndexedDbLocalStore<TDocument>> OpenAsync(Microsoft.JSInterop.IJSRuntime js, Bsync.Blazor.IndexedDb.IndexedDbStoreOptions options, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TDocument> typeInfo, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Blazor.IndexedDb.IndexedDbOrchestrationStore : Bsync.Storage.IOrchestrationStore, System.IAsyncDisposable
+  System.Threading.Tasks.Task DeleteAllAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.OrchestrationRecord> ReadAsync(System.String key, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> TryWriteAsync(System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationMutation> mutations, Bsync.Storage.OrchestrationFence fence = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationRecord>> ReadPageAsync(System.String prefix, System.String afterKey, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  static System.Threading.Tasks.Task<Bsync.Blazor.IndexedDb.IndexedDbOrchestrationStore> OpenAsync(Microsoft.JSInterop.IJSRuntime js, Bsync.Client.AccountScope account, System.Threading.CancellationToken cancellationToken = default)
 sealed class Bsync.Blazor.IndexedDb.IndexedDbReplicaLease : System.IAsyncDisposable
   System.Threading.Tasks.ValueTask DisposeAsync()
   static System.Threading.Tasks.Task<Bsync.Blazor.IndexedDb.IndexedDbReplicaLease> TryAcquireAsync(Microsoft.JSInterop.IJSRuntime js, System.String name, System.Threading.CancellationToken cancellationToken = default)
