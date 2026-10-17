@@ -31,8 +31,15 @@ public sealed class HttpBlobTransferOptions
     public bool DirectUploads { get; init; } = true;
 
     /// <summary>
+    /// Opts into the additive authenticated download-ticket endpoint. Requires a supporting server; unsupported routes
+    /// fail explicitly. Presigned downloads use DirectClient and refresh once on 401/403. Default false preserves 0.2 clients/servers.
+    /// </summary>
+    public bool DownloadTickets { get; init; }
+
+    /// <summary>
     /// The client for presigned URLs. It must not add the sync credentials (an object store refuses a second
-    /// authorization). Default a shared client without handlers.
+    /// authorization). Do not attach application cookies, default credential headers or authentication handlers.
+    /// Default a shared client without application handlers. Used for presigned uploads and opted-in download tickets.
     /// </summary>
     public HttpClient? DirectClient { get; init; }
 }
@@ -212,19 +219,16 @@ public sealed class HttpBlobTransfer
 
             if (held < size)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, $"{_base}/{sha256}");
-                if (held > 0)
-                {
-                    request.Headers.Range = new RangeHeaderValue(held, null);
-                }
-
-                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                using var response = await DownloadResponseAsync(sha256, held, cancellationToken).ConfigureAwait(false);
                 if (held > 0 && response.StatusCode != HttpStatusCode.PartialContent)
                 {
                     throw new HttpRequestException($"The server did not resume the download at {held} ({(int)response.StatusCode}).", null, response.StatusCode);
                 }
 
                 response.EnsureSuccessStatusCode();
+                if (response.Content.Headers.ContentRange is { } range &&
+                    (range.From != held || range.Length != size || range.To != size - 1))
+                    throw new InvalidDataException("Download Content-Range disagrees with the requested object.");
                 await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
                 var buffer = new byte[_options.ChunkSize];
                 while (held < size)
@@ -247,6 +251,8 @@ public sealed class HttpBlobTransfer
                 {
                     throw new IOException($"The download of {sha256} ended at {held} of {size} bytes.");
                 }
+                if (await stream.ReadAsync(buffer.AsMemory(0, 1), cancellationToken).ConfigureAwait(false) != 0)
+                    throw new InvalidDataException("Download exceeds its announced content length; partial retained for explicit recovery.");
             }
 
             if (size == 0) await cache.AppendPartialAsync(sha256, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
@@ -263,6 +269,44 @@ public sealed class HttpBlobTransfer
         finally
         {
             Transfers.Add(1, Down, new KeyValuePair<string, object?>("bsync.result", result));
+        }
+    }
+
+    private async Task<HttpResponseMessage> DownloadResponseAsync(string hash, long held, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            Uri? direct = null;
+            if (_options.DownloadTickets)
+            {
+                using var ticketRequest = new HttpRequestMessage(HttpMethod.Get, $"{_base}/{hash}/download");
+                ticketRequest.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+                using var ticket = await _http.SendAsync(ticketRequest, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                ticket.EnsureSuccessStatusCode(); // No redirect fallback to an older server.
+                await using var body = await ticket.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                var buffer = new byte[8193]; var length = await body.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false, ct).ConfigureAwait(false);
+                if (length > 8192) throw new InvalidDataException("Download ticket exceeds 8 KiB.");
+                using var document = JsonDocument.Parse(buffer.AsMemory(0, length), new() { MaxDepth = 4 });
+                var root = document.RootElement;
+                if (root.GetProperty("schema").GetInt32() != 1) throw new InvalidDataException("Unsupported download ticket schema.");
+                if (root.GetProperty("downloadUrl").ValueKind != JsonValueKind.Null)
+                {
+                    if (!Uri.TryCreate(root.GetProperty("downloadUrl").GetString(), UriKind.Absolute, out direct) ||
+                        direct.Scheme is not ("https" or "http") || direct.UserInfo.Length != 0 || direct.Fragment.Length != 0)
+                        throw new InvalidDataException("Invalid presigned download URL.");
+                }
+            }
+            using var request = new HttpRequestMessage(HttpMethod.Get, direct?.AbsoluteUri ?? $"{_base}/{hash}" + (_options.DownloadTickets ? "?proxy=1" : ""));
+            if (held > 0) request.Headers.Range = new RangeHeaderValue(held, null);
+            var client = direct is null ? _http : _options.DirectClient ?? SharedDirectClient.Value;
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            if (direct is not null && response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                response.Dispose();
+                if (attempt == 0) continue;
+                throw new IOException("The refreshed object-store download URL was refused.");
+            }
+            return response;
         }
     }
 

@@ -1,0 +1,567 @@
+{
+  "schemaVersion": 1,
+  "recordedUtc": "2026-10-16T20:35:03.727636+00:00",
+  "localDate": "2026-10-17",
+  "source": {
+    "commit": "d796e0d17cbad8019244c142b0de981dfb023015",
+    "dirty": true,
+    "sourceTreeSha256": "e6e19f61cf9d09da6115268d073b8a4ec1f250804b93a412af946495643474a9",
+    "fingerprintDefinition": "SHA256 of sorted tracked/unignored src, scripts and .github file names, NUL, and each SHA256 digest; documents/artifacts excluded."
+  },
+  "environments": {
+    "windows-desktop": {
+      "os": "Windows 10.0.19045",
+      "architecture": "x64",
+      "device": "Development desktop, Intel Core Ultra 7 255H, WD PC SN5000S NVMe",
+      "sdk": "10.0.401",
+      "runtime": "10.0.12",
+      "browsers": {
+        "chromium": "153.0.8010.12",
+        "firefox": "155.0",
+        "webkit": "26.6",
+        "driver": "Playwright 1.63; Windows engines, not native Safari"
+      },
+      "providers": {
+        "sqlServer": "SQL Server 2025 LocalDB, disposable test databases",
+        "postgreSql": "17.11 portable x64, loopback disposable test databases",
+        "s3": "Moto 5.2.4 emulator, task-owned loopback process"
+      },
+      "nativeSqlite": [
+        {
+          "name": "sqlite",
+          "distribution": "SQLitePCLRaw.bundle_e_sqlite3 2.1.12",
+          "file": "src/Tests/Bsync.Tests/bin/Release/net10.0/runtimes/win-x64/native/e_sqlite3.dll",
+          "sha256": "b7385d722c83fb52142a00477a726723745916d22a555711ee89834c1111fb2e",
+          "sqliteVersion": "3.53.3"
+        },
+        {
+          "name": "sqlcipher",
+          "distribution": "SQLitePCLRaw.bundle_e_sqlcipher 2.1.11",
+          "file": "src/Tests/Bsync.Tests.SqliteEncrypted/bin/Release/net10.0/runtimes/win-x64/native/e_sqlcipher.dll",
+          "sha256": "895c0f5203352446f159d7780021b69b280dec6347c434c7a643ad6b7d0d883b",
+          "sqliteVersion": "3.39.2"
+        }
+      ]
+    }
+  },
+  "suites": [
+    {
+      "name": "core",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests/TestResults/final-core.trx",
+      "sha256": "f671af4f95e1f2018e49e4bca2ae92d630fda7b1161200ade0219637c4687d23",
+      "times": {
+        "creation": "2026-10-17T00:00:11.8456942+03:30",
+        "queuing": "2026-10-17T00:00:11.8456944+03:30",
+        "start": "2026-10-17T00:00:11.2534732+03:30",
+        "finish": "2026-10-17T00:00:17.5952460+03:30"
+      },
+      "counters": {
+        "total": "740",
+        "executed": "740",
+        "passed": "740",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests -c Release --no-build"
+    },
+    {
+      "name": "sqlServer",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests.SqlServer/TestResults/final-sqlserver.trx",
+      "sha256": "6fcb51f873dc69d2412e5e1785c40ffb74f776ddff32d141ab09d029c96bca7e",
+      "times": {
+        "creation": "2026-10-17T00:02:33.7481614+03:30",
+        "queuing": "2026-10-17T00:02:33.7481620+03:30",
+        "start": "2026-10-17T00:02:30.0030964+03:30",
+        "finish": "2026-10-17T00:03:03.7638482+03:30"
+      },
+      "counters": {
+        "total": "94",
+        "executed": "94",
+        "passed": "94",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests.SqlServer -c Release; BSYNC_SQLSERVER and BSYNC_S3 configured"
+    },
+    {
+      "name": "postgreSql",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests.PostgreSql/TestResults/continuation-postgres.trx",
+      "sha256": "e5207dda098101b1d33c8102cfcd782f0e92b6148e3261479c0af8e6fbcc5ecd",
+      "times": {
+        "creation": "2026-10-16T23:37:14.5435953+03:30",
+        "queuing": "2026-10-16T23:37:14.5435961+03:30",
+        "start": "2026-10-16T23:37:11.2643695+03:30",
+        "finish": "2026-10-16T23:37:24.7569253+03:30"
+      },
+      "counters": {
+        "total": "45",
+        "executed": "45",
+        "passed": "45",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests.PostgreSql -c Release; BSYNC_POSTGRES configured"
+    },
+    {
+      "name": "sqlCipher",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests.SqliteEncrypted/TestResults/continuation-sqlcipher.trx",
+      "sha256": "d574552e57434e2ad0f806c6c1a48526a324ab8a01c530980fc506bfccaf0b1b",
+      "times": {
+        "creation": "2026-10-16T23:35:11.3612956+03:30",
+        "queuing": "2026-10-16T23:35:11.3612959+03:30",
+        "start": "2026-10-16T23:35:09.2243985+03:30",
+        "finish": "2026-10-16T23:35:12.5619424+03:30"
+      },
+      "counters": {
+        "total": "31",
+        "executed": "31",
+        "passed": "31",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests.SqliteEncrypted -c Release"
+    },
+    {
+      "name": "sourceBrowserCheckpoint",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests.Browser/TestResults/continuation-browser.trx",
+      "sha256": "ae518fb25ef56eaf0ed071f4729766b7674e29642627021f39ea982fb7b98e56",
+      "times": {
+        "creation": "2026-10-16T23:37:35.9786269+03:30",
+        "queuing": "2026-10-16T23:37:35.9786277+03:30",
+        "start": "2026-10-16T23:37:28.8063482+03:30",
+        "finish": "2026-10-16T23:47:08.9862588+03:30"
+      },
+      "counters": {
+        "total": "129",
+        "executed": "129",
+        "passed": "129",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests.Browser -c Release; SQL Server and PostgreSQL configured"
+    },
+    {
+      "name": "latestTasksBrowser",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests.Browser/TestResults/final-tasks-browser.trx",
+      "sha256": "8362788a3a27fe659f019525289bed2399189721a6ad81b7b75494f5e178a034",
+      "times": {
+        "creation": "2026-10-16T23:52:08.0776767+03:30",
+        "queuing": "2026-10-16T23:52:08.0776769+03:30",
+        "start": "2026-10-16T23:51:52.4774817+03:30",
+        "finish": "2026-10-16T23:54:33.1701996+03:30"
+      },
+      "counters": {
+        "total": "12",
+        "executed": "12",
+        "passed": "12",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests.Browser -c Release --filter FullyQualifiedName~TasksSampleTests --blame-hang-timeout 3m --blame-hang-dump-type none; BSYNC_SQLSERVER configured"
+    },
+    {
+      "name": "packageConsumer",
+      "environment": "windows-desktop",
+      "file": "src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests/TestResults/final-package-consumer.trx",
+      "sha256": "051c26f27c375a7e49a9b82eae4fef4d1d5883652f3ee0acd975a4004ce4611a",
+      "times": {
+        "creation": "2026-10-16T23:45:51.2175952+03:30",
+        "queuing": "2026-10-16T23:45:51.2175957+03:30",
+        "start": "2026-10-16T23:45:48.6915843+03:30",
+        "finish": "2026-10-16T23:45:51.4705344+03:30"
+      },
+      "counters": {
+        "total": "55",
+        "executed": "55",
+        "passed": "55",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.3.0-offline.20261016.8"
+    },
+    {
+      "name": "packageBrowser",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests.Browser/TestResults/final-package-browser.trx",
+      "sha256": "ab4e243f3bdb4d5763b9fd752887207de7ae496d850caf5b3b491ab7087760b8",
+      "times": {
+        "creation": "2026-10-16T23:46:38.9507298+03:30",
+        "queuing": "2026-10-16T23:46:38.9507302+03:30",
+        "start": "2026-10-16T23:46:34.9180088+03:30",
+        "finish": "2026-10-16T23:50:12.6034907+03:30"
+      },
+      "counters": {
+        "total": "75",
+        "executed": "75",
+        "passed": "75",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests.Browser -c Release --no-build --filter FullyQualifiedName~IndexedDbBrowserTests; BSYNC_BROWSER_HOST=artifacts/final-package-browser/wwwroot"
+    },
+    {
+      "name": "nativePortableRecovery",
+      "environment": "windows-desktop",
+      "file": "src/Tests/Bsync.Tests/TestResults/native-download-inbox.trx",
+      "sha256": "5d5a8e55845f6a3fdb8e31c87b9f67bc4f0c6d4a13e45159236883388e1c637b",
+      "times": {
+        "creation": "2026-10-16T23:58:17.4620695+03:30",
+        "queuing": "2026-10-16T23:58:17.4620697+03:30",
+        "start": "2026-10-16T23:58:16.3153853+03:30",
+        "finish": "2026-10-16T23:58:17.4670224+03:30"
+      },
+      "counters": {
+        "total": "9",
+        "executed": "9",
+        "passed": "9",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "reproduceCommand": "dotnet test src/Tests/Bsync.Tests -c Release --filter FullyQualifiedName~BackgroundDownloadInboxTests|FullyQualifiedName~NativeBackgroundRuntimeTests"
+    }
+  ],
+  "httpCompatibility": {
+    "command": "python scripts/check_http_compatibility.py --version 0.3.0-offline.20261016.8 --packages artifacts/final-packages",
+    "file": "artifacts/http-compatibility-bfc4a4534dc64a48ba40d1ddc7475819/results.json",
+    "sha256": "95c5d82e6dfcf3544f2241a519845774bd09de2dc4c78f3a65b5f75c2132b8ff",
+    "preview": "0.3.0-offline.20261016.8",
+    "cases": [
+      {
+        "client": "new",
+        "server": "old",
+        "server_assembly": "0.2.0.0",
+        "mode": "legacy",
+        "result": "PASS: upload and resumed download, client 0.3.0.0, mode legacy."
+      },
+      {
+        "client": "new",
+        "server": "old",
+        "server_assembly": "0.2.0.0",
+        "mode": "unsupported",
+        "result": "PASS: opted-in new client explicitly refused by old server; partial retained."
+      },
+      {
+        "client": "old",
+        "server": "new",
+        "server_assembly": "0.3.0.0",
+        "mode": "legacy",
+        "result": "PASS: upload and resumed download, client 0.2.0.0, mode legacy."
+      },
+      {
+        "client": "new",
+        "server": "new",
+        "server_assembly": "0.3.0.0",
+        "mode": "tickets",
+        "result": "PASS: upload and resumed download, client 0.3.0.0, mode tickets."
+      }
+    ]
+  },
+  "packageArtifacts": [
+    {
+      "file": "Bsync.0.3.0-offline.20261016.8.nupkg",
+      "sha256": "f88d6381631e3cf82bcbedd9a711ba4b202e56d6d2fbdc9febea42b8bfa94dfc",
+      "id": "Bsync",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.0.3.0-offline.20261016.8.snupkg",
+      "sha256": "2b9abca9046addea2052dd8fbb235bb7acdce5075ec7dd43f7c45390f98adc44",
+      "id": "Bsync",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Blazor.0.3.0-offline.20261016.8.nupkg",
+      "sha256": "fb0adc3d33e34062e818e9e995d7b65fb1bf3921fb5f002436017656dcad6c92",
+      "id": "Bsync.Blazor",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Blazor.0.3.0-offline.20261016.8.snupkg",
+      "sha256": "1242eb090cb2e82cc0944b8bea00909c0422751bc6c5af7b2b12551bd0b3b667",
+      "id": "Bsync.Blazor",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Server.AspNetCore.0.3.0-offline.20261016.8.nupkg",
+      "sha256": "232cb0e1381b615698aeec50ab6a521fbed295846ce6e15502998dc47f7f5a09",
+      "id": "Bsync.Server.AspNetCore",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Server.AspNetCore.0.3.0-offline.20261016.8.snupkg",
+      "sha256": "faf3aa66df5fea1a496c18afdeb059784ce1d550222c64199af5a876c4199aa2",
+      "id": "Bsync.Server.AspNetCore",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Server.PostgreSql.0.3.0-offline.20261016.8.nupkg",
+      "sha256": "17b314c649180847aeb4ae44606270ad78760be4ff176d4176a6ec5748c711a2",
+      "id": "Bsync.Server.PostgreSql",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Server.PostgreSql.0.3.0-offline.20261016.8.snupkg",
+      "sha256": "7ebe7b5b42068f0adcc6a044d6745fd12d8d1f5f9f5a8e437a5f472a93f86d83",
+      "id": "Bsync.Server.PostgreSql",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Server.SqlServer.0.3.0-offline.20261016.8.nupkg",
+      "sha256": "cc97ba195de153179aa3660791d02bfaba0da5ae419342ca984476a3eb502a8b",
+      "id": "Bsync.Server.SqlServer",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Server.SqlServer.0.3.0-offline.20261016.8.snupkg",
+      "sha256": "95bf2ec0b04d3442ddb647c5e8f7feead6922e3030799d6aaa16d49a70b3fe3e",
+      "id": "Bsync.Server.SqlServer",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Storage.Sqlite.0.3.0-offline.20261016.8.nupkg",
+      "sha256": "bccec6e9d9aef50af37d1ede060d5b2b55eaa15da29bd930627fa71a26549b9f",
+      "id": "Bsync.Storage.Sqlite",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    },
+    {
+      "file": "Bsync.Storage.Sqlite.0.3.0-offline.20261016.8.snupkg",
+      "sha256": "4651a83be28aa03cca69be49d054bcb3ac82b05e8f58172a50c35c374bc0e91e",
+      "id": "Bsync.Storage.Sqlite",
+      "version": "0.3.0-offline.20261016.8",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "d796e0d17cbad8019244c142b0de981dfb023015"
+      }
+    }
+  ],
+  "packageVersion": "0.3.0-offline.20261016.8",
+  "symbolVerification": {
+    "assemblyPdbPairs": 6,
+    "embeddedSourceChecksums": 177,
+    "remoteSourceChecksums": 0,
+    "file": "artifacts/final-packages/symbols-verification.json",
+    "sha256": "b3b9deffd6fdcd83699f9afe5a07aeeb3bd4a4295c7fe0c06f53f865d6b7ad8c"
+  },
+  "otherChecks": [
+    {
+      "command": "dotnet build src/Bsync.slnx -c Release",
+      "file": "artifacts/final-solution.log",
+      "sha256": "54e519155e2f2d8c9de69482fd05619f93bf0e26fefc35bd311f107416bf1d76"
+    },
+    {
+      "command": "dotnet artifacts/final-consumer-web/Bsync.PackageConsumer.Web.dll --smoke",
+      "file": "artifacts/final-package-web.log",
+      "sha256": "b3925caa1b6e8ef58639a8946d6892e22f0e3ecdb9f38506e4f43c1917724fa4"
+    },
+    {
+      "command": "python scripts/check_native_bindings.py ios --ios-package artifacts/ios-reference.nupkg",
+      "file": "artifacts/ios-download-binding.log",
+      "sha256": "9fa5c740eaadb5ee629e92ee3133e52b4517fe109a643e7c7738965b6a00e8ad"
+    },
+    {
+      "command": "python scripts/check_native_bindings.py android --android-ref C:/Program Files/dotnet/packs/Microsoft.Android.Ref.36/36.1.69/ref/net10.0",
+      "file": "artifacts/final-android-binding.log",
+      "sha256": "23c3292f7f41884cc58830bbcfe82b1f049b9e81e7105a0e1e1aeaa464863145"
+    }
+  ],
+  "nativeBindings": {
+    "android": "36.1.69; AndroidX Work Runtime 2.11.2.1",
+    "ios": "Microsoft.iOS.Ref.net10.0_26.5 26.5.10318",
+    "scope": "C# reference compilation only, zero warnings/errors; no APK/app, entitlements or OS execution"
+  },
+  "performance": {
+    "file": "docs/review/offline-performance-2026-10-16.json",
+    "sha256": "991ecf078aa94d047e2be34957a79e3aec188fce72ed96e411be4100ac9655e9",
+    "latencyBudgetsPassed": 5,
+    "peakMemoryBudgetPassed": true
+  },
+  "tooling": {
+    "releaseUnitTests": 9,
+    "archiveVerifierTests": 5,
+    "workflowYamlParsed": 4
+  },
+  "boundaries": [
+    "Suites overlap; counts must not be summed into distinct coverage.",
+    "129 full source browser/WPF checkpoint precedes final Tasks changes; all 12 impacted Tasks cases pass afterward.",
+    "Five native inbox tests use portable SQLite reopen and injected commit failure; they do not establish actual iOS relaunch callbacks.",
+    "Package .8 library source is unchanged by later sample, HTTP fixture and documentation additions.",
+    "S3 expiry refresh/credential isolation use deterministic HTTP faults; Moto does not qualify real signatures or browser CORS.",
+    "Android full SDK bootstrap failed with HTTP 404; no physical-device/native Safari qualification.",
+    "Clean immutable-tag release, remote Source Link checksums and ten consecutive designated CI qualification runs remain open.",
+    "Historical published 0.2.0 binary/source equivalence is unproven.",
+    "Task-owned PostgreSQL and Moto stopped; shared LocalDB retained. No commit/tag/push/publication."
+  ]
+}

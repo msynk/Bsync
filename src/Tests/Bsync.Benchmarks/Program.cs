@@ -10,6 +10,12 @@ using Bsync.Server;
 using Bsync.Storage;
 using Bsync.Storage.Sqlite;
 
+if (args is ["offline-probe", var report])
+{
+    await OfflineProbe.RunAsync(report);
+    return;
+}
+
 if (args is ["peak", var file, var countText])
 {
     // Task E1, peak memory: "peak <file> <count>" seeds a SQLite file in this process, then measures a fresh process

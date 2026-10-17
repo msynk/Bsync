@@ -152,6 +152,25 @@ public static class SyncBlobEndpoints
             await StatusAsync(http, StatusCodes.Status200OK, size, complete: true);
         }));
 
+        // Optional v1 tickets keep application credentials on the authority request. Old clients retain redirect behavior.
+        group.MapGet("/download", (RequestDelegate)(async http =>
+        {
+            if (Caller(http, options) is not { } caller)
+            { await RefuseAsync(http, "ticket", StatusCodes.Status400BadRequest); return; }
+            var sha256 = Sha(http);
+            if (!await access.CanReadAsync(caller, sha256, http.RequestAborted) || !await store.ExistsAsync(sha256, http.RequestAborted))
+            { await RefuseAsync(http, "ticket", StatusCodes.Status404NotFound); return; }
+            var direct = await store.PresignReadAsync(sha256, blobOptions.PresignedReadValidity, http.RequestAborted);
+            http.Response.Headers.CacheControl = "no-store";
+            http.Response.ContentType = "application/json; charset=utf-8";
+            Requests.Add(1, Tag("ticket"), Ok);
+            await WriteJsonAsync(http, writer =>
+            {
+                writer.WriteNumber("schema", 1);
+                if (direct is null) writer.WriteNull("downloadUrl"); else writer.WriteString("downloadUrl", direct.AbsoluteUri);
+            });
+        }));
+
         // Reads a blob the caller may read: a redirect to a presigned URL when the store has them, else the bytes, with
         // range requests (resumable downloads) either way.
         group.MapGet("/", (RequestDelegate)(async http =>
@@ -169,7 +188,7 @@ public static class SyncBlobEndpoints
                 return;
             }
 
-            if (await store.PresignReadAsync(sha256, blobOptions.PresignedReadValidity, http.RequestAborted) is { } direct)
+            if (http.Request.Query["proxy"] != "1" && await store.PresignReadAsync(sha256, blobOptions.PresignedReadValidity, http.RequestAborted) is { } direct)
             {
                 Requests.Add(1, Tag("read"), Result("redirect"));
                 await Results.Redirect(direct.ToString(), permanent: false, preserveMethod: true).ExecuteAsync(http);

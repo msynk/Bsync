@@ -1,0 +1,52 @@
+name: Optional native background compilation
+
+# A separate, explicitly invoked platform gate; the portable solution never requires mobile workloads.
+on:
+  workflow_dispatch:
+    inputs:
+      xcode_path:
+        description: Xcode installation matching the selected .NET iOS workload
+        default: /Applications/Xcode.app
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            workload: android
+            target: net10.0-android
+          - os: macos-latest
+            workload: ios
+            target: net10.0-ios
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-java@v4
+        if: matrix.workload == 'android'
+        with:
+          distribution: microsoft
+          java-version: '17'
+      - name: Select and record Xcode
+        if: matrix.workload == 'ios'
+        env:
+          SELECTED_XCODE: ${{ inputs.xcode_path }}
+        run: |
+          sudo xcode-select --switch "$SELECTED_XCODE"
+          xcodebuild -version
+      - run: dotnet workload install ${{ matrix.workload }}
+      - run: dotnet --info
+      - name: Install required Android SDK components
+        if: matrix.workload == 'android'
+        shell: pwsh
+        run: dotnet build src/Samples/Bsync.Samples.NativeBackground -t:InstallAndroidDependencies -p:NativeBackgroundTarget=net10.0-android "-p:AndroidSdkDirectory=$env:ANDROID_HOME" "-p:JavaSdkDirectory=$env:JAVA_HOME" -p:AcceptAndroidSdkLicenses=True
+      # Compilation cannot establish OS delivery, protected-key behavior or background entitlements.
+      - run: dotnet build src/Samples/Bsync.Samples.NativeBackground -c Release -p:NativeBackgroundTarget=${{ matrix.target }}

@@ -476,6 +476,22 @@ public sealed class TasksSampleTests : IAsyncLifetime
 
         using var eve = await SignedInAsync(address, "eve", "team-2");
         Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"sync/blobs/{sha256}")).StatusCode); // no URL for others
+        Assert.Equal(HttpStatusCode.NotFound, (await eve.GetAsync($"sync/blobs/{sha256}/download")).StatusCode);
+
+        // A whole presigned PUT can finish after its caller abandons the job. It remains staging, never a held blob.
+        await s3.PutObjectAsync(new Amazon.S3.Model.PutObjectRequest
+        { BucketName = bucket, Key = "uploads/abandoned", ContentBody = "abandoned upload" });
+        var janitor = server.Services.GetRequiredService<BlobJanitor>();
+        Assert.Equal((0, 0, 0), await janitor.CollectAsync(TimeSpan.FromHours(1)));
+        Assert.Equal((0, 1, 0), await janitor.CollectAsync(TimeSpan.Zero));
+        Assert.Equal(1, await _database.ScalarAsync("SELECT count(*) FROM dbo.TenantBlobs"));
+        Assert.True((await s3.GetObjectMetadataAsync(bucket, $"objects/{sha256[..2]}/{sha256}")).ContentLength > 0);
+        await alice.Tasks.DeleteAsync("t1");
+        await alice.SyncNowAsync();
+        Assert.Equal((1, 0, 1), await janitor.CollectAsync(TimeSpan.Zero));
+        Assert.Equal(0, await _database.ScalarAsync("SELECT count(*) FROM dbo.TenantBlobs"));
+        Assert.Empty((await s3.ListObjectsV2Async(new Amazon.S3.Model.ListObjectsV2Request { BucketName = bucket })).S3Objects ?? []);
+        await s3.DeleteBucketAsync(bucket);
     }
 
     /// <summary>Faults injected into one client's HTTP traffic, and what crossed the network.</summary>

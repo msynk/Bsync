@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Bsync;
+using Bsync.Client;
 using Bsync.Blazor.IndexedDb;
 using Bsync.Protocol;
 using Bsync.Samples.Tasks;
@@ -19,7 +20,7 @@ builder.Services.AddSingleton(session);
 var attachments = new TaskAttachments(session, baseAddress);
 builder.Services.AddSingleton(attachments);
 
-// One IndexedDB replica per signed-in user. The sync HttpClient is dedicated: a shared pipeline that rewrites error
+// One IndexedDB replica per server/tenant/user account. The sync HttpClient is dedicated: a shared pipeline that rewrites error
 // responses would hide Retry-After and the protocol's problem codes from the transport.
 builder.Services.AddBrowserSyncCollection<TaskDocument>(
     TasksJson.Collection,
@@ -28,7 +29,7 @@ builder.Services.AddBrowserSyncCollection<TaskDocument>(
         new HttpClient(new BearerHandler(session) { InnerHandler = new HttpClientHandler() }) { BaseAddress = baseAddress },
         new HttpSyncTransportOptions { Collection = TasksJson.Collection, SchemaId = TasksJson.SchemaId },
         SyncJsonTypes<TaskDocument>.From(TasksJson.Default)),
-    resolveAccount: (_, _) => Task.FromResult(session.User ?? throw new InvalidOperationException("Sign in first.")),
+    resolveAccount: (_, _) => Task.FromResult(session.Account.StorageKey),
     configure: options => options with
     {
         Interval = TimeSpan.FromSeconds(10),
@@ -37,6 +38,15 @@ builder.Services.AddBrowserSyncCollection<TaskDocument>(
         // A task waits until the server holds its attachments (task F1).
         EngineOptions = new SyncOptions<TaskDocument> { ReadyToPush = attachments.EnsureUploadedAsync },
     });
+
+builder.Services.AddBrowserSyncCollection<TaskIntent>(
+    TasksJson.IntentCollection, TasksJson.Default.TaskIntent,
+    (_, _) => new HttpSyncTransport<TaskIntent>(
+        new HttpClient(new BearerHandler(session) { InnerHandler = new HttpClientHandler() }) { BaseAddress = baseAddress },
+        new HttpSyncTransportOptions { Collection = TasksJson.IntentCollection, SchemaId = TasksJson.SchemaId },
+        SyncJsonTypes<TaskIntent>.From(TasksJson.Default)),
+    resolveAccount: (_, _) => Task.FromResult(session.Account.StorageKey),
+    configure: options => options with { Interval = TimeSpan.FromSeconds(5), MaxBackoff = TimeSpan.FromSeconds(10) });
 
 await builder.Build().RunAsync();
 
@@ -49,6 +59,10 @@ namespace Bsync.Samples.Tasks.Client
 
         public string? Token { get; private set; }
 
+        public string? Tenant { get; private set; }
+
+        public AccountScope Account => new("tasks", server.AbsoluteUri, User ?? throw new InvalidOperationException("Sign in first."), Tenant);
+
         public async Task SignInAsync(string user, string tenant)
         {
             using var http = new HttpClient { BaseAddress = server };
@@ -56,6 +70,7 @@ namespace Bsync.Samples.Tasks.Client
             response.EnsureSuccessStatusCode();
             Token = (await response.Content.ReadFromJsonAsync(TasksJson.Default.TokenResponse))!.Token;
             User = user;
+            Tenant = tenant;
         }
     }
 

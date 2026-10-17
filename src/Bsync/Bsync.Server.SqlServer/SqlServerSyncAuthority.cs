@@ -358,15 +358,19 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(id);
         Scope(context);
+        var principal = _options.PrincipalKey?.Invoke(context);
+        if (_options.PrincipalKey is not null && !SyncIds.IsValid(principal)) return null;
+        var membership = _options.PrincipalKey is null ? "" : $"AND EXISTS (SELECT 1 FROM {_schema}.[document_access] a WHERE a.[feed_id]=d.[feed_id] AND a.[id_key]=d.[id_key] AND a.[principal_key]=@principal AND a.[granted]=1)";
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(
             $"""
             SELECT d.[version], d.[document] FROM {_schema}.[documents] d JOIN {_schema}.[feeds] f ON f.[feed_id] = d.[feed_id]
-            WHERE f.[collection_key] = @collection AND f.[scope_key] = @scope AND d.[id_key] = @id
+            WHERE f.[collection_key] = @collection AND f.[scope_key] = @scope AND d.[id_key] = @id {membership}
             """,
             connection,
             null);
         AddFeedKey(command, context.Scope);
+        if (_options.PrincipalKey is not null) command.Parameters.Add("@principal", SqlDbType.VarBinary, 512).Value = Key(principal!);
         command.Parameters.Add("@id", SqlDbType.VarBinary, 512).Value = Key(id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -384,17 +388,21 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
         ArgumentNullException.ThrowIfNull(context);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         Scope(context);
+        var principal = _options.PrincipalKey?.Invoke(context);
+        if (_options.PrincipalKey is not null && !SyncIds.IsValid(principal)) return [];
+        var membership = _options.PrincipalKey is null ? "" : $"AND EXISTS (SELECT 1 FROM {_schema}.[document_access] a WHERE a.[feed_id]=d.[feed_id] AND a.[id_key]=d.[id_key] AND a.[principal_key]=@principal AND a.[granted]=1)";
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(
             $"""
             SELECT TOP (@take) d.[version], d.[document] FROM {_schema}.[documents] d JOIN {_schema}.[feeds] f ON f.[feed_id] = d.[feed_id]
-            WHERE f.[collection_key] = @collection AND f.[scope_key] = @scope AND d.[deleted] = 0 AND (@after IS NULL OR d.[id_key] > @after)
+            WHERE f.[collection_key] = @collection AND f.[scope_key] = @scope AND d.[deleted] = 0 AND (@after IS NULL OR d.[id_key] > @after) {membership}
             ORDER BY d.[id_key]
             """,
             connection,
             null);
         command.Parameters.Add("@take", SqlDbType.Int).Value = Math.Min(limit, _options.MaxPageSize);
         AddFeedKey(command, context.Scope);
+        if (_options.PrincipalKey is not null) command.Parameters.Add("@principal", SqlDbType.VarBinary, 512).Value = Key(principal!);
         command.Parameters.Add("@after", SqlDbType.VarBinary, 512).Value = afterId is null ? DBNull.Value : Key(afterId);
         var page = new List<StoredDocument<TDocument>>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);

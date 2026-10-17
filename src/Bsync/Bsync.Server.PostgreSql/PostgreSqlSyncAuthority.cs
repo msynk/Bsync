@@ -804,10 +804,14 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(id);
         Scope(context);
-        await using var command = _source.CreateCommand("SELECT version, document FROM bs_documents WHERE collection = $1 AND scope = $2 AND id = $3");
+        var principal = _options.PrincipalKey?.Invoke(context);
+        if (_options.PrincipalKey is not null && !SyncIds.IsValid(principal)) return null;
+        var membership = _options.PrincipalKey is null ? "" : "AND EXISTS (SELECT 1 FROM bs_document_access a WHERE a.collection=d.collection AND a.scope=d.scope AND a.id=d.id AND a.principal_key=$4 AND a.granted)";
+        await using var command = _source.CreateCommand($"SELECT version, document FROM bs_documents d WHERE collection = $1 AND scope = $2 AND id = $3 {membership}");
         command.Parameters.Add(new() { Value = _options.Collection });
         command.Parameters.Add(new() { Value = context.Scope });
         command.Parameters.Add(new() { Value = id });
+        if (_options.PrincipalKey is not null) command.Parameters.Add(new() { Value = principal! });
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -824,15 +828,19 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         ArgumentNullException.ThrowIfNull(context);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         Scope(context);
+        var principal = _options.PrincipalKey?.Invoke(context);
+        if (_options.PrincipalKey is not null && !SyncIds.IsValid(principal)) return [];
+        var membership = _options.PrincipalKey is null ? "" : "AND EXISTS (SELECT 1 FROM bs_document_access a WHERE a.collection=d.collection AND a.scope=d.scope AND a.id=d.id AND a.principal_key=$5 AND a.granted)";
 
         // COLLATE "C" orders by bytes of UTF-8, which is not UTF-16 ordinal order for every string; ids compare with
         // the id_key column (UTF-16BE bytes) instead.
         await using var command = _source.CreateCommand(
-            "SELECT version, document FROM bs_documents WHERE collection = $1 AND scope = $2 AND NOT deleted AND ($3::bytea IS NULL OR id_key > $3) ORDER BY id_key LIMIT $4");
+            $"SELECT version, document FROM bs_documents d WHERE collection = $1 AND scope = $2 AND NOT deleted AND ($3::bytea IS NULL OR id_key > $3) {membership} ORDER BY id_key LIMIT $4");
         command.Parameters.Add(new() { Value = _options.Collection });
         command.Parameters.Add(new() { Value = context.Scope });
         command.Parameters.Add(new() { Value = afterId is null ? DBNull.Value : Encoding.BigEndianUnicode.GetBytes(afterId), NpgsqlDbType = NpgsqlDbType.Bytea });
         command.Parameters.Add(new() { Value = Math.Min(limit, _options.MaxPageSize) });
+        if (_options.PrincipalKey is not null) command.Parameters.Add(new() { Value = principal! });
         var page = new List<StoredDocument<TDocument>>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))

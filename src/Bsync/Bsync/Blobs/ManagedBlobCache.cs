@@ -173,14 +173,22 @@ public sealed class ManagedBlobCache : IBlobCache
     {
         await using var held = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
         var next = checked(await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false) + bytes.Length + (await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0));
+        if (_inner is EncryptedBlobCache)
+            next = checked(next + await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false) + 28);
         await Reserve(sha256, next, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         await _inner.AppendPartialAsync(sha256, bytes, CancellationToken.None).ConfigureAwait(false);
+        if (_inner is EncryptedBlobCache) await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
     }
     /// <inheritdoc />
     public async Task<bool> CompletePartialAsync(string sha256, CancellationToken cancellationToken = default)
     {
         await using var held = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
+        if (_inner is EncryptedBlobCache)
+        {
+            var partial = await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false);
+            await Reserve(sha256, checked((await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0) + 2 * partial + 28), cancellationToken).ConfigureAwait(false);
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var complete = await _inner.CompletePartialAsync(sha256, CancellationToken.None).ConfigureAwait(false);
         await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
@@ -256,6 +264,13 @@ public sealed class ManagedBlobCache : IBlobCache
         await using (var existing = await _inner.OpenReadAsync(hash, ct).ConfigureAwait(false))
             if (existing is not null && existing.Length == size &&
                 Convert.ToHexStringLower(await SHA256.HashDataAsync(existing, ct).ConfigureAwait(false)) == hash) return (hash, size);
+        if (_inner is EncryptedBlobCache encrypted)
+        {
+            await Reserve(hash, checked(existingSize + await _inner.PartialLengthAsync(hash, ct).ConfigureAwait(false) + size + 28), ct).ConfigureAwait(false);
+            var imported = await encrypted.ImportVerifiedAsync(content, hash, ct).ConfigureAwait(false);
+            await UpdateBytes(hash, ct).ConfigureAwait(false);
+            return imported;
+        }
         // Never delete corrupt bytes before a verified replacement exists. Old readers keep their handles, while
         // durable pins protect the logical identity. Include old bytes and any interrupted staging in the reservation.
         await Reserve(hash, checked(existingSize + size + await _inner.PartialLengthAsync(hash, ct).ConfigureAwait(false)), ct).ConfigureAwait(false);
@@ -289,6 +304,18 @@ public sealed class ManagedBlobCache : IBlobCache
     }
     /// <inheritdoc />
     public Task<IReadOnlyList<string>> ListAsync(CancellationToken cancellationToken = default) => _inner.ListAsync(cancellationToken);
+
+    /// <summary>Rotates an EncryptedBlobCache object while preserving pins and reserving space for both ciphertext generations.</summary>
+    public async Task RotateEncryptionAsync(string sha256, CancellationToken cancellationToken = default)
+    {
+        if (_inner is not EncryptedBlobCache encrypted) throw new NotSupportedException("The managed cache is not encrypted.");
+        await using var transfer = await AcquireTransferAsync(sha256, cancellationToken).ConfigureAwait(false);
+        await using var held = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
+        var logical = checked((await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0) + await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false));
+        await Reserve(sha256, checked(2 * logical + 56), cancellationToken).ConfigureAwait(false);
+        await encrypted.RotateAsync(sha256, cancellationToken).ConfigureAwait(false);
+        await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
+    }
 
     private sealed class PinnedStream(Stream inner, Func<Task> release) : Stream
     {

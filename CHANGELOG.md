@@ -4,7 +4,21 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
 [docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
 
-## Unreleased
+## Unreleased (0.4.0)
+
+- Fixed direct document reads/listing to enforce reader membership in all three authorities before page limits.
+- Added optional AES-GCM encrypted blob caches for native and browser storage, with bounded authenticated ranges,
+  partial recovery, explicit migration and atomic key rotation; plaintext content identities remain unchanged.
+- Added credential-isolated download tickets with one expiry refresh, strict range validation and an explicit proxy path.
+- Added candidate package preparation status and a shared browser/WPF content-library sample for interrupted updates.
+- Tasks now persists immutable completion requests, displays transport/execution outcomes separately, scopes stores by
+  server/tenant/user, and uses pinned managed attachments plus durable ReadyToPush upload prerequisites.
+- Added EF Core transaction retry and related-ACL projection recipes, optional WorkManager/BGProcessingTask sources,
+  published 0.2.0 IndexedDB fixtures, package-only regressions and bounded desktop performance probes.
+  Native OS delivery and release qualification remain separate gates; see the support matrix.
+- Added an optional iOS background-download callback recipe with durable account receipts, verified pinned import
+  after relaunch, and explicit plaintext OS spool boundaries; actual device delivery remains unqualified.
+- Added actual published-0.2.0/current HTTP client/server process fixtures to CI and release candidate checks.
 
 - Added immutable intent request/payload registration and separate persistence, transport and business-outcome
   contracts, with generated JSON registrations in the Tasks sample and restart coverage for two request kinds.

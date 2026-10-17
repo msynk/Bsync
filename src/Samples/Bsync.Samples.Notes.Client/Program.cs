@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
+builder.Services.AddScoped<IContentLibraryFactory, BrowserContentLibraryFactory>();
 
 // An IndexedDB replica for this browser, replicated over HTTP by whichever tab holds the lease. The sample has
 // no sign-in, so every visitor uses the default account; a real app passes resolveAccount.

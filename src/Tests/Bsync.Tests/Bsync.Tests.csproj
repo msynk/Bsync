@@ -33,6 +33,7 @@
     <ProjectReference Include="..\..\Bsync\Bsync.Server.PostgreSql\Bsync.Server.PostgreSql.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Server.SqlServer\Bsync.Server.SqlServer.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync.Blazor\Bsync.Blazor.csproj" />
+    <ProjectReference Include="..\..\Samples\Bsync.Samples.NativeBackground\Bsync.Samples.NativeBackground.csproj" />
   </ItemGroup>
 
 </Project>

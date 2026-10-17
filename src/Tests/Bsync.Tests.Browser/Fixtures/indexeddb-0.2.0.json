@@ -1,0 +1,396 @@
+{
+  "packageVersion": "0.2.0",
+  "assemblyVersion": "0.2.0.0",
+  "schema": 4,
+  "stores": [
+    {
+      "name": "meta",
+      "keyPath": [
+        "collection",
+        "key"
+      ],
+      "autoIncrement": false,
+      "indexes": [],
+      "values": [
+        {
+          "collection": "",
+          "key": "incarnation",
+          "value": "002bf9d825e94cc1a7a3fec8eb8e0874"
+        },
+        {
+          "collection": "",
+          "key": "replicaId",
+          "value": "139257c7ab394a8d91eeca896cbe0723"
+        },
+        {
+          "collection": "fixtures",
+          "key": "checkpoint",
+          "value": "server-588eff268ced498e83dbe178812b4bdd~:3"
+        },
+        {
+          "collection": "fixtures",
+          "key": "clockHighWater",
+          "value": "001792180544558:000001:device-020"
+        },
+        {
+          "collection": "fixtures",
+          "key": "generation",
+          "value": "0"
+        },
+        {
+          "collection": "fixtures",
+          "key": "purgeMissing",
+          "value": false
+        },
+        {
+          "collection": "fixtures",
+          "key": "resnapshot",
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "records",
+      "keyPath": [
+        "collection",
+        "id"
+      ],
+      "autoIncrement": false,
+      "indexes": [
+        {
+          "name": "conflicts",
+          "keyPath": "conflictKey",
+          "unique": false,
+          "multiEntry": false
+        },
+        {
+          "name": "dirty",
+          "keyPath": "dirtyKey",
+          "unique": false,
+          "multiEntry": false
+        },
+        {
+          "name": "ix",
+          "keyPath": "ixKeys",
+          "unique": false,
+          "multiEntry": true
+        },
+        {
+          "name": "live",
+          "keyPath": "liveKey",
+          "unique": false,
+          "multiEntry": false
+        },
+        {
+          "name": "pending",
+          "keyPath": "pendingKey",
+          "unique": false,
+          "multiEntry": false
+        },
+        {
+          "name": "stale",
+          "keyPath": "staleKey",
+          "unique": false,
+          "multiEntry": false
+        },
+        {
+          "name": "visible",
+          "keyPath": "visibleKey",
+          "unique": false,
+          "multiEntry": false
+        }
+      ],
+      "values": [
+        {
+          "id": "colour",
+          "stamp": "b500ca6c-4156-42b2-8e43-bae77f95d3fc",
+          "current": "{\"id\":\"colour\",\"updatedAt\":\"001792180544371:000000:device-020\",\"deleted\":false,\"title\":\"synced\",\"amount\":12.5,\"due\":null,\"tags\":[],\"colour\":\"teal\"}",
+          "updatedAt": "001792180544371:000000:device-020",
+          "deleted": false,
+          "base": "{\"id\":\"colour\",\"updatedAt\":\"001792180544371:000000:device-020\",\"deleted\":false,\"title\":\"synced\",\"amount\":12.5,\"due\":null,\"tags\":[],\"colour\":\"teal\"}",
+          "baseVersion": "1",
+          "isDirty": false,
+          "localRevision": "1",
+          "pendingId": null,
+          "pendingRevision": null,
+          "pendingBaseVersion": null,
+          "pendingPayload": null,
+          "rejectionRevision": null,
+          "rejectionCode": null,
+          "rejectionMessage": null,
+          "rejectionArguments": null,
+          "observed": null,
+          "observedVersion": null,
+          "generation": "0",
+          "missing": false,
+          "conflictServer": null,
+          "conflictServerVersion": null,
+          "conflictLocal": null,
+          "conflictBase": null,
+          "groupId": null,
+          "groupMembers": null,
+          "pendingGroup": null,
+          "pendingGroupSize": null,
+          "collection": "fixtures",
+          "staleKey": [
+            "fixtures",
+            "colour"
+          ],
+          "visibleKey": [
+            "fixtures",
+            "colour"
+          ],
+          "liveKey": [
+            "fixtures",
+            "colour"
+          ]
+        },
+        {
+          "id": "g1",
+          "stamp": "a96570f1-e80e-460b-ae96-86c779018b68",
+          "current": "{\"id\":\"g1\",\"updatedAt\":\"001792180544558:000000:device-020\",\"deleted\":false,\"title\":\"order\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "updatedAt": "001792180544558:000000:device-020",
+          "deleted": false,
+          "base": null,
+          "baseVersion": null,
+          "isDirty": true,
+          "localRevision": "1",
+          "pendingId": "01a14648e4397a1e908cf813226bd3d1",
+          "pendingRevision": "1",
+          "pendingBaseVersion": null,
+          "pendingPayload": "{\"id\":\"g1\",\"updatedAt\":\"001792180544558:000000:device-020\",\"deleted\":false,\"title\":\"order\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "rejectionRevision": null,
+          "rejectionCode": null,
+          "rejectionMessage": null,
+          "rejectionArguments": null,
+          "observed": null,
+          "observedVersion": null,
+          "generation": "0",
+          "missing": false,
+          "conflictServer": null,
+          "conflictServerVersion": null,
+          "conflictLocal": null,
+          "conflictBase": null,
+          "groupId": "01a14648e42d712a8f7e92880c1cd887",
+          "groupMembers": [
+            "g1",
+            "g2"
+          ],
+          "pendingGroup": "01a14648e42d712a8f7e92880c1cd887",
+          "pendingGroupSize": 2,
+          "collection": "fixtures",
+          "pendingKey": [
+            "fixtures",
+            "001792180544558:000000:device-020",
+            "g1"
+          ],
+          "dirtyKey": [
+            "fixtures",
+            "g1"
+          ],
+          "visibleKey": [
+            "fixtures",
+            "g1"
+          ],
+          "liveKey": [
+            "fixtures",
+            "g1"
+          ]
+        },
+        {
+          "id": "g2",
+          "stamp": "5daa7872-c731-4b53-b103-036cb79c601c",
+          "current": "{\"id\":\"g2\",\"updatedAt\":\"001792180544558:000001:device-020\",\"deleted\":false,\"title\":\"line\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "updatedAt": "001792180544558:000001:device-020",
+          "deleted": false,
+          "base": null,
+          "baseVersion": null,
+          "isDirty": true,
+          "localRevision": "1",
+          "pendingId": "01a14648e43a771da3b3624e029b9fff",
+          "pendingRevision": "1",
+          "pendingBaseVersion": null,
+          "pendingPayload": "{\"id\":\"g2\",\"updatedAt\":\"001792180544558:000001:device-020\",\"deleted\":false,\"title\":\"line\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "rejectionRevision": null,
+          "rejectionCode": null,
+          "rejectionMessage": null,
+          "rejectionArguments": null,
+          "observed": null,
+          "observedVersion": null,
+          "generation": "0",
+          "missing": false,
+          "conflictServer": null,
+          "conflictServerVersion": null,
+          "conflictLocal": null,
+          "conflictBase": null,
+          "groupId": "01a14648e42d712a8f7e92880c1cd887",
+          "groupMembers": [
+            "g1",
+            "g2"
+          ],
+          "pendingGroup": "01a14648e42d712a8f7e92880c1cd887",
+          "pendingGroupSize": 2,
+          "collection": "fixtures",
+          "pendingKey": [
+            "fixtures",
+            "001792180544558:000001:device-020",
+            "g2"
+          ],
+          "dirtyKey": [
+            "fixtures",
+            "g2"
+          ],
+          "visibleKey": [
+            "fixtures",
+            "g2"
+          ],
+          "liveKey": [
+            "fixtures",
+            "g2"
+          ]
+        },
+        {
+          "id": "kept",
+          "stamp": "ca9d0b4c-f1f5-4fd6-a241-163c5ffac9b6",
+          "current": "{\"id\":\"kept\",\"updatedAt\":\"001792180544498:000000:other-020\",\"deleted\":false,\"title\":\"theirs\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "updatedAt": "001792180544498:000000:other-020",
+          "deleted": false,
+          "base": "{\"id\":\"kept\",\"updatedAt\":\"001792180544498:000000:other-020\",\"deleted\":false,\"title\":\"theirs\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "baseVersion": "3",
+          "isDirty": false,
+          "localRevision": "2",
+          "pendingId": null,
+          "pendingRevision": null,
+          "pendingBaseVersion": null,
+          "pendingPayload": null,
+          "rejectionRevision": null,
+          "rejectionCode": null,
+          "rejectionMessage": null,
+          "rejectionArguments": null,
+          "observed": null,
+          "observedVersion": null,
+          "generation": "0",
+          "missing": false,
+          "conflictServer": "{\"id\":\"kept\",\"updatedAt\":\"001792180544498:000000:other-020\",\"deleted\":false,\"title\":\"theirs\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "conflictServerVersion": "3",
+          "conflictLocal": "{\"id\":\"kept\",\"updatedAt\":\"001792180544507:000000:device-020\",\"deleted\":false,\"title\":\"mine\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "conflictBase": "{\"id\":\"kept\",\"updatedAt\":\"001792180544414:000000:device-020\",\"deleted\":false,\"title\":\"base\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "groupId": null,
+          "groupMembers": null,
+          "pendingGroup": null,
+          "pendingGroupSize": null,
+          "collection": "fixtures",
+          "staleKey": [
+            "fixtures",
+            "kept"
+          ],
+          "visibleKey": [
+            "fixtures",
+            "kept"
+          ],
+          "liveKey": [
+            "fixtures",
+            "kept"
+          ],
+          "conflictKey": [
+            "fixtures",
+            "kept"
+          ]
+        },
+        {
+          "id": "pending",
+          "stamp": "0916cae6-9967-49e2-9142-2e42defbb7e1",
+          "current": "{\"id\":\"pending\",\"updatedAt\":\"001792180544554:000000:device-020\",\"deleted\":false,\"title\":\"offline edit\",\"amount\":0,\"due\":null,\"tags\":[\"a\",\"b\"],\"colour\":\"amber\"}",
+          "updatedAt": "001792180544554:000000:device-020",
+          "deleted": false,
+          "base": null,
+          "baseVersion": null,
+          "isDirty": true,
+          "localRevision": "1",
+          "pendingId": "01a14648e4397445aba9a42307ab2292",
+          "pendingRevision": "1",
+          "pendingBaseVersion": null,
+          "pendingPayload": "{\"id\":\"pending\",\"updatedAt\":\"001792180544554:000000:device-020\",\"deleted\":false,\"title\":\"offline edit\",\"amount\":0,\"due\":null,\"tags\":[\"a\",\"b\"],\"colour\":\"amber\"}",
+          "rejectionRevision": null,
+          "rejectionCode": null,
+          "rejectionMessage": null,
+          "rejectionArguments": null,
+          "observed": null,
+          "observedVersion": null,
+          "generation": "0",
+          "missing": false,
+          "conflictServer": null,
+          "conflictServerVersion": null,
+          "conflictLocal": null,
+          "conflictBase": null,
+          "groupId": null,
+          "groupMembers": null,
+          "pendingGroup": null,
+          "pendingGroupSize": null,
+          "collection": "fixtures",
+          "pendingKey": [
+            "fixtures",
+            "001792180544554:000000:device-020",
+            "pending"
+          ],
+          "dirtyKey": [
+            "fixtures",
+            "pending"
+          ],
+          "visibleKey": [
+            "fixtures",
+            "pending"
+          ],
+          "liveKey": [
+            "fixtures",
+            "pending"
+          ]
+        },
+        {
+          "id": "rejected",
+          "stamp": "dfe1bd61-a886-455e-abd8-b7ecfd0085c7",
+          "current": "{\"id\":\"rejected\",\"updatedAt\":\"001792180544514:000000:device-020\",\"deleted\":false,\"title\":\"forbidden\",\"amount\":0,\"due\":null,\"tags\":[],\"colour\":null}",
+          "updatedAt": "001792180544514:000000:device-020",
+          "deleted": false,
+          "base": null,
+          "baseVersion": null,
+          "isDirty": true,
+          "localRevision": "1",
+          "pendingId": null,
+          "pendingRevision": null,
+          "pendingBaseVersion": null,
+          "pendingPayload": null,
+          "rejectionRevision": "1",
+          "rejectionCode": "title-forbidden",
+          "rejectionMessage": null,
+          "rejectionArguments": null,
+          "observed": null,
+          "observedVersion": null,
+          "generation": "0",
+          "missing": false,
+          "conflictServer": null,
+          "conflictServerVersion": null,
+          "conflictLocal": null,
+          "conflictBase": null,
+          "groupId": null,
+          "groupMembers": null,
+          "pendingGroup": null,
+          "pendingGroupSize": null,
+          "collection": "fixtures",
+          "dirtyKey": [
+            "fixtures",
+            "rejected"
+          ],
+          "visibleKey": [
+            "fixtures",
+            "rejected"
+          ],
+          "liveKey": [
+            "fixtures",
+            "rejected"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -28,6 +28,108 @@ public sealed class BlobTransferManagerTests : IAsyncLifetime
             new() { TimeProvider = _time, ScanLimit = scanLimit });
 
     [Fact]
+    public async Task ReadyToPushRevalidatesHistoricalCompletionAndPreservesExplicitPause()
+    {
+        await using var store = await Store();
+        await Cache().ImportAsync(new MemoryStream(_bytes));
+        var starts = 0; var available = true;
+        var manager = Manager(store, new Handler((_, _) =>
+        {
+            starts++;
+            return Task.FromResult(available
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent($"{{\"received\":{_bytes.Length},\"complete\":true}}") }
+                : new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        }));
+        BlobReference[] required = [new("file", Hash, _bytes.Length, "text/plain", "file.txt")];
+        Assert.True(await manager.EnsureUploadsAsync(required, TimeSpan.FromSeconds(5)));
+        Assert.Equal(1, starts);
+        available = false;
+        Assert.False(await manager.EnsureUploadsAsync(required, TimeSpan.FromSeconds(5)));
+        Assert.Equal(2, starts);
+        Assert.Equal(BlobTransferState.WaitingForCredentials, (await manager.GetAsync(Hash, BlobTransferDirection.Upload))!.State);
+        available = true;
+        Assert.True(await manager.ResumeCredentialWaitAsync(Hash, BlobTransferDirection.Upload));
+        Assert.False(await manager.ResumeCredentialWaitAsync(Hash, BlobTransferDirection.Upload));
+        Assert.True(await manager.EnsureUploadsAsync(required, TimeSpan.FromSeconds(5)));
+        available = false;
+        Assert.False(await manager.EnsureUploadsAsync(required, TimeSpan.FromSeconds(5)));
+        await manager.SetStateAsync(Hash, BlobTransferDirection.Upload, BlobTransferState.Paused);
+        available = true;
+        Assert.False(await manager.ResumeCredentialWaitAsync(Hash, BlobTransferDirection.Upload));
+        Assert.False(await manager.EnsureUploadsAsync(required, TimeSpan.FromSeconds(5)));
+        Assert.Equal(4, starts);
+    }
+
+    [Fact]
+    public async Task DownloadTicketsRefreshExpiredUrlsWithoutForwardingCredentialsAndResumeFromDisk()
+    {
+        var tickets = 0; var downloads = 0;
+        using var application = new HttpClient(new Handler((request, _) =>
+        {
+            Assert.Equal("secret", request.Headers.GetValues("X-App-Credential").Single());
+            Assert.EndsWith("/download", request.RequestUri!.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new StringContent($"{{\"schema\":1,\"downloadUrl\":\"https://bucket.test/content?ticket={++tickets}\"}}") });
+        })) { BaseAddress = new("https://application.test/") };
+        application.DefaultRequestHeaders.Add("X-App-Credential", "secret");
+        using var bucket = new HttpClient(new Handler((request, _) =>
+        {
+            Assert.False(request.Headers.Contains("X-App-Credential"));
+            Assert.Null(request.Headers.Authorization);
+            Assert.Equal(1536, request.Headers.Range!.Ranges.Single().From);
+            if (++downloads == 1) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+            var response = new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(_bytes[1536..]) };
+            response.Content.Headers.ContentRange = new(1536, _bytes.Length - 1, _bytes.Length);
+            return Task.FromResult(response);
+        }));
+        await Cache().AppendPartialAsync(Hash, _bytes.AsMemory(0, 1536));
+        var transfer = new HttpBlobTransfer(application, new() { DownloadTickets = true, DirectClient = bucket, ChunkSize = 1024 });
+        Assert.Equal(_bytes.Length - 1536, await transfer.DownloadAsync(Cache(), Hash, _bytes.Length));
+        Assert.Equal(2, tickets); Assert.Equal(2, downloads);
+        Assert.Equal(_bytes.Length, await Cache().SizeAsync(Hash));
+    }
+
+    [Fact]
+    public async Task UnsupportedTicketEndpointAndRepeatedExpiryNeverFallBackToCredentialedRedirects()
+    {
+        var requests = 0;
+        using var application = new HttpClient(new Handler((request, _) =>
+        {
+            requests++; Assert.EndsWith("/download", request.RequestUri!.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        })) { BaseAddress = new("https://old-server.test/") };
+        var transfer = new HttpBlobTransfer(application, new() { DownloadTickets = true });
+        await Assert.ThrowsAsync<HttpRequestException>(() => transfer.DownloadAsync(Cache(), Hash, _bytes.Length));
+        Assert.Equal(1, requests);
+        Assert.Equal(0, await Cache().PartialLengthAsync(Hash));
+        using var current = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new StringContent("{\"schema\":1,\"downloadUrl\":\"https://bucket.test/expired\"}") }))) { BaseAddress = new("https://new-server.test/") };
+        var bucketRequests = 0;
+        using var bucket = new HttpClient(new Handler((_, _) => { bucketRequests++; return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)); }));
+        await Assert.ThrowsAsync<IOException>(() => new HttpBlobTransfer(current, new() { DownloadTickets = true, DirectClient = bucket }).DownloadAsync(Cache(), Hash, _bytes.Length));
+        Assert.Equal(2, bucketRequests);
+    }
+
+    [Fact]
+    public async Task WrongContentRangeAndOversizedBodyNeverBecomeVerifiedContent()
+    {
+        await Cache().AppendPartialAsync(Hash, _bytes.AsMemory(0, 100));
+        using var wrongRange = new HttpClient(new Handler((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(_bytes[100..]) };
+            response.Content.Headers.ContentRange = new(0, _bytes.Length - 101, _bytes.Length);
+            return Task.FromResult(response);
+        })) { BaseAddress = new("https://server.test/") };
+        await Assert.ThrowsAsync<InvalidDataException>(() => new HttpBlobTransfer(wrongRange).DownloadAsync(Cache(), Hash, _bytes.Length));
+        Assert.Equal(100, await Cache().PartialLengthAsync(Hash));
+        await Cache().DiscardPartialAsync(Hash);
+        using var oversized = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new ByteArrayContent([.. _bytes, 9]) }))) { BaseAddress = new("https://server.test/") };
+        await Assert.ThrowsAsync<InvalidDataException>(() => new HttpBlobTransfer(oversized).DownloadAsync(Cache(), Hash, _bytes.Length));
+        Assert.Null(await Cache().SizeAsync(Hash));
+    }
+
+    [Fact]
     public async Task SameLengthCorruptionIsNotReportedVerifiedOrSilentlyDeleted()
     {
         await Cache().ImportAsync(new MemoryStream(_bytes));

@@ -73,3 +73,19 @@ Capacity must accommodate both old and staged bytes. A refusal, cancellation or 
 object available for diagnosis and keeps pending references; retry with enough capacity and a trustworthy source.
 Already-open native handles keep the prior bytes. A snapshot cannot turn previously read corrupt bytes into good data;
 open/verify again after repair. Automatic network repair and a corrupted-source recovery policy remain host concerns.
+## Encrypted cache and candidate status additions (unreleased)
+
+`EncryptedBlobCache` can wrap dedicated native `FileBlobCache` or browser `BrowserBlobStore` storage. Pass the existing
+account's `ILocalKeyProvider`, a versioned `LocalKeyReference` and `PlatformBlobEncryption` (native) or
+`BrowserBlobEncryption.OpenAsync(js)` (browser). Wrap that encrypted adapter in `ManagedBlobCache` for pins/budgets.
+Use `ManagedBlobCache.RotateEncryptionAsync(hash)` when changing the configured write key; retain old versions until
+every required complete/partial object has rotated successfully. Wrong keys never trigger reimport repair. This format
+is limited to 16 MiB and rewrites/authenticates whole objects; see [ADR-025](../architecture/adr-025-encrypted-blob-envelopes.md).
+
+`OfflinePackageManager.GetPreparationAsync` verifies the latest staged candidate and reports missing required/optional
+items with their durable transfer states/error codes. `GetStatusAsync` independently describes the active revision.
+Both return observation times. Missing-byte totals count distinct required hashes and do not discount unverified partials.
+
+The Notes browser app and WPF app share `ContentLibraryPanel` and `ContentLibrarySession`: prepare revision 1, interrupt
+revision 2, restart, read revision 1, finish revision 2, then read the new complete snapshot. Content is bundled with the
+sample as publisher-authored immutable bytes; these buttons demonstrate local package boundaries, not a remote catalog.

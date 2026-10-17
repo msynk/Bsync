@@ -82,6 +82,9 @@ public sealed class BlobRouteTests : IDisposable
         public Task<Uri?> PresignWriteAsync(string upload, long size, TimeSpan validity, CancellationToken cancellationToken = default) =>
             Task.FromResult<Uri?>(new Uri($"http://localhost/direct/{upload}"));
 
+        public Task<Uri?> PresignReadAsync(string sha256, TimeSpan validity, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Uri?>(new Uri($"http://localhost/direct-read/{sha256}"));
+
         public IAsyncEnumerable<(string Sha256, DateTimeOffset Stored)> ListAsync(CancellationToken cancellationToken = default) => inner.ListAsync(cancellationToken);
 
         public Task DeleteAsync(string sha256, CancellationToken cancellationToken = default) => inner.DeleteAsync(sha256, cancellationToken);
@@ -141,6 +144,35 @@ public sealed class BlobRouteTests : IDisposable
         await app.StartAsync();
         host = new Host(app, files, access);
         return host;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TicketAuthorizationAndProxyRemainCompatibleWithLegacyRead(bool presign)
+    {
+        await using var host = await StartAsync(presign);
+        using var client = host.Client("team-1");
+        var cache = new FileBlobCache(Path.Combine(_root, "ticket-cache"));
+        var blob = await cache.ImportAsync(new MemoryStream(Content(1024, 3)));
+        await new HttpBlobTransfer(client, new() { DirectUploads = false }).UploadAsync(cache, blob.Sha256);
+        using var ticket = await client.GetAsync($"sync/blobs/{blob.Sha256}/download");
+        Assert.Equal(HttpStatusCode.OK, ticket.StatusCode);
+        Assert.True(ticket.Headers.CacheControl!.NoStore);
+        using var json = System.Text.Json.JsonDocument.Parse(await ticket.Content.ReadAsStringAsync());
+        Assert.Equal(1, json.RootElement.GetProperty("schema").GetInt32());
+        Assert.Equal(presign ? System.Text.Json.JsonValueKind.String : System.Text.Json.JsonValueKind.Null, json.RootElement.GetProperty("downloadUrl").ValueKind);
+        using var stranger = host.Client("team-2");
+        Assert.Equal(HttpStatusCode.NotFound, (await stranger.GetAsync($"sync/blobs/{blob.Sha256}/download")).StatusCode);
+        using var legacy = await client.GetAsync($"sync/blobs/{blob.Sha256}");
+        Assert.Equal(presign ? HttpStatusCode.TemporaryRedirect : HttpStatusCode.OK, legacy.StatusCode);
+        using var proxy = await client.GetAsync($"sync/blobs/{blob.Sha256}?proxy=1");
+        Assert.Equal(Content(1024, 3), await proxy.Content.ReadAsByteArrayAsync());
+        if (!presign)
+        {
+            var target = new FileBlobCache(Path.Combine(_root, "ticket-target"));
+            Assert.Equal(blob.Size, await new HttpBlobTransfer(client, new() { DownloadTickets = true }).DownloadAsync(target, blob.Sha256, blob.Size));
+        }
     }
 
     private static byte[] Content(int length, int seed)

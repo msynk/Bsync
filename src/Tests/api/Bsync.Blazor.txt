@@ -3,6 +3,11 @@ sealed class Bsync.Blazor.Blobs.BrowserBlobCacheLock : Bsync.Blobs.IBlobCacheLoc
   System.Threading.Tasks.ValueTask<System.IAsyncDisposable> AcquireAsync(System.String name, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.ValueTask<System.IAsyncDisposable> TryAcquireAsync(System.String name, System.Threading.CancellationToken cancellationToken = default)
   static System.Threading.Tasks.Task<Bsync.Blazor.Blobs.BrowserBlobCacheLock> OpenAsync(Microsoft.JSInterop.IJSRuntime js, Bsync.Client.AccountScope account, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Blazor.Blobs.BrowserBlobEncryption : Bsync.Blobs.BlobEncryption, System.IAsyncDisposable
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  static System.Threading.Tasks.Task<Bsync.Blazor.Blobs.BrowserBlobEncryption> OpenAsync(Microsoft.JSInterop.IJSRuntime js, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.ValueTask<System.Byte[]> OpenAsync(System.ReadOnlyMemory<System.Byte> key, System.ReadOnlyMemory<System.Byte> envelope, System.ReadOnlyMemory<System.Byte> associatedData, System.Threading.CancellationToken cancellationToken = default)
+  virtual System.Threading.Tasks.ValueTask<System.Byte[]> SealAsync(System.ReadOnlyMemory<System.Byte> key, System.ReadOnlyMemory<System.Byte> plaintext, System.ReadOnlyMemory<System.Byte> associatedData, System.Threading.CancellationToken cancellationToken = default)
 sealed class Bsync.Blazor.Blobs.BrowserBlobStore : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheInventory
   System.IO.Stream OpenRead(System.String sha256, System.Int64 size)
   System.String Name { get; }

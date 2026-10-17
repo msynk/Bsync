@@ -11,6 +11,23 @@ dotnet run -c Release --project src/Tests/Bsync.Benchmarks -- --filter "*Initial
 dotnet run -c Release --project src/Tests/Bsync.Benchmarks -- --filter "*ScalePull*"
 ```
 
+## Offline workload probe (development)
+
+Run `dotnet run -c Release --project src/Tests/Bsync.Benchmarks -- offline-probe <absolute-report.json>`.
+The probe records individual observations (100 or 200 per workload), p50/p95/p99, total managed allocations and process
+peak working set. Fixed seed: 1729. Setup and one warmup are excluded from latency; process peak includes setup.
+The selected development reference is Windows 10 x64, Core Ultra 7 255H, .NET 10.0.12, SQLite FULL and local SSD storage.
+Before running this probe, the desktop p95 budgets are: local save during managed transfer staging 50 ms; indexed
+50-item page over 10,000 records 50 ms; 1 MiB package staging/activation 250 ms; authentication of a 16 MiB encrypted
+object followed by a 4 KiB range read 250 ms; reconnecting 1,000 pending writes to an in-process authority 10 seconds.
+The memory guardrail is a 1 GiB process peak for this complete probe; allocations are reported separately per workload.
+
+Concurrent staging writes 256 KiB chunks into a bounded 16 MiB partial; this measures cache/storage contention and
+does not simulate network bandwidth or OS-delivered background work. Reconnect has no network latency and uses fresh
+prepared stores/authorities. Quantiles are samples, not confidence bounds or mobile/browser guarantees. Run on an idle
+machine for release qualification; keep the JSON, exact command, commit, device/drive and runtime with the evidence.
+The encrypted range measurement deliberately includes full-envelope authentication: this format is not chunk-random-access.
+
 ## Recorded run (2026-09-28)
 
 The run used BenchmarkDotNet 0.15.8 and .NET 10.0.12 (x64 RyuJIT) on Windows 10 22H2, with an Intel Core Ultra 7
@@ -213,7 +230,7 @@ The same pattern: one feed's writes are serialized (its row lock, ADR-005), sepa
 - A durable SQLite write stays around a millisecond on this machine, far inside the 50 ms target. A
   reference *mobile* device has not been measured.
 - `QueryAsync` materializes the whole collection. It takes tens of milliseconds at 10,000 documents, so large
-  collections need paging or indexed queries (not implemented).
+  collections need the now-available bounded/indexed query APIs; this older observation predates their implementation.
 - Allocation per synced document is high: about 64 KB per document to push and 24 KB to pull in the recorded
   run. JSON cloning for isolation and fingerprinting dominates. 0.2.0 cuts the push cost to 14.5 KB with the
   in-memory store (see above).

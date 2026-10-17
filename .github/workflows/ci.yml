@@ -170,6 +170,8 @@ jobs:
         run: dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages "$(git rev-parse HEAD)"
       - name: Reject mismatched and missing packaged symbols
         run: python scripts/verify_symbols_test.py artifacts/packages -v
+      - name: Published 0.2.0 and candidate HTTP compatibility in separate processes
+        run: python scripts/check_http_compatibility.py --version "$BSYNC_PACKAGE_VERSION" --packages artifacts/packages
       # Only PackageReference from artifacts/packages (src/Tests/PackageConsumers/nuget.config maps Bsync.* to that feed).
       - name: Public conformance suites from the Bsync package (namespace Bsync.Testing)
         run: dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION --logger "trx;LogFileName=package-consumer.trx"
@@ -186,7 +188,10 @@ jobs:
         if: always()
         with:
           name: package-consumer-results
-          path: src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests/TestResults
+          path: |
+            src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests/TestResults
+            artifacts/http-compatibility-*/*.log
+            artifacts/http-compatibility-*/results.json
 
   package-browser:
     name: Packaged WebAssembly conformance (Chromium, Firefox, WebKit)

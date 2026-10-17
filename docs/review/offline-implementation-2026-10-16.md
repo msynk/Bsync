@@ -1,16 +1,18 @@
 # Offline implementation evidence, 2026-10-16
 
-This records work in the uncommitted checkout based on `ad46c3b61f17d2304fd6c580d916a5242aca52d8`.
+This records the earlier implementation checkpoint and continued work based on
+`d796e0d17cbad8019244c142b0de981dfb023015`. The earlier checkpoint began at `ad46c3b`; its changes are now committed.
+The continuation remains uncommitted and uses the user-selected 0.3.0 version prefix.
 It does **not** mark the improvement plan or a supported release complete.
 
 Environment: Windows 10 x64 build 19045, Intel Core Ultra 7 255H, .NET SDK 10.0.401/runtime 10.0.12,
 `wasm-tools` 10.0.112, `maui-windows` 10.0.20. Native tests select SQLitePCLRaw plain 2.1.12 or SQLCipher 2.1.11 in
-separate processes. SQL Server uses a disposable LocalDB database per fixture. Android/iOS workloads and physical
-devices were unavailable. Later qualification provisioned PostgreSQL 17.11 and Moto 5.2.4 in isolated task-owned
+separate processes. SQL Server uses a disposable LocalDB database per fixture. At the earlier checkpoint Android/iOS workloads and physical
+devices were unavailable. The continuation installed the Android workload; device execution remains unavailable. Later qualification provisioned PostgreSQL 17.11 and Moto 5.2.4 in isolated task-owned
 directories on loopback; early runs without them are explicitly historical below. No production service was used.
 Playwright engine versions recorded by the full browser run: Chromium 153.0.8010.12, Firefox 155.0, WebKit 26.6.
 
-Final executed source counts: core **713**, SQL Server **87**, PostgreSQL **44**, SQLCipher **31**, browser/WPF
+Earlier checkpoint source counts: core **713**, SQL Server **87**, PostgreSQL **44**, SQLCipher **31**, browser/WPF
 **114**, all with zero failures and zero skips. The solution built with zero warnings/errors. Exact preview .6 passed
 53 package conformance cases, the published web smoke, 66 packaged-browser cases and a subsequent nine-case rerun
 with corrected awaited lifetime probes. `artifacts/offline-validation-summary.json` identifies the corresponding TRX
@@ -169,12 +171,102 @@ multi-server scenarios (`offline-browser-qualified.trx`). The corrected awaited 
 The fresh complete source-browser run then passed all 114 cases with no skips. These fixes address observed test
 boundaries; one green local run is not the plan's ten-consecutive-CI-run release qualification.
 
-Required work remains: whole-account lock adoption by host-managed workers/resources; physical protected-key integration;
-custom/legacy owner reconciliation; encrypted blob envelopes, rotation and migration; complete generic intent execution examples and external-service integration (transactional outbox recipe implemented); online large-feed
-projection rebuild and membership reconciliation (bounded exclusive-boundary repair is implemented); automatic read-model retention and host snapshot integration; Android/iOS adapters; complete
-generic samples and the full failure/performance matrix.
+## Continued implementation after d796e0d
 
-External/release gates also remain: physical-device execution/key tests, real S3 CORS,
-platform native-library qualification, clean tagged release provenance,
-remote source checksum validation and ten consecutive designated qualification workflow runs. Old 0.2.0 binary/source
-equivalence remains unresolved. Existing passing tests must not be used to mark these gaps complete.
+- Optional bounded AES-256-GCM blob envelopes on native and Web Crypto, complete/partial atomic mapping,
+  account/identity/mode authenticated data, copy-and-verify migration, key rotation and journaled orphan cleanup.
+  Managed budgets include ciphertext overhead and coexistence during replacement. Ten core encryption tests include
+  real process termination on both sides of rotation commit; six browser encryption/interop cases passed.
+- Opt-in credential-isolated download tickets, one expiry refresh, authority proxy fallback, range/oversize rejection;
+  ReadyToPush now has a durable upload prerequisite helper and the Tasks browser uses managed pinned storage.
+- Candidate preparation reports required/optional failures separately from the still-usable active snapshot.
+  Shared browser/WPF content library survives interrupted revision preparation and offline restart.
+- Tasks saves immutable completion requests and separates local persistence, transport and execution UI outcomes.
+  Credential-waiting uploads now conditionally resume after sign-in without overriding paused/canceled jobs; the UI
+  identifies credential-required attachments and downloads use durable jobs. All 17 transfer tests passed again.
+- Explicit EF execution-strategy create recipe with fresh transactions and lost-commit-response recovery;
+  optional related-ACL projection with transactional grants/removals and bounded complete repair.
+- Fixed direct Get/List membership enforcement in all authorities, with filtering before page limits.
+- Optional native scheduler sources plus a common fresh-account runner; its deadline covers account opening,
+  execution and cancellation. Platform compilation/device evidence is recorded separately below.
+- Captured a real published 0.2.0 IndexedDB fixture; all three browser engines preserve prepared operations,
+  groups, conflicts, rejections and unknown fields. See [fixture provenance](published-020-store-fixture.md).
+
+### Current executed checks
+
+| Check | Result |
+|---|---|
+| Full core after native download recovery | 740 passed, zero skipped; `final-core.trx` (earlier continuation: 735) |
+| Full PostgreSQL 17.11 | 45 passed, zero skipped; `continuation-postgres.trx` |
+| Full SQLCipher | 31 passed, zero skipped; `continuation-sqlcipher.trx` |
+| Full solution | Zero warnings/errors; `final-solution.log` |
+| Full SQL Server, including Moto 5.2.4 | 94 passed, zero skipped; `final-sqlserver.trx`; includes ownership, interrupted/ranged transfers and expanded abandoned-staging/grace-period/ownership-record collection assertions |
+| Full source browser/WPF checkpoint | 129 passed, zero skipped; `continuation-browser.trx` (before the final credential UI regression additions) |
+| Final Tasks attachments, immutable actions, account isolation and expired credentials | 12 passed across Chromium/Firefox/WebKit; `final-tasks-browser.trx` |
+| Published IndexedDB preservation | Three passed; `published-020-browser.trx` |
+| Encrypted browser content plus browser/WPF library restart | Nine passed; `encrypted-content-library.trx` |
+| Exact preview 0.3.0-offline.20261016.8 | Six package/symbol pairs; 177 embedded-source checksums; five archive tests; 55 package-only tests, 75 packaged browser cases and published web smoke passed |
+| Actual 0.2.0/current HTTP processes | Four passed: legacy transfer in both version directions, current ticket transfer, explicit old-server 404 retaining partial bytes; `scripts/check_http_compatibility.py` |
+| Native callback inbox plus common worker | Nine passed; `native-download-inbox.trx`; five inbox cases plus four runner cases. iOS delegate also compiles against 26.5.10318 bindings. |
+| Native scheduler reference compilation | Android 36.1.69 / Work Runtime 2.11.2.1 and iOS 26.5.10318: zero warnings/errors via `scripts/check_native_bindings.py`; not full platform builds |
+
+The first continuation core run had one expected public API baseline failure for EnsureUploadsAsync (733 other tests
+passed); the baseline was reviewed/updated, an account-opening deadline test was added, and the full run above passed.
+The first ACL tests exposed the direct-read membership omission; corrected in all authorities rather than hidden with
+an extra sample CanRead policy. Browser fixture harness compilation needed the default ILocalStore issue-count contract;
+its final three-engine run passed. No known product failure is being relabeled as infrastructure failure.
+
+### Desktop performance checkpoint
+
+[Complete observations and environment](offline-performance-2026-10-16.json); fixed seed 1729, 100?200 observations,
+one excluded warmup, .NET 10.0.12/SDK 10.0.401, Windows 10 x64, Core Ultra 7 255H, WD PC SN5000S NVMe SSD.
+Budgets were declared in docs/benchmarks.md before the measured run. Other local builds/downloads were active;
+this is development evidence, not an idle-machine/mobile qualification or a network latency claim.
+
+| Workload | p50 ms | p95 ms | p99 ms | p95 budget ms |
+|---|---:|---:|---:|---:|
+| sqlite-full-save-during-managed-staging | 0.91 | 1.38 | 6.48 | 50 |
+| sqlite-indexed-page-50-of-10000 | 0.40 | 0.48 | 1.70 | 50 |
+| package-stage-activate-one-mib | 4.91 | 6.21 | 7.18 | 250 |
+| encrypted-16mib-open-authenticate-read-4k | 40.01 | 45.01 | 47.07 | 250 |
+| sqlite-reconnect-1000-inprocess | 91.36 | 113.91 | 124.87 | 10000 |
+
+All five latency budgets passed; process peak was 343 MiB against 1 GiB, including setup. Allocations include concurrent
+staging for that workload. Encrypted range reads authenticate the complete 16 MiB envelope and allocated about 72 MiB
+per observation; the bounded whole-envelope format is deliberately not suitable for unbounded large media files.
+Reconnect uses 1,000 prepared writes and an in-process authority, without simulated elapsed days or network latency.
+
+### Remaining qualification boundaries
+
+Hosts must adopt account lifetimes for every custom worker/resource, register idempotent deletion callbacks and provide
+real protected-key/account-catalog integration. Unknown legacy pins are preserved. The optional ACL projection requires
+registration in every affected writer. Online large-feed rebuild and automatic capture remain explicitly gated/deferred;
+the portable milestone uses controlled publication and bounded protected-snapshot repair. Domain-specific external
+receivers remain host integrations, with no exactly-once external-effect claim. The optional URLSession download recipe
+now persists account receipts and recovers callback files without the original UI; hosts still supply bootstrap,
+protected storage, resource lifetimes and credential renewal. Its OS plaintext spool is outside encrypted-cache protection.
+Background uploads and actual Apple callback/device qualification remain outside the demonstrated recipe.
+
+External/release gates remain: physical-device execution/key tests, real supported S3 CORS, platform native-library
+qualification, clean tagged release provenance, remote source checksum validation and ten consecutive designated
+qualification workflow runs. Old 0.2.0 binary/source equivalence remains unresolved. Existing passing tests cannot
+establish those gates. No commit, tag, push or package publication was performed by this continuation.
+
+Android build limitation: the full SDK bootstrap installed Microsoft JDK 17.0.14 but failed fetching an Android SDK
+archive (HTTP 404); the current official command-line-tools URL also returned 404. Android/iOS reference compilation
+caught and corrected obsolete Android Preserve and nullable binding annotations, but no APK/app bundle, manifest,
+entitlement, OS job delivery or physical locked-device behavior is claimed. The default solution target remains net10.0.
+
+
+### Final local evidence (continuation through 2026-10-17)
+
+The [validation manifest](offline-validation-2026-10-17.json) records commands, source fingerprint, toolchain,
+native distributions, browser versions, TRX counts/checksums and package identity. Current sample/tooling additions do
+not change the six library assemblies in preview .8. Native inbox tests exercise SQLite reopen and injected failure
+after pinned cache import/before receipt commit; they are not OS process-relaunch delivery tests. Separate-process HTTP
+fixtures restore actual published 0.2.0 packages and the exact .8 candidate with no source project references. CI/release
+workflows now run those fixtures and preserve their logs. All four workflow YAML files parse locally; nine release-tool
+unit tests pass. Remote workflow execution remains unverified.
+
+Task-owned PostgreSQL and Moto services were stopped after validation; shared LocalDB was left running. Stable release
+preflight was attempted and correctly refused the dirty checkout. No tag, push or publication was performed.

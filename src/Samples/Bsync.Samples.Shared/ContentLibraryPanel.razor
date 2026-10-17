@@ -1,0 +1,46 @@
+@using Microsoft.AspNetCore.Components
+@using Bsync.Blobs
+@implements IAsyncDisposable
+@inject IContentLibraryFactory Factory
+
+<section data-testid="content-library">
+    <h2>Offline field guide</h2>
+    <p>Prepare the bundled guide, interrupt an update, then reopen the app to read the complete revision saved on this device.</p>
+    <p data-testid="library-status">@(_status is null ? "Opening local library" : $"Active: {_status.ActiveRevision ?? "none"}; latest: {_status.LatestKnownRevision ?? "none"}; {_status.Readiness}")</p>
+    <p data-testid="library-preparation">@(_preparation is null ? "No update prepared" : $"Revision {_preparation.Revision}: {_preparation.BytesRemaining} bytes required; {_preparation.Issues.Length} unavailable items")</p>
+    <button data-testid="library-one" disabled="@_busy" @onclick="() => RunAsync(() => _library!.PrepareAsync(1, false))">Prepare revision 1</button>
+    <button data-testid="library-interrupt" disabled="@_busy" @onclick="() => RunAsync(() => _library!.PrepareAsync(2, true))">Start update and interrupt</button>
+    <button data-testid="library-two" disabled="@_busy" @onclick="() => RunAsync(() => _library!.PrepareAsync(2, false))">Finish revision 2</button>
+    <button data-testid="library-read" disabled="@(_busy || _status?.ActiveRevision is null)" @onclick="ReadAsync">Read saved guide</button>
+    <pre data-testid="library-text">@_text</pre>
+    @if (_error is not null) { <p role="alert">@_error</p> }
+</section>
+
+@code {
+    private ContentLibrarySession? _library;
+    private OfflinePackageStatus? _status;
+    private PackagePreparationStatus? _preparation;
+    private string? _text, _error;
+    private bool _busy = true;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { _library = await Factory.OpenAsync(); await RefreshAsync(); }
+        catch (Exception error) { _error = error.Message; }
+        _busy = _library is null; StateHasChanged();
+    }
+    private async Task RefreshAsync()
+    {
+        _status = await _library!.Packages.GetStatusAsync("field-guide");
+        _preparation = await _library.Packages.GetPreparationAsync("field-guide");
+    }
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true; _error = null;
+        try { await action(); await RefreshAsync(); }
+        catch (Exception error) { _error = error.Message; }
+        finally { _busy = false; }
+    }
+    private Task ReadAsync() => RunAsync(async () => _text = await _library!.ReadAsync());
+    public async ValueTask DisposeAsync() { if (_library is not null) await _library.DisposeAsync(); }
+}

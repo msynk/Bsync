@@ -17,8 +17,8 @@ Release status and historical provenance: [README](../../README.md#status),
    remaining provider/browser/device qualification evidence.
 
 This workflow never publishes. It does not replace the full support matrix or ten-run qualification gate.
-The current 0.2.0 development checkout deliberately fails stable preflight: no matching version tag or
-dated release heading exists, and the historical published-source mismatch is unresolved.
+The current 0.4.0 development checkout requires a clean, matching version tag before stable preflight can pass.
+The historical 0.2.0 published-source mismatch remains unresolved.
 
 ## Local preview
 
@@ -30,14 +30,20 @@ changing a package's bytes without changing its preview version is not a valid t
 python -m unittest discover -s scripts -p 'test_*.py' -v
 # Repeat for each of the six packages listed in scripts/release.py:
 dotnet pack src/Bsync/Bsync -c Release -o artifacts/packages -p:VersionSuffix=local.1 -p:ContinuousIntegrationBuild=true
-python scripts/release.py manifest --version 0.2.0-local.1
+python scripts/release.py manifest --version 0.4.0-local.1
 $packageCommit = git rev-parse HEAD
 dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages $packageCommit
 python scripts/verify_symbols_test.py artifacts/packages -v
-dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.2.0-local.1
-dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.2.0-local.1 -o artifacts/consumer-web
+dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.4.0-local.1
+dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.4.0-local.1 -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
+python scripts/check_http_compatibility.py --version 0.4.0-local.1 --packages artifacts/packages
 ```
+
+The HTTP fixture builds isolated processes against published 0.2.0 and the exact local candidate. It verifies legacy
+uploads/resumed downloads in both version directions, new ticket downloads against the candidate and explicit 404
+with retained partial bytes when ticket mode contacts the old server. Logs and results are retained under
+`artifacts/http-compatibility-*`; CI and release-candidate jobs upload them. This does not qualify object-store CORS.
 
 For package-only WebAssembly execution, publish `src/Tests/PackageConsumers/Bsync.PackageConsumer.Browser` with the
 same `BsyncPackageVersion` to an isolated output directory. Build `Bsync.Tests.Browser`, then set `BSYNC_BROWSER_HOST`

@@ -3,8 +3,8 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.2.0` is published on NuGet, with an unresolved source-provenance mismatch. This branch still uses
-> the `0.2.0` version prefix; development artifacts use preview suffixes. Pre-1.0: minor versions may
+> **Status:** `0.2.0` is published on NuGet, with an unresolved source-provenance mismatch. This branch uses
+> the `0.4.0` version prefix; development artifacts use preview suffixes. Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
@@ -27,9 +27,9 @@ This section is the single source of truth for release and verification status; 
   and samples.
 - **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
 - **Offline orchestration (unreleased).** Account lifecycle, durable transfer jobs, pinned cache budgets,
-  immutable packages, workflow recovery, derived read-model generations and portable scheduling contracts are in progress. See
+  immutable packages, bounded encrypted blob envelopes, workflow recovery, derived read-model generations and optional native scheduler recipes are implemented in development. See
   [managed content](docs/patterns/managed-content.md), [recoverable work](docs/patterns/recoverable-work.md),
-  [local unlock](docs/patterns/local-unlock.md), and the [improvement plan](docs/Improvement-Plan.md). This is not a claim that all roadmap work or native
+  [local unlock](docs/patterns/local-unlock.md), [native background recipes](docs/patterns/native-background.md), and the [improvement plan](docs/Improvement-Plan.md). This is not a claim that all roadmap work or native
   background qualification is complete.
 - **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
   including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
@@ -666,8 +666,8 @@ Consume the packages exactly as a NuGet user would (no project references; `src/
 ```bash
 for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite; do
   dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
-dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.2.0-local
-dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.2.0-local -o artifacts/consumer-web
+dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.4.0-local
+dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.4.0-local -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
 ```
 

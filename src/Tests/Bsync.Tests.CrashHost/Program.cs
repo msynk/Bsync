@@ -11,6 +11,11 @@ using Bsync.Storage.Sqlite;
 // The test process kills this process at an arbitrary point and inspects the database afterwards.
 
 var mode = args[0];
+if (mode == "encrypted-rotation")
+{
+    await EncryptionCrashHost.RunAsync(args[1], args[2] == "after");
+    return;
+}
 if (mode == "workflow")
 {
     var account = new Bsync.Client.AccountScope("crash", "test", "account");

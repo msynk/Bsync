@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Standalone cross-version process fixture; never reference source projects. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <BsyncFixtureVersion Condition="'$(BsyncFixtureVersion)' == ''">0.2.0</BsyncFixtureVersion>
+    <DefineConstants Condition="'$(BsyncFixtureVersion)' != '0.2.0'">$(DefineConstants);DOWNLOAD_TICKETS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Bsync" Version="[$(BsyncFixtureVersion)]" />
+    <PackageReference Include="Bsync.Server.AspNetCore" Version="[$(BsyncFixtureVersion)]" />
+  </ItemGroup>
+</Project>

@@ -89,4 +89,12 @@ public sealed class WpfHybridTests : IAsyncLifetime
         Assert.StartsWith("ok", await RunAsync("resume", "written offline in WPF"));
         Assert.Contains("written offline in WPF", await ServerFeedAsync());
     }
+
+    [WindowsDesktopFact]
+    public async Task NativeContentLibrarySurvivesInterruptedUpdateAndOfflineProcessRestart()
+    {
+        Assert.StartsWith("ok", await RunAsync("library-prepare", ""));
+        await _server.StopAsync();
+        Assert.StartsWith("ok", await RunAsync("library-resume", ""));
+    }
 }

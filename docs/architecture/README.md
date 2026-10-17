@@ -29,6 +29,7 @@
 | [022](adr-022-workflow-publication.md) | Recoverable workflows, command identity and controlled publication | Implementation in progress |
 | [023](adr-023-local-read-model-generations.md) | Full-reconciliation local read-model generations | Implemented primitive; host snapshot required |
 | [024](adr-024-sql-server-capture-gate.md) | Controlled publication after a bounded capture spike | Automatic capture deferred |
+| [025](adr-025-encrypted-blob-envelopes.md) | Bounded authenticated blob envelopes, migration and rotation | Implemented; native/browser and process recovery tests |
 | [014](adr-014-sql-server-authority.md) | SQL Server authority on the application's database: feed lock, transaction enlistment, write handler, publisher | Accepted; implemented (0.2.0, unreleased) |
 
 Operations: [disaster recovery and stuck replicas](../operations/disaster-recovery.md).

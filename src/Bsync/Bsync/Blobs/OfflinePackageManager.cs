@@ -47,6 +47,23 @@ public enum OfflinePackageReadiness
 public sealed record OfflinePackageStatus(string PackageId, string? ActiveRevision, string? LatestKnownRevision,
     OfflinePackageReadiness Readiness, string[] MissingRequired, string[] MissingOptional, long BytesRemaining, DateTimeOffset VerifiedUtc);
 
+/// <summary>One unavailable candidate item with its durable transfer outcome; null state means it has not been queued.</summary>
+/// <param name="ItemId">Manifest item identity.</param>
+/// <param name="Required">Whether the item is required, including transitive dependencies.</param>
+/// <param name="TransferState">Current download job state, independent of complete-content verification.</param>
+/// <param name="ErrorCode">Content-free durable transfer failure classification, or null.</param>
+public sealed record PackagePreparationIssue(string ItemId, bool Required, BlobTransferState? TransferState, string? ErrorCode);
+
+/// <summary>Fresh bounded verification of the latest candidate, separate from active-revision readiness.</summary>
+/// <param name="PackageId">Package identity.</param>
+/// <param name="Revision">Latest staged candidate.</param>
+/// <param name="RequiredContentComplete">True when required candidate bytes are verified; does not imply activation.</param>
+/// <param name="BytesRemaining">Full byte sizes of distinct missing required hashes; excludes optional content and does not discount unverified partials.</param>
+/// <param name="Issues">Missing required/optional items and resumable job outcomes.</param>
+/// <param name="VerifiedUtc">Observation time. Concurrent transfer state can change afterwards.</param>
+public sealed record PackagePreparationStatus(string PackageId, string Revision, bool RequiredContentComplete, long BytesRemaining,
+    PackagePreparationIssue[] Issues, DateTimeOffset VerifiedUtc);
+
 /// <summary>
 /// Account-scoped staged packages over durable metadata and managed content. Authorization is supplied by the host and
 /// evaluated before staging/opening/activation; an offline policy may permit previously granted local access. No network
@@ -175,16 +192,37 @@ public sealed class OfflinePackageManager
     private async Task<(string[] Required, string[] Optional, long Bytes)> Missing(OfflinePackageManifest manifest, CancellationToken ct)
     {
         var required = Required(manifest); var missing = new List<string>(); var optional = new List<string>(); long bytes = 0;
+        var counted = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in manifest.Items)
         {
             await using var stream = await _cache.OpenReadAsync(item.Sha256, ct).ConfigureAwait(false);
             var valid = stream is not null && stream.Length == item.Size
                 && Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false)) == item.Sha256;
             if (valid) continue;
-            if (required.Contains(item.Id)) { missing.Add(item.Id); bytes = checked(bytes + item.Size); }
+            if (required.Contains(item.Id)) { missing.Add(item.Id); if (counted.Add(item.Sha256)) bytes = checked(bytes + item.Size); }
             else optional.Add(item.Id);
         }
         return (missing.ToArray(), optional.ToArray(), bytes);
+    }
+    /// <summary>Verifies the latest bounded candidate and reports missing items and durable retry reasons without changing active readiness.</summary>
+    public async Task<PackagePreparationStatus?> GetPreparationAsync(string packageId, CancellationToken cancellationToken = default)
+    {
+        await using var held = await _locks.AcquireAsync(Hash("package/" + packageId), cancellationToken).ConfigureAwait(false);
+        var latest = await _store.ReadAsync(Prefix(packageId) + "latest", cancellationToken).ConfigureAwait(false);
+        if (latest is null) return null;
+        var manifest = Decode(await _store.ReadAsync(RevisionKey(packageId, latest.Payload), cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidDataException("Missing candidate manifest."));
+        await Authorize(manifest, cancellationToken).ConfigureAwait(false);
+        var missing = await Missing(manifest, cancellationToken).ConfigureAwait(false);
+        var required = missing.Required.ToHashSet(StringComparer.Ordinal);
+        var unavailable = required.Concat(missing.Optional).ToHashSet(StringComparer.Ordinal);
+        var issues = new List<PackagePreparationIssue>();
+        foreach (var item in manifest.Items.Where(item => unavailable.Contains(item.Id)))
+        {
+            var job = await _transfers.GetAsync(item.Sha256, BlobTransferDirection.Download, cancellationToken).ConfigureAwait(false);
+            issues.Add(new(item.Id, required.Contains(item.Id), job?.State, job?.ErrorCode));
+        }
+        return new(packageId, manifest.Revision, required.Count == 0, missing.Bytes, issues.ToArray(), _time.GetUtcNow());
     }
     /// <summary>Verifies at most 256 active items. This performs content I/O; hosts may cache displayed results but must label their age.</summary>
     public async Task<OfflinePackageStatus> GetStatusAsync(string packageId, CancellationToken cancellationToken = default)

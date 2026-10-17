@@ -3,7 +3,7 @@
 Tiers (ADR-012): **Verified** = executed tests or a recorded run; **Build-only** = compiles or publishes,
 not executed; **Planned** = not implemented. Nothing here is Verified unless the evidence column says how.
 
-Release status: [README](../README.md#status).
+Release status: [README](../README.md#status). Current development target: **0.4.0 (unreleased)**.
 
 2026-10-16 R0 update: [baseline and validation evidence](review/release-baseline-2026-10-16.md).
 The six 0.2.0 packages are published, with an unresolved source-provenance mismatch. Older rows below
@@ -14,8 +14,9 @@ Later 2026-10-16 offline implementation: [executed evidence and open gates](revi
 Core (713), SQLCipher (31), PostgreSQL 17.11 (44), SQL Server (87, including isolated Moto 5.2.4 S3 emulation) and exact-preview package consumers (53) passed.
 An earlier full browser suite passed 91 tests with one PostgreSQL skip; additional lock termination/read-model/diagnostic
 reload tests passed in Chromium, Firefox and WebKit. New capabilities remain under
-qualification: this does not establish encrypted blobs, Android/iOS background delivery, native Safari, or complete
-read-model/projection reconciliation support. See the evidence record for full-browser and process/tab termination runs.
+qualification: the earlier checkpoint did not establish encrypted blobs or Android/iOS background delivery.
+The continuation adds native/Web Crypto encrypted-blob tests and optional scheduler source recipes; native Safari
+and OS-delivered mobile work remain unqualified. See the evidence record for full-browser and process/tab termination runs.
 The recovery-key PWA UI passed offline reload/wrong-key retention in Chromium/Firefox. The native protected-store
 recipe compiled for Windows MAUI; this does not qualify locked-device key access. Account resource locks are opt-in
 and require every participating coordinator/worker to share the same namespace.
@@ -34,6 +35,23 @@ after the fix below, and later (539 tests) 8 more times; `dotnet test src/Tests/
 a local `0.2.0-local` pack of the seven packages (48 tests from the `Bsync.Testing` package, web smoke); the browser and
 WPF tests again on the later work (70 passed, 1 skipped); `dotnet test src/Tests/Bsync.Tests.SqlServer -c Release`
 (57 tests) 6 consecutive times against SQL Server 2025 LocalDB. Rows below say which run their evidence comes from.
+
+Continued implementation after `d796e0d` (through 2026-10-17): core 740, SQL Server 94 (including Moto), PostgreSQL 45
+and SQLCipher 31 passed. The full source browser/WPF checkpoint passed 129; the final Tasks account/credential/action/
+attachment cases passed 12 across Chromium/Firefox/WebKit. Preview `0.3.0-offline.20261016.8` passed 55 package-only tests,
+75 exact-package browser cases, published web smoke, six DLL/PDB pairs, 177 embedded-source checksums and five verifier
+archive tests. Four published-0.2.0/current HTTP process cases passed. Full solution: zero warnings/errors.
+Commands, environment, result checksums and qualification boundaries are preserved in the
+[validation manifest](review/offline-validation-2026-10-17.json) and [continuation record](review/offline-implementation-2026-10-16.md).
+
+Native source status: the common worker runner and durable download inbox are tested. The optional iOS URLSession
+recipe handles download callbacks through durable account receipts after relaunch, with a separate plaintext OS spool;
+its five portable recovery cases and reference compilation do not qualify OS callbacks or file-protection behavior. Android C# bindings compile against Android reference
+36.1.69 and AndroidX Work Runtime 2.11.2.1 after correcting nullable binding annotations and replacing obsolete Preserve
+with DynamicDependency. The full Android build is **not qualified**: workload installation succeeded, but the SDK
+bootstrap and current official command-line-tools download returned HTTP 404. JDK 17.0.14 was installed under ignored
+artifacts. iOS C# binding compilation also passed against Microsoft.iOS.Ref.net10.0_26.5 26.5.10318. iOS app builds and
+physical-device delivery are not qualified by the default net10.0 build or these reference-only checks.
 
 ## Components
 
@@ -72,4 +90,4 @@ WPF tests again on the later work (70 passed, 1 skipped); `dotnet test src/Tests
 | `MauiSync` recipe (MAUI sample, unreleased) | Verified on Windows only; mobile Build-only not possible here | 2026-10-06: built for `net10.0-windows10.0.19041.0`; the MAUI sample uses `UseMauiLifecycle` and `MauiHybridTests` (a write through the UI reaches the server) passes on Windows. Not exercised by a test: connectivity events, background runs, `SecureReplicaKeys`. Android, iOS and Mac Catalyst targets were not built (no workloads). |
 | Android, iOS, Mac Catalyst (MAUI), native Safari (macOS, iPadOS) | Not run | 2026-10-06: tasks G1 (`MauiSync` recipe: connectivity watcher, background sync, `SecureStorage` helpers) and G2 (platform qualification) stopped on their stop condition: this machine has only the `maui-windows` and `wasm-tools` workloads, no Android SDK or emulator, and no Apple device. Nothing here is claimed for these platforms; G1 was not built, because its done-when needs an Android emulator. |
 | Tasks sample: ASP.NET Core + EF Core on SQL Server, console client on SQLite (`Bsync.Samples.Tasks.*`) | Verified on Windows with SQL Server 2025 LocalDB | 2026-10-05, `TasksSampleTests` (Kestrel on loopback, JWT bearer): an offline save is kept across a client restart and uploaded; the server-computed `Slug` reaches the replica and `dbo.Tasks`; the `title-required` rejection is visible through `GetItemStatusAsync`; a task published by `POST /api/tasks` reaches a second client of the same team and not another team; requests without a token get 401. 2026-10-06, `IntentsExecuteOnce` (F3, 4 consecutive runs): an intent saved offline is still pending after a client restart; with the first upload response lost after the commit, the task is changed once (revision 2) and the intent reports `executed` by the caller; an intent on a stale revision is accepted as `rejected` with `target-changed`, kept across syncs; an edit of an intent is refused with `intent-immutable`; an intent for a task not yet on the server waits (`retry-later`) and executes after the task arrives from another device. `AttachmentsSurviveInterruptions` (F1, 5 consecutive runs): a 50 MiB attachment's upload dropped at 60% resumes after a client restart (at most one chunk resent) with the task held back meanwhile; a lost finish response stores no second object; a download dropped at 60% and damaged on disk resumes, fails its hash check, is discarded and never opened, then succeeds; another team gets 404 and must upload the same bytes itself (stored once); eviction keeps a pending task's content. `BundleSwitchesAtomically` (F2, 5 consecutive runs): revision 2 of a bundle interrupted halfway through a 20 MiB item keeps revision 1 in use and reported (latest 2, missing item, bytes remaining) across a restart; the next update resumes, verifies and switches every item to revision 2 at once; replicas cannot write bundles; another team gets 404. 2026-10-06 later: the sample moved to the package blob routes; `UnreferencedContentIsCollected` (the janitor removes content of a deleted task after the grace period, with its upload record, and keeps referenced content) and, with `BSYNC_S3`, presigned uploads in `AttachmentsInObjectStorage` (an upload cut halfway is sent again whole to the bucket and never through the application server; no upload left behind); suite 71 tests, green. |
-| Tasks sample WebAssembly client (`Bsync.Samples.Tasks.Client`, IndexedDB) | Verified in Playwright browsers on Windows | 2026-10-06, `TasksSampleTests.AttachmentsReachOtherDevices` (`src/Tests/Bsync.Tests.Browser`, published server on SQL Server 2025 LocalDB, `BSYNC_SQLSERVER` set; skipped without it) in Chromium, Firefox and WebKit (Playwright 1.63): sign-in, a task synced; a file attached while the sync routes are blocked stays on the device with its task pending; after unblocking, the attachment is uploaded and then the task; a second device downloads the attachment and shows its verified text, and opens it again after a reload with the routes blocked. Emulated offline mode is not used: in WebKit it breaks reading the chosen file. Bundles and intents are not in the browser client. |
+| Tasks sample WebAssembly client (`Bsync.Samples.Tasks.Client`, IndexedDB) | Verified in Playwright browsers on Windows | 2026-10-06, `TasksSampleTests.AttachmentsReachOtherDevices` (`src/Tests/Bsync.Tests.Browser`, published server on SQL Server 2025 LocalDB, `BSYNC_SQLSERVER` set; skipped without it) in Chromium, Firefox and WebKit (Playwright 1.63): sign-in, a task synced; a file attached while the sync routes are blocked stays on the device with its task pending; after unblocking, the attachment is uploaded and then the task; a second device downloads the attachment and shows its verified text, and opens it again after a reload with the routes blocked. Emulated offline mode is not used: in WebKit it breaks reading the chosen file. That historical run predates the immutable-action UI; the continuation adds and tests it. |

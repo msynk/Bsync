@@ -53,6 +53,8 @@ jobs:
         run: dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages "$(git rev-parse HEAD)" --verify-sources
       - name: Reject mismatched and missing packaged symbols
         run: python scripts/verify_symbols_test.py artifacts/packages -v
+      - name: Published 0.2.0 and candidate HTTP compatibility
+        run: python scripts/check_http_compatibility.py --version "$BSYNC_PACKAGE_VERSION" --packages artifacts/packages
       - name: Consume exact artifacts with auditing enabled
         run: |
           dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion="$BSYNC_PACKAGE_VERSION" --logger "trx;LogFileName=consumer.trx"
@@ -67,4 +69,7 @@ jobs:
         if: always()
         with:
           name: release-test-evidence
-          path: src/Tests/**/TestResults/*.trx
+          path: |
+            src/Tests/**/TestResults/*.trx
+            artifacts/http-compatibility-*/*.log
+            artifacts/http-compatibility-*/results.json

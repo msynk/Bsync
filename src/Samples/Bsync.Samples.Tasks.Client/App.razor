@@ -26,6 +26,8 @@
             {
                 <li data-testid="task" class="@(status?.State == SyncItemState.Rejected ? "rejected" : null)">
                     <span data-testid="task-title">@task.Title</span> <small>@task.Slug</small>
+                    <span data-testid="task-done">@(task.Done ? "Complete" : "Open")</span>
+                    <button data-testid="task-complete" disabled="@(task.Done || _intents is null)" @onclick="() => CompleteAsync(task)">Request completion</button>
                     @if (status?.State == SyncItemState.Rejected)
                     {
                         <span> rejected: @status.Detail</span>
@@ -36,6 +38,7 @@
                             <li data-testid="attachment">
                                 <span data-testid="attachment-name">@attachment.FileName</span>
                                 <small>@attachment.Size bytes</small>
+                                <small data-testid="attachment-transfer">@TransferLabel(_transferStates.GetValueOrDefault(attachment.Sha256))</small>
                                 @if (_local.Contains(attachment.Sha256))
                                 {
                                     <button data-testid="attachment-open" @onclick="() => OpenAsync(attachment)">Open</button>
@@ -48,6 +51,18 @@
                         }
                     </ul>
                     <label>Attach <InputFile data-testid="attach" OnChange="e => AttachAsync(task.Id, e)" /></label>
+                </li>
+            }
+        </ul>
+        <h2>Action requests</h2>
+        <ul>
+            @foreach (var (intent, observation) in _actions)
+            {
+                <li data-testid="intent">
+                    <span>@intent.Kind</span>
+                    <span data-testid="intent-local">@(observation.LocallyPersisted ? "Saved on this device" : "Saving")</span>
+                    <span data-testid="intent-transport">Transport: @(observation.Transport?.State.ToString() ?? "Unknown") @(observation.Transport?.Detail)</span>
+                    <span data-testid="intent-execution">Execution: @(observation.Execution?.State.ToString() ?? "Awaiting server outcome") @(observation.Execution?.Code)</span>
                 </li>
             }
         </ul>
@@ -65,8 +80,12 @@
 @code {
     private ISyncCollection<TaskDocument>? _tasks;
     private IDisposable? _subscription;
+    private ISyncCollection<TaskIntent>? _intents;
+    private IDisposable? _intentSubscription;
+    private List<(TaskIntent Intent, IntentStatus Status)> _actions = [];
     private List<(TaskDocument Task, SyncItemStatus? Status)> _items = [];
     private HashSet<string> _local = new(StringComparer.Ordinal);
+    private Dictionary<string, BlobTransferState?> _transferStates = new(StringComparer.Ordinal);
     private string _user = "alice";
     private string _tenant = "team-1";
     private string _title = string.Empty;
@@ -78,7 +97,10 @@
         await Session.SignInAsync(_user, _tenant);
         await Attachments.OpenAsync(JS);
         _tasks = (ISyncCollection<TaskDocument>)Services.GetService(typeof(ISyncCollection<TaskDocument>))!;
+        _intents = (ISyncCollection<TaskIntent>)Services.GetService(typeof(ISyncCollection<TaskIntent>))!;
         _subscription = _tasks.Subscribe(() => InvokeAsync(ReloadAsync));
+        _intentSubscription = _intents.Subscribe(() => InvokeAsync(ReloadAsync));
+        Attachments.Changed += AttachmentsChanged;
         await ReloadAsync();
     }
 
@@ -87,6 +109,15 @@
         // Saved locally at once; an empty title is rejected by the server with "title-required" and shown here.
         await _tasks!.SaveAsync(new TaskDocument { Title = _title });
         _title = string.Empty;
+        await ReloadAsync();
+    }
+
+    private async Task CompleteAsync(TaskDocument task)
+    {
+        // A new immutable command, never an edit of an earlier request or a client-produced result.
+        var intent = new TaskIntent { Kind = IntentKinds.Complete, TaskId = task.Id, TaskRevision = task.Revision > 0 ? task.Revision : null };
+        _ = TaskIntentDefinitions.Capture(intent); // Explicit registered payload validation before durable save.
+        await _intents!.SaveAsync(intent);
         await ReloadAsync();
     }
 
@@ -141,11 +172,13 @@
     {
         var items = new List<(TaskDocument, SyncItemStatus?)>();
         var local = new HashSet<string>(StringComparer.Ordinal);
+        var transfers = new Dictionary<string, BlobTransferState?>(StringComparer.Ordinal);
         foreach (var task in await _tasks!.QueryAsync())
         {
             items.Add((task, await _tasks.GetItemStatusAsync(task.Id)));
             foreach (var attachment in task.Attachments)
             {
+                transfers[attachment.Sha256] = await Attachments.UploadStateAsync(attachment);
                 if (await Attachments.IsLocalAsync(attachment))
                 {
                     local.Add(attachment.Sha256);
@@ -155,8 +188,36 @@
 
         _items = items;
         _local = local;
+        _transferStates = transfers;
+        var actions = new List<(TaskIntent, IntentStatus)>();
+        if (_intents is not null)
+        {
+            foreach (var intent in await _intents.QueryAsync())
+            {
+                IntentExecutionResult? execution = intent.State switch
+                {
+                    IntentStates.Executed => new(intent.Id, 1, IntentExecutionState.Succeeded),
+                    IntentStates.Rejected => new(intent.Id, 1, IntentExecutionState.Rejected, intent.Code),
+                    _ => null,
+                };
+                actions.Add((intent, new(true, await _intents.GetItemStatusAsync(intent.Id), execution)));
+            }
+        }
+        _actions = actions;
         StateHasChanged();
     }
 
-    public void Dispose() => _subscription?.Dispose();
+    private void AttachmentsChanged() => _ = InvokeAsync(ReloadAsync);
+    private static string TransferLabel(BlobTransferState? state) => state switch
+    {
+        BlobTransferState.WaitingForCredentials => "Sign in again to upload",
+        BlobTransferState.WaitingForConnectivity => "Waiting for connection",
+        BlobTransferState.Complete => "Uploaded",
+        BlobTransferState.Paused => "Upload paused",
+        BlobTransferState.Failed => "Upload needs attention",
+        BlobTransferState.Canceled => "Upload canceled",
+        BlobTransferState.Queued or BlobTransferState.Running => "Uploading",
+        _ => "",
+    };
+    public void Dispose() { Attachments.Changed -= AttachmentsChanged; _subscription?.Dispose(); _intentSubscription?.Dispose(); }
 }

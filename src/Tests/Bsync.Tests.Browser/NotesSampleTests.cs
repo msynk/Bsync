@@ -60,6 +60,30 @@ public sealed class NotesSampleTests(BrowserFixture fixture) : IAsyncLifetime
     private static ILocatorAssertions Expect(ILocator locator) => Assertions.Expect(locator);
 
     [Theory]
+    [MemberData(nameof(OfflineReloadBrowsers))]
+    public async Task ContentLibraryKeepsPriorRevisionAcrossOfflineInterruptedUpdate(string browser)
+    {
+        await using var context = await (await fixture.BrowserAsync(browser)).NewContextAsync();
+        var page = await OpenControlledAppAsync(context);
+        await page.GetByTestId("library-one").ClickAsync();
+        await Expect(page.GetByTestId("library-status")).ToContainTextAsync("Active: 1; latest: 1; ReadyFreshnessUnknown");
+        await page.GetByTestId("library-interrupt").ClickAsync();
+        await Expect(page.GetByTestId("library-status")).ToContainTextAsync("Active: 1; latest: 2; ReadyKnownOutdated");
+        await context.SetOfflineAsync(true);
+        await page.ReloadAsync();
+        await Expect(page.GetByTestId("library-status")).ToContainTextAsync("Active: 1; latest: 2; ReadyKnownOutdated", new() { Timeout = 60000 });
+        await page.GetByTestId("library-read").ClickAsync();
+        await Expect(page.GetByTestId("library-text")).ToContainTextAsync("Revision 1:");
+        await page.GetByTestId("library-two").ClickAsync();
+        await Expect(page.GetByTestId("library-status")).ToContainTextAsync("Active: 2; latest: 2; ReadyFreshnessUnknown");
+        await page.GetByTestId("library-read").ClickAsync();
+        await Expect(page.GetByTestId("library-text")).ToContainTextAsync("Revision 2:");
+        await page.ReloadAsync();
+        await page.GetByTestId("library-read").ClickAsync();
+        await Expect(page.GetByTestId("library-text")).ToContainTextAsync("Revision 2:");
+    }
+
+    [Theory]
     [MemberData(nameof(Browsers))]
     public async Task ServiceWorkerBypassesNonManifestApiBlobAndHintRequests(string browser)
     {

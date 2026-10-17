@@ -111,18 +111,13 @@ public static class TasksServer
                 return Results.Problem(statusCode: 400, title: TaskRules.TitleRequired);
             }
 
-            var document = new TaskDocument { Id = request.Id, Title = request.Title, Slug = TaskRules.Slug(request.Title) };
-            await using var db = TasksDb.Open(connectionString);
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            // Replication holds the feed before entering its domain handler. API writes use the same order.
-            await authority.AcquirePublicationLockAsync(tenant, transaction.GetDbTransaction(), cancellationToken);
-            document.Revision = 1;
-            db.Tasks.Add(new TaskEntity { Tenant = tenant, Id = document.Id, Title = document.Title, Slug = document.Slug, Revision = 1, ChangedBy = user.FindFirst("sub")?.Value });
-            await db.SaveChangesAsync(cancellationToken);
-            await authority.UpsertAsync(tenant, document, transaction.GetDbTransaction(), cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            authority.NotifyCommitted(new AuthorityCommit(tenant, [document.Id]));
-            return Results.Created($"/api/tasks/{document.Id}", document);
+            if (user.FindFirst("sub")?.Value is not { } actor) return Results.Unauthorized();
+            try
+            {
+                var document = await new TaskApiPublication(connectionString, authority).CreateAsync(tenant, actor, request, cancellationToken);
+                return Results.Created($"/api/tasks/{document.Id}", document);
+            }
+            catch (TaskCreationConflictException) { return Results.Conflict(); }
         }).RequireAuthorization();
 
         // Bundles (task F2): published by the server through an API endpoint, read by replicas.

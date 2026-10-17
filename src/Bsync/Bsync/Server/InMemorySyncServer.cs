@@ -453,7 +453,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         lock (_gate)
         {
             return Task.FromResult(
-                _documents.TryGetValue(id, out var entry) && (_options.CanRead?.Invoke(context, entry.Document) ?? true)
+                _documents.TryGetValue(id, out var entry) && MayRead(context, id) && (_options.CanRead?.Invoke(context, entry.Document) ?? true)
                     ? new StoredDocument<TDocument>(_clone(entry.Document), entry.Version)
                     : null);
         }
@@ -469,7 +469,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
         {
             IReadOnlyList<StoredDocument<TDocument>> page = _documents
                 .Where(kv => afterId is null || string.CompareOrdinal(kv.Key, afterId) > 0)
-                .Where(kv => !kv.Value.Document.Deleted && (_options.CanRead?.Invoke(context, kv.Value.Document) ?? true))
+                .Where(kv => !kv.Value.Document.Deleted && MayRead(context, kv.Key) && (_options.CanRead?.Invoke(context, kv.Value.Document) ?? true))
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
                 .Take(Math.Min(limit, _options.MaxPageSize))
                 .Select(kv => new StoredDocument<TDocument>(_clone(kv.Value.Document), kv.Value.Version))
@@ -510,7 +510,7 @@ public sealed class InMemorySyncServer<TDocument> : ISyncAuthority<TDocument>, I
     /// <summary>With membership, whether the caller is among the current readers of <paramref name="id"/>.</summary>
     private bool MayRead(SyncCallContext context, string id) =>
         _options.PrincipalKey is not { } principal
-        || (principal(context) is { } key && _documents.TryGetValue(id, out var entry) && entry.Readers?.Contains(key) == true);
+        || (principal(context) is { } key && SyncIds.IsValid(key) && _documents.TryGetValue(id, out var entry) && entry.Readers?.Contains(key) == true);
 
     private bool SameReaders(TDocument candidate, Entry current) =>
         _options.Readers is not { } readers || (current.Readers ?? EmptyReaders).SetEquals(readers(candidate));

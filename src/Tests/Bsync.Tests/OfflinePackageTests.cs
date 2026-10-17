@@ -36,6 +36,30 @@ public sealed class OfflinePackageTests : IAsyncLifetime
         [new("page", Convert.ToHexStringLower(SHA256.HashData(new[] { value })), 1, true, [])]);
 
     [Fact]
+    public async Task CandidateIssuesDoNotHideUsableActiveRevisionAndCountSharedBytesOnce()
+    {
+        Assert.Null(await _manager.GetPreparationAsync("manual"));
+        await _manager.StageAsync(Manifest("one", 1));
+        await _cache.ImportAsync(new MemoryStream([1]));
+        Assert.True(await _manager.TryActivateAsync("manual", "one"));
+        var next = Manifest("two", 2);
+        next = next with { Items = [next.Items[0], next.Items[0] with { Id = "same-content" }, new("optional", new string('a', 64), 9, false, [])] };
+        await _manager.StageAsync(next);
+        var preparation = (await _manager.GetPreparationAsync("manual"))!;
+        Assert.Equal("two", preparation.Revision);
+        Assert.False(preparation.RequiredContentComplete);
+        Assert.Equal(1, preparation.BytesRemaining);
+        Assert.Equal(3, preparation.Issues.Length);
+        Assert.All(preparation.Issues, issue => Assert.Equal(BlobTransferState.Queued, issue.TransferState));
+        Assert.Equal(OfflinePackageReadiness.ReadyKnownOutdated, (await _manager.GetStatusAsync("manual")).Readiness);
+        await _cache.ImportAsync(new MemoryStream([2]));
+        preparation = (await _manager.GetPreparationAsync("manual"))!;
+        Assert.True(preparation.RequiredContentComplete);
+        Assert.False(Assert.Single(preparation.Issues).Required);
+        Assert.Equal("one", (await _manager.GetStatusAsync("manual")).ActiveRevision);
+    }
+
+    [Fact]
     public async Task LastVerificationSurvivesRestartButDoesNotClaimToDetectLaterStorageLoss()
     {
         var first = Manifest("one", 1);

@@ -19,6 +19,13 @@ public sealed class SqlServerMembershipTests(ITestOutputHelper output) : IAsyncL
 {
     private SqlServerDatabase _database = null!;
 
+    [Fact]
+    public async Task DirectReadsApplyMembershipBeforePaginationAndRespectRevocation()
+    {
+        await using var authority = await AuthorityAsync();
+        await MembershipReadContract.VerifyAsync(authority, authority);
+    }
+
     public async Task InitializeAsync() => _database = await SqlServerDatabase.CreateAsync();
 
     public async Task DisposeAsync() => await _database.DisposeAsync();

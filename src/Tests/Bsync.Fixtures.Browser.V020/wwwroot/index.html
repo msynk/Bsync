@@ -1,0 +1,30 @@
+<!doctype html>
+<html><head><base href="/"/><title>Published Bsync 0.2.0 fixture generator</title></head>
+<body><p>Generate once in an empty browser context; capture window.fixture as JSON.</p>
+<script>
+window.captureFixture = async version => {
+    const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open('published-020');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+    const stores = [];
+    for (const name of db.objectStoreNames) {
+        const transaction = db.transaction(name, 'readonly');
+        const store = transaction.objectStore(name);
+        const indexes = [...store.indexNames].map(name => {
+            const index = store.index(name);
+            return { name, keyPath: index.keyPath, unique: index.unique, multiEntry: index.multiEntry };
+        });
+        const values = await new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        stores.push({ name, keyPath: store.keyPath, autoIncrement: store.autoIncrement, indexes, values });
+    }
+    window.fixture = { packageVersion: '0.2.0', assemblyVersion: version, schema: db.version, stores };
+    db.close();
+};
+</script>
+<script src="_framework/blazor.webassembly.js"></script></body></html>

@@ -1,0 +1,28 @@
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Playwright;
+using System.Text.Json;
+
+if (args.Length != 2) throw new ArgumentException("Usage: Bsync.FixtureCapture <published-wwwroot> <new-output.json>");
+if (File.Exists(args[1])) throw new IOException("Refusing to replace a preserved fixture; choose a new output path.");
+if (!File.Exists(Path.Combine(args[0], "index.html"))) throw new DirectoryNotFoundException("Published wwwroot must contain index.html. Pass absolute paths to dotnet run.");
+var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { WebRootPath = Path.GetFullPath(args[0]) });
+builder.WebHost.UseUrls("http://127.0.0.1:0");
+await using var app = builder.Build();
+app.UseDefaultFiles();
+app.UseStaticFiles(new StaticFileOptions { ServeUnknownFileTypes = true });
+await app.StartAsync();
+if (Microsoft.Playwright.Program.Main(["install", "chromium"]) != 0) throw new InvalidOperationException("Browser installation failed.");
+using var playwright = await Playwright.CreateAsync();
+await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
+await using var context = await browser.NewContextAsync();
+var page = await context.NewPageAsync();
+page.PageError += (_, error) => Console.Error.WriteLine(error);
+await page.GotoAsync(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single());
+await page.WaitForFunctionAsync("() => window.fixture !== undefined", null, new() { Timeout = 120_000 });
+var json = await page.EvaluateAsync<string>("() => JSON.stringify(window.fixture, null, 2)");
+using var document = JsonDocument.Parse(json);
+if (document.RootElement.GetProperty("packageVersion").GetString() != "0.2.0") throw new InvalidDataException("Unexpected fixture version.");
+await File.WriteAllTextAsync(args[1], json + "\n");
+Console.WriteLine($"Captured Chromium {browser.Version}: {Path.GetFullPath(args[1])}");
+await app.StopAsync();

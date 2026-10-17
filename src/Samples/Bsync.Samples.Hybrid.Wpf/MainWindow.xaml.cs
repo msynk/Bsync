@@ -70,6 +70,27 @@ public partial class MainWindow : Window
                 throw new TimeoutException($"Timed out waiting for {what}. Page: {await Eval("document.body.innerText")}");
             }
 
+            if (App.Settings.SmokeStep.StartsWith("library-", StringComparison.Ordinal))
+            {
+                await Until("document.querySelector('[data-testid=library-one]') && !document.querySelector('[data-testid=library-one]').disabled", "the content library");
+                async Task Click(string id) => await Eval($"document.querySelector('[data-testid={id}]').click(), 'clicked'");
+                Task Active(string expected) => Until($"document.querySelector('[data-testid=library-status]').textContent.includes('{expected}')", expected);
+                if (App.Settings.SmokeStep == "library-prepare")
+                {
+                    await Click("library-one"); await Active("Active: 1; latest: 1; ReadyFreshnessUnknown");
+                    await Click("library-interrupt"); await Active("Active: 1; latest: 2; ReadyKnownOutdated");
+                }
+                else
+                {
+                    await Active("Active: 1; latest: 2; ReadyKnownOutdated");
+                    await Click("library-read");
+                    await Until("document.querySelector('[data-testid=library-text]').textContent.includes('Revision 1:')", "the old complete guide");
+                    await Click("library-two"); await Active("Active: 2; latest: 2; ReadyFreshnessUnknown");
+                    await Click("library-read");
+                    await Until("document.querySelector('[data-testid=library-text]').textContent.includes('Revision 2:')", "the updated complete guide");
+                }
+                await File.WriteAllTextAsync(resultFile, "ok content-library"); Close(); return;
+            }
             await Until("document.querySelector('[data-testid=notes-panel]') && !document.querySelector('[data-testid=new-text]').disabled", "the notes panel");
             var text = App.Settings.SmokeText ?? $"from WPF {Guid.NewGuid():N}";
             if (App.Settings.SmokeStep == "resume")

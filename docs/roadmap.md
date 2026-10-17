@@ -14,7 +14,7 @@ workloads and targets: ADR-012. Explicit non-goals: see the README.
 
 ## Status
 
-Current work: [offline improvement plan](Improvement-Plan.md), release integrity and portable orchestration/content
+Current development target: **0.4.0 (unreleased)**. Current work: [offline improvement plan](Improvement-Plan.md), release integrity and portable orchestration/content
 implementation. Audited consumers/provenance checks, lifecycle/persistence, transfers/pins/packages, local workflows,
 portable background dispatch, read-model generations, redacted diagnostics and SQL Server publication recipes are implemented under continuing qualification
 ([ADRs 019–024](architecture/README.md)). Full workstream exit gates remain open.

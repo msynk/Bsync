@@ -10,6 +10,13 @@ namespace Bsync.Tests;
 /// <summary>Task C1 / ADR-015: read membership in the feed and removals without a resnapshot, end to end through the engine.</summary>
 public sealed class MembershipTests
 {
+    [Fact]
+    public async Task DirectReadsApplyMembershipBeforePaginationAndRespectRevocation()
+    {
+        var server = Server().Server;
+        await MembershipReadContract.VerifyAsync(server, server);
+    }
+
     // Readers are listed in the note's body: "alice,bob".
     private static InMemorySyncServerRef Server(Func<Note, IEnumerable<string>>? readers = null)
     {

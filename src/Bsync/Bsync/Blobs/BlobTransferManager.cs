@@ -118,6 +118,42 @@ public sealed class BlobTransferManager
     /// <summary>Notification after durable state transitions. Observers must re-read; notifications can be lost across restarts.</summary>
     public event Action? Changed;
 
+    /// <summary>
+    /// A ReadyToPush helper for at most 256 application-selected local prerequisites. Enqueues idempotently, drains within
+    /// budget and returns true only when each upload is authority-confirmed complete. Server handlers must still validate
+    /// blob availability/authorization. Pass only prerequisites this device must upload, not every remote reference.
+    /// </summary>
+    public async ValueTask<bool> EnsureUploadsAsync(IReadOnlyList<BlobReference> prerequisites, TimeSpan budget, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(prerequisites);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
+        if (prerequisites.Count > 256) throw new ArgumentException("Upload prerequisites are bounded to 256 items.", nameof(prerequisites));
+        var items = prerequisites.ToArray();
+        // Validate the complete request before creating durable jobs.
+        foreach (var item in items)
+        { ArgumentNullException.ThrowIfNull(item); _ = Key(item.Sha256, BlobTransferDirection.Upload); ArgumentOutOfRangeException.ThrowIfNegative(item.Size); }
+        if (items.GroupBy(item => item.Sha256).Any(group => group.Select(item => item.Size).Distinct().Count() != 1))
+            throw new ArgumentException("One hash cannot have different prerequisite lengths.", nameof(prerequisites));
+        foreach (var item in items.DistinctBy(item => item.Sha256))
+        {
+            await EnqueueAsync(item.Sha256, item.Size, BlobTransferDirection.Upload, priority: 1, cancellationToken).ConfigureAwait(false);
+            // Complete is historical. The server may have collected an unpublished upload during a long offline period.
+            var key = Key(item.Sha256, BlobTransferDirection.Upload);
+            while (await _store.ReadAsync(key, cancellationToken).ConfigureAwait(false) is { } record)
+            {
+                var job = Decode(record);
+                if (job.State != BlobTransferState.Complete) break; // Never override a concurrent pause/cancel/failure.
+                if (await _store.TryWriteAsync([new(key, record.Revision, Encode(job with { State = BlobTransferState.Queued, NextAttemptUtc = null, ErrorCode = null }))], cancellationToken: cancellationToken).ConfigureAwait(false))
+                { Notify(); break; }
+            }
+        }
+        if (items.Length == 0) return true;
+        await DrainAsync(budget, cancellationToken).ConfigureAwait(false);
+        foreach (var item in items)
+            if ((await GetAsync(item.Sha256, BlobTransferDirection.Upload, cancellationToken).ConfigureAwait(false))?.State != BlobTransferState.Complete) return false;
+        return true;
+    }
+
     private string Key(string hash, BlobTransferDirection direction)
     {
         ArgumentNullException.ThrowIfNull(hash);
@@ -177,6 +213,20 @@ public sealed class BlobTransferManager
         if (_cache is ManagedBlobCache pinned) await pinned.UnpinAsync(sha256, key, cancellationToken).ConfigureAwait(false);
         Notify();
         return true;
+    }
+
+    /// <summary>After a host restores credentials, resumes only a credential-waiting job. A concurrent pause/cancel is preserved.</summary>
+    public async Task<bool> ResumeCredentialWaitAsync(string sha256, BlobTransferDirection direction, CancellationToken cancellationToken = default)
+    {
+        var key = Key(sha256, direction);
+        while (await _store.ReadAsync(key, cancellationToken).ConfigureAwait(false) is { } record)
+        {
+            var job = Decode(record);
+            if (job.State != BlobTransferState.WaitingForCredentials) return false;
+            if (await _store.TryWriteAsync([new(key, record.Revision, Encode(job with { State = BlobTransferState.Queued, NextAttemptUtc = null, ErrorCode = null }))], cancellationToken: cancellationToken).ConfigureAwait(false))
+            { Notify(); return true; }
+        }
+        return false;
     }
 
     /// <summary>Pauses, cancels or resumes a job. Cancellation never claims to undo a committed upload.</summary>

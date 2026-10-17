@@ -27,6 +27,63 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
 
     [Theory]
     [MemberData(nameof(Browsers))]
+    public async Task Published020StorePreservesPreparedWorkAndUnknownFields(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var name = Unique("published-020");
+        var fixtureJson = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "indexeddb-0.2.0.json"));
+        var records = await page.Page.EvaluateAsync<string>("""
+            async ([name, json]) => {
+                const fixture = JSON.parse(json);
+                const db = await new Promise((resolve, reject) => {
+                    const request = indexedDB.open(name, fixture.schema);
+                    request.onupgradeneeded = () => {
+                        for (const source of fixture.stores) {
+                            const store = request.result.createObjectStore(source.name, { keyPath: source.keyPath, autoIncrement: source.autoIncrement });
+                            for (const index of source.indexes) store.createIndex(index.name, index.keyPath, { unique: index.unique, multiEntry: index.multiEntry });
+                            for (const value of source.values) store.put(value);
+                        }
+                    };
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+                db.close();
+                return JSON.stringify(fixture.stores.find(store => store.name === 'records').values);
+            }
+            """, new[] { name, fixtureJson });
+        Assert.Equal("ok", await page.CallAsync("PublishedMigration", name, records));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task EncryptedBlobPartialsSurviveReloadAndRotateWithoutPlaintextStorage(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var account = Unique("encrypted-blobs");
+        Assert.Equal("ok", await page.CallAsync("EncryptedBlobChecks", account, false));
+        await page.Page.CloseAsync();
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("EncryptedBlobChecks", account, true));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task BlobEncryptionInteroperatesWithNativeAesGcm(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var crypto = new Bsync.Blobs.PlatformBlobEncryption();
+        var key = Enumerable.Repeat((byte)7, 32).ToArray();
+        var aad = new byte[] { 1, 2, 3 }; var bytes = new byte[] { 4, 5, 6, 7 };
+        var encrypted = await crypto.SealAsync(key, bytes, aad);
+        var result = await page.CallAsync("BlobCryptoInterop", Convert.ToBase64String(encrypted));
+        Assert.Equal(bytes, await crypto.OpenAsync(key, Convert.FromBase64String(result), aad));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
     public async Task SharedAccountReadersExcludeDeletionUntilAllTabsClose(string browser)
     {
         var (context, first) = await NewDeviceAsync(browser);

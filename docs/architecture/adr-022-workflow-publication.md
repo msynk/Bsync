@@ -69,5 +69,25 @@ in that same transaction. All domain writers must follow the feed-before-domain 
 writers until commit, so no concurrent change can fall into a snapshot/catch-up gap. It reconciles absent/deleted tasks
 and attachment changes, but is not an online large-feed rebuild or a per-user membership projector. Rollback tests inject
 a failure after the first projection and verify that both feed and outbox remain unchanged; retry completes the repair.
-Membership-aware projection samples, lag metrics and production execution-strategy integration remain open. Never
-call ReplaceScopeAsync with an incomplete snapshot.
+Never call ReplaceScopeAsync with an incomplete snapshot.
+
+`TaskApiPublication` is the explicit EF Core create recipe: the execution strategy retries the entire delegate with
+a fresh connection/context/transaction, acquires the task feed lock before domain rows, calls SaveChanges, then
+publishes the canonical projection in that transaction. It notifies only after the strategy returns committed state.
+A stable creation ID recognizes a lost commit reply only while the actor, title and initial revision still match;
+reusing that ID after another update returns a conflict. This limited create replay contract is not a general command
+ledger. SQL Server tests inject retryable failures before commit and after commit, and verify rollback, one domain
+effect and one feed version. Intent handlers retain their separate command ledger for longer replay horizons.
+
+`TaskAudiencePublication` is an optional explicitly registered read-only projection over Tasks plus TaskReaders ACLs.
+Readers come from server-owned rows; client writes to the audience feed are refused. Every participating domain or ACL
+writer acquires task feed, then audience feed, then domain/ACL rows. After SaveChanges it publishes each affected ID
+in the same transaction and notifies after commit. Register this path in every relevant writer (including raw SQL and
+bulk jobs); the sample does not install an interceptor or silently enable a second feed in the default application.
+Its bounded complete repair locks both feeds through the snapshot/replacement boundary, including removed readers
+and hard deletions. There is no catch-up gap because participating writers cannot commit within that boundary.
+Rollback, competing ACL writers and repair are tested. Online large-feed rebuild remains a separate design problem.
+
+Direct Get/List reads now enforce persisted reader membership in the in-memory, SQL Server and PostgreSQL authorities,
+as pull already did. Membership filtering precedes page limits, and additional CanRead policy still applies. Anonymous,
+invalid, differently cased or trailing-space principals cannot borrow another principal's membership.

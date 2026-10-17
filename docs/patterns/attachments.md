@@ -127,3 +127,21 @@ on a second device, also offline after a reload) in Chromium, Firefox and WebKit
 `HttpBlobTransfer` records `bsync.blob.bytes` and `bsync.blob.transfers` on the `Bsync` meter; the routes record
 `bsync.server.blob.bytes` and `bsync.server.blob.requests` on the `Bsync.Server` meter
 ([observability](../operations/observability.md)).
+# Credential-isolated download tickets (unreleased)
+
+Set `HttpBlobTransferOptions.DownloadTickets = true` against a supporting server to request an authenticated
+`GET {prefix}/{sha256}/download` ticket. A schema-1 JSON response contains a presigned `downloadUrl`, or null for a
+credentialed `?proxy=1` read through the authority. Tickets are not cached or persisted. Presigned requests use
+`DirectClient`, which must have no application authorization headers, credential handlers or application cookies.
+The default direct client has no application pipeline. A 401/403 from that client refreshes the ticket once; a second
+refusal leaves durable progress and fails. Range offset/length and final hash remain verified. Use HTTPS in deployment.
+
+This option defaults off for compatibility. An opted-in client fails against a missing/newer ticket endpoint, without
+falling back to credentialed automatic redirects. Legacy clients still use the old redirect route; their HTTP pipeline
+must be reviewed before use with a third-party bucket. The Tasks browser sample opts into tickets.
+
+After successful credential renewal, call `ResumeCredentialWaitAsync(hash, direction)` for the selected pending jobs.
+It resumes only credential-waiting work with a conditional metadata update; a concurrent pause/cancel remains intact.
+Do not call it repeatedly under the same expired credentials. The Tasks sample checks each local prerequisite once per
+successful sign-in lifetime, displays credential-required uploads explicitly, and retains local bytes for offline viewing.
+Its explicit Download button now enqueues/retries a durable download job and retains partial progress on failure.

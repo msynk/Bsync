@@ -10,6 +10,7 @@
   <Folder Name="/Samples/">
     <Project Path="Samples/Bsync.Demo/Bsync.Demo.csproj" />
     <Project Path="Samples/Bsync.Samples.Hybrid.Wpf/Bsync.Samples.Hybrid.Wpf.csproj" />
+    <Project Path="Samples/Bsync.Samples.NativeBackground/Bsync.Samples.NativeBackground.csproj" />
     <Project Path="Samples/Bsync.Samples.Notes.Client/Bsync.Samples.Notes.Client.csproj" />
     <Project Path="Samples/Bsync.Samples.Notes.Server/Bsync.Samples.Notes.Server.csproj" />
     <Project Path="Samples/Bsync.Samples.Shared/Bsync.Samples.Shared.csproj" />

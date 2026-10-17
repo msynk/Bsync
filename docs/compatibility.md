@@ -1,6 +1,6 @@
 # Compatibility policy and migration notes
 
-## Offline orchestration additions (unreleased)
+## 0.4.0 (unreleased) - Offline orchestration additions
 
 New account lifecycle, orchestration stores, transfer/cache/package managers, workflow/background/read-model contracts and the
 SQL Server publication-lock method are additive. Existing session opens still construct transports normally;
@@ -287,3 +287,23 @@ The sections below describe changes made before the first published release; all
 
 The 18 original tests are kept. One assertion changed: `ConflictHandlerTests.LastWriteWins_PrefersTheNewerTimestamp`
 now expects `KeepFork` instead of `UseResolved` for a newer fork.
+## Unreleased optional encrypted blobs and download tickets
+
+Encrypted blob metadata/envelopes use independent schema 1. They preserve plaintext SHA-256 wire identities and require
+an explicit separate-cache migration; old clients cannot read the new local cache. Copy/verify all protected objects,
+retain the source until the host switches bindings, and retain old keys until every object rotates. See ADR-025.
+`DownloadTickets` is opt-in: its schema-1 endpoint is additive, old clients keep existing blob routes, and an opted-in
+client against an old server refuses an unsupported route without a redirect fallback. No document sync wire changed.
+
+The Tasks sample now namespaces local replicas/blobs by server, tenant and user. Its former user-only sample databases
+are preserved but are not silently adopted: their tenant cannot be established from their names. Export pending work
+under the old app/account and explicitly import it into the verified target account before removing legacy storage.
+
+
+## Reader membership on direct reads (unreleased fix)
+
+GetAsync and ListAsync now enforce persisted reader membership whenever PrincipalKey is configured, in all three
+authorities. Earlier direct reads applied CanRead but omitted membership. Applications using reader membership must
+upgrade their server; scope checks and optional CanRead still apply. Page limits are applied after the membership filter.
+This changes authorization behavior without a wire or store-schema change. Tests cover revocation, tombstones, anonymous
+callers and ordinal principal identity. Do not rely on an omitted CanRead hook to bypass membership.

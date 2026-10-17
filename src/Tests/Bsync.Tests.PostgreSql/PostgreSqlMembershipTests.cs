@@ -17,6 +17,13 @@ public sealed class PostgreSqlMembershipTests(ITestOutputHelper output) : IAsync
 {
     private PostgresDatabase _database = null!;
 
+    [Fact]
+    public async Task DirectReadsApplyMembershipBeforePaginationAndRespectRevocation()
+    {
+        await using var authority = await AuthorityAsync();
+        await MembershipReadContract.VerifyAsync(authority, authority);
+    }
+
     public async Task InitializeAsync() => _database = await PostgresDatabase.CreateAsync();
 
     public async Task DisposeAsync() => await _database.DisposeAsync();

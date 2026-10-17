@@ -14,7 +14,7 @@ namespace Bsync.Tests.BrowserHost;
 /// Entry points the Playwright tests call with <c>DotNet.invokeMethodAsync("Bsync.Tests.BrowserHost", ...)</c>.
 /// Every method returns JSON text so no reflection-based serialization is needed in the trimmed app.
 /// </summary>
-public static class Harness
+public static partial class Harness
 {
     private const string Assembly = "Bsync.Tests.BrowserHost";
 
@@ -26,6 +26,72 @@ public static class Harness
     private static Stream? _managedReader;
     private static Bsync.Blobs.PackageSnapshot? _managedSnapshot;
     private static readonly List<IAsyncDisposable> AccountLocks = [];
+
+    [JSInvokable(nameof(EncryptedBlobChecks))]
+    public static async Task<string> EncryptedBlobChecks(string accountName, bool reopened)
+    {
+        var account = new Bsync.Client.AccountScope("tests", "browser", accountName);
+        await using var metadata = await IndexedDbOrchestrationStore.OpenAsync(_js, account);
+        await using var locks = await Bsync.Blazor.Blobs.BrowserBlobCacheLock.OpenAsync(_js, account);
+        await using var crypto = await Bsync.Blazor.Blobs.BrowserBlobEncryption.OpenAsync(_js);
+        var backing = await Bsync.Blazor.Blobs.BrowserBlobStore.OpenAsync(_js, account.StorageKey);
+        var keys = new BlobTestKeys();
+        Bsync.Blobs.EncryptedBlobCache Cache(int version) => new(backing, metadata, locks, keys, new(account, "blobs", version), crypto);
+        var bytes = System.Text.Encoding.UTF8.GetBytes("Private content survives an offline browser restart.");
+        var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+        var cache = Cache(1);
+        if (!reopened)
+        {
+            await cache.AppendPartialAsync(hash, bytes.AsMemory(0, 11));
+            if (await cache.PartialLengthAsync(hash) != 11) throw new Exception("Partial not committed.");
+        }
+        else
+        {
+            if (await cache.PartialLengthAsync(hash) != 11) throw new Exception("Partial did not survive reload.");
+            await cache.AppendPartialAsync(hash, bytes.AsMemory(11));
+            if (!await cache.CompletePartialAsync(hash)) throw new Exception("Completion failed.");
+            keys.Wrong = true;
+            try { await cache.OpenReadAsync(hash); throw new Exception("Wrong key exposed content."); }
+            catch (System.Security.Cryptography.CryptographicException) { }
+            keys.Wrong = false;
+            await Cache(2).RotateAsync(hash);
+            keys.MinimumVersion = 2;
+            cache = Cache(2);
+            await using var stream = await cache.OpenReadAsync(hash);
+            stream!.Position = 8;
+            var range = new byte[13]; await stream.ReadExactlyAsync(range);
+            if (!range.AsSpan().SequenceEqual(bytes.AsSpan(8, 13))) throw new Exception("Range mismatch.");
+            await cache.ReconcileAsync();
+            if (await cache.GetStoredBytesAsync() != bytes.Length + 28) throw new Exception("Orphan envelopes not reclaimed.");
+            if ((await cache.ListAsync()).Single() != hash) throw new Exception("Plaintext identity changed.");
+        }
+        foreach (var cipherHash in await backing.ListAsync())
+        {
+            await using var encrypted = await backing.OpenReadAsync(cipherHash);
+            using var output = new MemoryStream(); await encrypted!.CopyToAsync(output);
+            if (System.Text.Encoding.UTF8.GetString(output.ToArray()).Contains("Private content", StringComparison.Ordinal)) throw new Exception("Plaintext reached IndexedDB.");
+        }
+        return "ok";
+    }
+
+    [JSInvokable(nameof(BlobCryptoInterop))]
+    public static async Task<string> BlobCryptoInterop(string envelopeBase64)
+    {
+        await using var crypto = await Bsync.Blazor.Blobs.BrowserBlobEncryption.OpenAsync(_js);
+        var key = Enumerable.Repeat((byte)7, 32).ToArray();
+        var aad = new byte[] { 1, 2, 3 };
+        var bytes = await crypto.OpenAsync(key, Convert.FromBase64String(envelopeBase64), aad);
+        if (!bytes.AsSpan().SequenceEqual(new byte[] { 4, 5, 6, 7 })) throw new Exception("Native/Web Crypto mismatch.");
+        return Convert.ToBase64String(await crypto.SealAsync(key, bytes, aad));
+    }
+
+    private sealed class BlobTestKeys : Bsync.Client.ILocalKeyProvider
+    {
+        public bool Wrong; public int MinimumVersion = 1;
+        public ValueTask<Bsync.Client.LocalKeyAccess> AcquireAsync(Bsync.Client.LocalKeyReference reference, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(reference.Version < MinimumVersion ? Bsync.Client.LocalKeyAccess.Unavailable(reference) :
+                Bsync.Client.LocalKeyAccess.Available(reference, Enumerable.Repeat((byte)(Wrong ? 99 : reference.Version), 32).ToArray()));
+    }
 
     [JSInvokable(nameof(AccountResourceCheck))]
     public static async Task<string> AccountResourceCheck(string accountName, bool exclusive, bool hold)

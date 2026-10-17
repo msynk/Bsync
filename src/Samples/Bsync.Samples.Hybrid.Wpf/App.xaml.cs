@@ -28,6 +28,7 @@ public partial class App : Application
 
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
+        services.AddSingleton<IContentLibraryFactory>(new NativeContentLibraryFactory(Settings.DataDirectory));
         services.AddLocalSyncCollection<Note>(_ => new SyncSessionOptions<Note>
         {
             Host = "native",
