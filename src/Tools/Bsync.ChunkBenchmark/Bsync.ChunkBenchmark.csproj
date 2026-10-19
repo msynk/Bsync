@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PublishAot)' == 'true' Or '$(PublishSingleFile)' == 'true'">
+    <DefineConstants>$(DefineConstants);BSYNC_EMBEDDED_ASSEMBLIES</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(BsyncPackageVersion)' != ''">
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)../../Tests/PackageConsumers/NuGet.Config</RestoreConfigFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" Condition="'$(BsyncPackageVersion)' == ''" />
+    <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" Condition="'$(BsyncPackageVersion)' != ''" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+</Project>

@@ -43,13 +43,14 @@ internal sealed class SessionTransport<T> : ISyncTransport<T>
         await drained.ConfigureAwait(false);
     }
 
-    private CancellationTokenSource Link(CancellationToken token)
+    private CancellationTokenSource Link(CancellationToken token, out IDisposable cause)
     {
         lock (_gate)
         {
             _stopped.ThrowIfCancellationRequested();
             if (!_accepting) throw new InvalidOperationException("Network replication is suspended for this session.");
             var linked = CancellationTokenSource.CreateLinkedTokenSource(_stopped, _network.Token, token);
+            cause = CooperativeDeadline.TrackLinkedToken(linked.Token, token, additionalCaller: _stopped, additionalCaller2: _network.Token);
             if (_running++ == 0) _drained = new(TaskCreationOptions.RunContinuationsAsynchronously);
             return linked;
         }
@@ -62,21 +63,24 @@ internal sealed class SessionTransport<T> : ISyncTransport<T>
 
     public async Task<PullResult<T>> PullAsync(PullRequest request, CancellationToken cancellationToken = default)
     {
-        using var linked = Link(cancellationToken);
+        using var linked = Link(cancellationToken, out var observation);
+        using var cause = observation;
         try { return await _inner.Value.PullAsync(request, linked.Token).ConfigureAwait(false); }
         finally { End(); }
     }
 
     public async Task<PushResult<T>> PushAsync(PushRequest<T> request, CancellationToken cancellationToken = default)
     {
-        using var linked = Link(cancellationToken);
+        using var linked = Link(cancellationToken, out var observation);
+        using var cause = observation;
         try { return await _inner.Value.PushAsync(request, linked.Token).ConfigureAwait(false); }
         finally { End(); }
     }
 
     public async IAsyncEnumerable<StreamEvent<T>> StreamAsync(Checkpoint since, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        using var linked = Link(cancellationToken);
+        using var linked = Link(cancellationToken, out var observation);
+        using var cause = observation;
         try { await foreach (var item in _inner.Value.StreamAsync(since, linked.Token).ConfigureAwait(false)) yield return item; }
         finally { End(); }
     }

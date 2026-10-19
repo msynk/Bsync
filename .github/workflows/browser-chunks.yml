@@ -1,0 +1,53 @@
+name: Optional browser chunk qualification
+on:
+  workflow_dispatch:
+    inputs:
+      probe_webkit_1gib:
+        description: Also probe 1 GiB beyond the recorded 256 MiB WebKit workload ceiling
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  browser-chunks:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        aot: ['false', 'true']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install wasm-tools
+      - name: Pack and publish exact consumer
+        shell: pwsh
+        run: |
+          $suffix = 'browser.${{ github.run_id }}.${{ github.run_attempt }}'
+          foreach ($package in @('Bsync', 'Bsync.Blazor')) {
+            dotnet pack "src/Bsync/$package" -c Release -o artifacts/packages -p:VersionSuffix=$suffix
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Browser -c Release -p:BsyncPackageVersion=0.5.0-$suffix -p:RunAOTCompilation=${{ matrix.aot }} -p:IntermediateOutputPath=obj/qualification/ -p:OutputPath=bin/qualification/ -o artifacts/browser-host
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/Tools/Bsync.BrowserQualification -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pwsh src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/playwright.ps1 install chromium firefox webkit
+      - name: Qualify declared sizes in fresh engines
+        shell: pwsh
+        run: |
+          dotnet src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/Bsync.BrowserQualification.dll artifacts/browser-host/wwwroot artifacts/browser-results/chromium-firefox 1,16,17,256,1024 --persistent --engines=chromium,firefox
+          $qualificationFailed = $LASTEXITCODE -ne 0
+          $webkitSizes = '1,16,17,256'
+          if ('${{ inputs.probe_webkit_1gib }}' -eq 'true') { $webkitSizes += ',1024' }
+          dotnet src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/Bsync.BrowserQualification.dll artifacts/browser-host/wwwroot artifacts/browser-results/webkit $webkitSizes --persistent --engines=webkit
+          if ($qualificationFailed -or $LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-chunks-aot-${{ matrix.aot }}
+          path: |
+            artifacts/browser-results/**
+            artifacts/packages/**

@@ -8,6 +8,55 @@ namespace Bsync.Tests;
 public sealed class OrchestrationProcessKillTests
 {
     [Theory]
+    [InlineData("before")]
+    [InlineData("after")]
+    public async Task RepairSurvivesProcessDeathAroundPromotionWithoutLosingPins(string boundary)
+    {
+        var directory = Directory.CreateTempSubdirectory("bsync-repair-kill-").FullName;
+        var path = Path.Combine(directory, "metadata.db");
+        var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { Path.Combine(AppContext.BaseDirectory, "Bsync.Tests.CrashHost.dll"), "blob-repair", path, boundary }) start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)!;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            var line = await process.StandardOutput.ReadLineAsync(timeout.Token);
+            if (line is null) Assert.Fail("Crash host exited early: " + await process.StandardError.ReadToEndAsync(timeout.Token));
+            Assert.Equal("repair-boundary", line);
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(timeout.Token);
+            var time = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(DateTimeOffset.UtcNow.AddMinutes(1));
+            await using var metadata = await SqliteOrchestrationStore.OpenAsync(path, new("crash", "test", "account"), timeProvider: time);
+            var locks = new FileBlobCacheLock(path + ".locks");
+            var cache = new ManagedBlobCache(new FileBlobCache(path + ".blobs"), metadata, locks, 100, 100);
+            var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3, 4 }));
+            await using (var released = await cache.AcquireTransferAsync(hash, timeout.Token)) { }
+            using var http = new HttpClient(new NoRepairRequest()) { BaseAddress = new("https://repair.test/") };
+            var transfers = new BlobTransferManager(metadata, cache, new(http), new() { TimeProvider = time });
+            Assert.Equal(BlobRepairState.Promoting, (await transfers.GetRepairAsync(hash))!.State);
+            Assert.Equal(boundary == "after" ? new byte[] { 1, 2, 3, 4 } : [9, 9, 9, 9],
+                await File.ReadAllBytesAsync(Path.Combine(path + ".blobs", "objects", hash[..2], hash), timeout.Token));
+            var owners = (await cache.GetEntryAsync(hash)).Owners;
+            var packages = new OfflinePackageManager(metadata, cache, transfers, locks, (_, _) => Task.FromResult(true), time);
+            Assert.Equal(OfflinePackageReadiness.ReadyFreshnessUnknown, (await packages.PrepareAsync("manual", TimeSpan.FromSeconds(10), timeout.Token)).Readiness);
+            Assert.Equal(BlobRepairState.Completed, (await transfers.GetRepairAsync(hash))!.State);
+            Assert.Equal(BlobTransferState.Complete, (await transfers.GetAsync(hash, BlobTransferDirection.Download))!.State);
+            Assert.Equal(owners.Order(), (await cache.GetEntryAsync(hash)).Owners.Order());
+        }
+        finally
+        {
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); }
+            await SqliteStorePool.DeleteDatabaseAsync(path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    private sealed class NoRepairRequest : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new Exception("Verified staging or promoted bytes should recover without another request.");
+    }
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     public async Task WorkflowResumesAfterProcessDeathBetweenEffectAndProgressCommit(int killedStep)

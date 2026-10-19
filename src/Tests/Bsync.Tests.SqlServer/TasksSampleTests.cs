@@ -5,6 +5,8 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using Bsync.Blobs;
 using Bsync.Client;
+using Bsync.Protocol;
+using Bsync.Transport;
 using Bsync.Samples.Tasks;
 using Bsync.Samples.Tasks.Console;
 using Bsync.Samples.Tasks.Server;
@@ -102,6 +104,48 @@ public sealed class TasksSampleTests : IAsyncLifetime
         Assert.Contains(await alice.Tasks.QueryAsync(), t => t.Id == "t3");
         Assert.Empty(await eve.Tasks.QueryAsync());
         Assert.Equal(2, await _database.ScalarAsync("SELECT count(*) FROM dbo.Tasks WHERE Tenant = 'team-1'"));
+    }
+
+    [Fact]
+    public async Task ConcurrentRestAndSyncCreationKeepOneCanonicalDomainEffect()
+    {
+        var address = FreeAddress();
+        await using var server = await StartServerAsync(address);
+        await server.StartAsync();
+        using var api = await SignedInAsync(address, "manager", "team-1");
+        using var syncHttp = await SignedInAsync(address, "alice", "team-1");
+        var transport = new HttpSyncTransport<TaskDocument>(syncHttp,
+            new() { Collection = TasksJson.Collection, SchemaId = TasksJson.SchemaId }, SyncJsonTypes<TaskDocument>.From(TasksJson.Default));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        var races = Enumerable.Range(0, 12).Select(async index =>
+        {
+            var id = $"race-{index}";
+            var apiWrite = api.PostAsJsonAsync("api/tasks", new NewTask(id, "API"), TasksJson.Default.NewTask, timeout.Token);
+            PushRequest<TaskDocument> Request() => new([new($"sync-{index}", id, null, new TaskDocument { Id = id, Title = "Sync" })]);
+            var syncWrite = transport.PushAsync(Request(), timeout.Token);
+            await Task.WhenAll(apiWrite, syncWrite);
+            using var response = await apiWrite;
+            var outcome = (await syncWrite).Outcomes.Single();
+            Assert.True((response.StatusCode == HttpStatusCode.Created && outcome.Kind == PushOutcomeKind.Conflict) ||
+                (response.StatusCode == HttpStatusCode.Conflict && outcome.Kind == PushOutcomeKind.Accepted));
+            var replay = (await transport.PushAsync(Request(), timeout.Token)).Outcomes.Single();
+            Assert.True(replay.IsDuplicate);
+            Assert.Equal(outcome.Kind, replay.Kind);
+            Assert.Equal(outcome.Version, replay.Version);
+        });
+        await Task.WhenAll(races);
+        var page = await transport.PullAsync(new(Checkpoint.Start, 100), timeout.Token);
+        Assert.Equal(12, page.Changes.Count);
+        Assert.All(page.Changes, item => Assert.Equal(1, item.Document.Revision));
+        Assert.Equal(12, await _database.ScalarAsync("SELECT COUNT(*) FROM dbo.Tasks WHERE Revision=1"));
+        await using var db = TasksDb.Open(_database.ConnectionString);
+        foreach (var change in page.Changes)
+        {
+            var row = await db.Tasks.FindAsync("team-1", change.Document.Id);
+            Assert.Equal(row!.Title, change.Document.Title);
+            Assert.Equal(row.Slug, change.Document.Slug);
+            Assert.Equal(row.Title == "API" ? "manager" : "alice", row.ChangedBy);
+        }
     }
 
     [Fact(DisplayName = "F3 I01 I16 I19: an intent stays pending across a restart, executes once despite a lost response, waits for its task, and a rejection keeps its code")]

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-ios</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <RuntimeIdentifier>ios-arm64</RuntimeIdentifier>
+    <ApplicationId>com.bsync.samples.headless</ApplicationId>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Bsync.Samples.NativeBackground/*.cs" Link="Runtime/%(Filename)%(Extension)" />
+    <ProjectReference Include="../../Bsync/Bsync/Bsync.csproj" />
+    <ProjectReference Include="../../Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+</Project>

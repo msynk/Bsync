@@ -13,6 +13,9 @@ namespace Bsync.Samples.Tasks.Server;
 /// </summary>
 public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> tasks) : ISyncWriteHandler<TaskIntent>
 {
+    /// <summary>Optional dependency; participating hosts register the same projection on API and task writers.</summary>
+    public TaskAudienceProjection? AudienceProjection { get; init; }
+
     public async ValueTask<SyncWriteDecision<TaskIntent>> HandleAsync(SyncWriteContext<TaskIntent> write, CancellationToken cancellationToken)
     {
         var intent = write.Submitted;
@@ -32,8 +35,10 @@ public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> task
 
         await using var db = TasksDb.Enlist(write.Connection!, write.Transaction!);
         var tenant = write.Caller.Scope;
-        // Global order in this sample: intent feed, task feed, domain rows. Ordinary task writes start at task feed.
+        // Global order: intent feed, task feed, optional audience feed, ledger/domain rows.
         await tasks.AcquirePublicationLockAsync(tenant, write.Transaction!, cancellationToken);
+        if (AudienceProjection is not null)
+            await AudienceProjection.AcquireLockAsync(tenant, write.Transaction!, cancellationToken);
         var fingerprint = IntentLedger.Fingerprint(intent, write.Caller.Principal.FindFirst("sub")?.Value);
         var prior = await IntentLedger.ReadAsync(write, cancellationToken);
         if (prior.Found)
@@ -92,6 +97,8 @@ public sealed class IntentWriteHandler(SqlServerSyncAuthority<TaskDocument> task
         await db.SaveChangesAsync(cancellationToken);
         var attachments = await db.TaskAttachments.Where(a => a.Tenant == tenant && a.TaskId == row.Id).ToListAsync(cancellationToken);
         await tasks.UpsertAsync(tenant, row.ToDocument(attachments), write.Transaction, cancellationToken);
+        if (AudienceProjection is not null)
+            await AudienceProjection.PublishAsync(write.Connection!, write.Transaction!, tenant, row.Id, cancellationToken);
 
         intent.State = IntentStates.Executed;
         intent.ExecutedBy = row.ChangedBy;

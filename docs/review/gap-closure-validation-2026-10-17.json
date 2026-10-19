@@ -1,0 +1,334 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "baseline_commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+  "working_tree_dirty": true,
+  "qualification": "partial M0/M1 development evidence; not a release",
+  "environment": {
+    "os": "Windows 10 x64 10.0.19045",
+    "sdk": "10.0.401",
+    "runtime": "10.0.12"
+  },
+  "tests": [
+    {
+      "path": "artifacts/gap-closure/baseline/gap-closure-baseline.trx",
+      "sha256": "51d124f51924afc9579d248004cd3d8acacb4eed79bb21eb1a10951764167a86",
+      "outcome": "Completed",
+      "counters": {
+        "total": "740",
+        "executed": "740",
+        "passed": "740",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/baseline/published-040.trx",
+      "sha256": "fc8417a67b53ebab583d65a65c6c5e3dfc8a3d6c05e814f25678f92e07161e94",
+      "outcome": "Failed",
+      "counters": {
+        "total": "58",
+        "executed": "58",
+        "passed": "56",
+        "failed": "2",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/baseline/repair-before.trx",
+      "sha256": "f03aac756ba39c50350000964e9369731b5ddd3b0a21ec5dee6762e6c13f1286",
+      "outcome": "Failed",
+      "counters": {
+        "total": "3",
+        "executed": "3",
+        "passed": "1",
+        "failed": "2",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/browser-recovery.trx",
+      "sha256": "cf0d0f839e64c822c606048e56a6d51ec9f64c0af77b675650ee7e2e535adbdb",
+      "outcome": "Failed",
+      "counters": {
+        "total": "66",
+        "executed": "66",
+        "passed": "66",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/core-recovery.trx",
+      "sha256": "fdda97a27a2ca4c1a0726b12a297ce4c7886611c76b64bfc457843722975c639",
+      "outcome": "Completed",
+      "counters": {
+        "total": "753",
+        "executed": "753",
+        "passed": "753",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/package-browser-recovery.trx",
+      "sha256": "d70347b4b6c045350a1f97949f4a15afdeda009add09f7a0faf503846333cecd",
+      "outcome": "Completed",
+      "counters": {
+        "total": "3",
+        "executed": "3",
+        "passed": "3",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/package-recovery.trx",
+      "sha256": "5dfbe3f866124c3adb13908beb01f7ec6503be799acccc3e5910452e0d3bbc36",
+      "outcome": "Completed",
+      "counters": {
+        "total": "58",
+        "executed": "58",
+        "passed": "58",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/recovery-focused.trx",
+      "sha256": "4f523377f91d1bc32bcf65fa9e4b272b49dc5458e0537e65cbca80bd8b3ae888",
+      "outcome": "Completed",
+      "counters": {
+        "total": "44",
+        "executed": "44",
+        "passed": "44",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/repair-cancellation.trx",
+      "sha256": "f073bff1d9fecc8c31f4f0fd15a754cf0f85394b59eb13474994f0f671dc353f",
+      "outcome": "Completed",
+      "counters": {
+        "total": "1",
+        "executed": "1",
+        "passed": "1",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/repair-first.trx",
+      "sha256": "1349ab804be1fd5122833350a095af13a82a913f7c0724efceb6482a27fe1b11",
+      "outcome": "Failed",
+      "counters": {
+        "total": "26",
+        "executed": "26",
+        "passed": "25",
+        "failed": "1",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/browser-recovery-complete.trx",
+      "sha256": "c0354e6a4c19ea3751cac8b0159edb626c142bc435a4c3e35ad06e280d6aff64",
+      "outcome": "Completed",
+      "counters": {
+        "total": "78",
+        "executed": "78",
+        "passed": "78",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    }
+  ],
+  "preview_packages": [
+    {
+      "path": "artifacts/packages/Bsync.0.4.0-gapclosure.20261017.1.nupkg",
+      "sha256": "e262917fec190e39119b064d9b0920f655d6d2333b910c38dc8b24cb790adf99",
+      "consumed_path": "artifacts/package-cache/bsync/0.4.0-gapclosure.20261017.1/bsync.0.4.0-gapclosure.20261017.1.nupkg",
+      "consumed_sha256": "e262917fec190e39119b064d9b0920f655d6d2333b910c38dc8b24cb790adf99"
+    },
+    {
+      "path": "artifacts/packages/Bsync.Blazor.0.4.0-gapclosure.20261017.1.nupkg",
+      "sha256": "42f0b8498c4799b657ddbf460a52e89b67117637379987ccf1ea4f57a8d47a47",
+      "consumed_path": "artifacts/package-cache/bsync.blazor/0.4.0-gapclosure.20261017.1/bsync.blazor.0.4.0-gapclosure.20261017.1.nupkg",
+      "consumed_sha256": "42f0b8498c4799b657ddbf460a52e89b67117637379987ccf1ea4f57a8d47a47"
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.AspNetCore.0.4.0-gapclosure.20261017.1.nupkg",
+      "sha256": "8eeaf0c5ba4550aa88d7e5a32a335795315a67fbca7cf493ac9bf65728e75f31",
+      "consumed_path": "artifacts/package-cache/bsync.server.aspnetcore/0.4.0-gapclosure.20261017.1/bsync.server.aspnetcore.0.4.0-gapclosure.20261017.1.nupkg",
+      "consumed_sha256": "8eeaf0c5ba4550aa88d7e5a32a335795315a67fbca7cf493ac9bf65728e75f31"
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.PostgreSql.0.4.0-gapclosure.20261017.1.nupkg",
+      "sha256": "d65440bd040234d54ca28119a392b5dfbc9a2ec5179dc6dca4dfb18115b909a1",
+      "consumed_path": "artifacts/package-cache/bsync.server.postgresql/0.4.0-gapclosure.20261017.1/bsync.server.postgresql.0.4.0-gapclosure.20261017.1.nupkg",
+      "consumed_sha256": "d65440bd040234d54ca28119a392b5dfbc9a2ec5179dc6dca4dfb18115b909a1"
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.SqlServer.0.4.0-gapclosure.20261017.1.nupkg",
+      "sha256": "c748d2b10d0cf00e67d1797a2a2f87dacc0c560cbb1a4dce656159d6f1a35168",
+      "consumed_path": "artifacts/package-cache/bsync.server.sqlserver/0.4.0-gapclosure.20261017.1/bsync.server.sqlserver.0.4.0-gapclosure.20261017.1.nupkg",
+      "consumed_sha256": "c748d2b10d0cf00e67d1797a2a2f87dacc0c560cbb1a4dce656159d6f1a35168"
+    },
+    {
+      "path": "artifacts/packages/Bsync.Storage.Sqlite.0.4.0-gapclosure.20261017.1.nupkg",
+      "sha256": "143b6148aa1ecf3e4a8387686b4bcb2745b5973a3e5b919a6c59b4e8de7d0f18",
+      "consumed_path": "artifacts/package-cache/bsync.storage.sqlite/0.4.0-gapclosure.20261017.1/bsync.storage.sqlite.0.4.0-gapclosure.20261017.1.nupkg",
+      "consumed_sha256": "143b6148aa1ecf3e4a8387686b4bcb2745b5973a3e5b919a6c59b4e8de7d0f18"
+    }
+  ],
+  "notes": [
+    "Published baseline had two expected repair regression failures.",
+    "Initial focused run had an exception-type regression, corrected before passing focused/core runs.",
+    "browser-recovery.trx was interrupted by the agent after 66 passing cases; it is not a completed qualification run.",
+    "New packaged browser repair cases passed all three engines.",
+    "Core 753-case run plus a later separately passing cancellation test: 754 distinct cases; no claim of a single 754-case run.",
+    "Symbol verifier: 6 pairs and 187 embedded checksums; no remote-source verification.",
+    "Release tooling unit tests: 9 passed; packaged symbol fault tests: 5 passed.",
+    "Full published-state fixture capture, devices, real object stores, new encrypted format, and ten designated qualification runs remain open.",
+    "Completed source browser rerun: 78 passed, zero skipped; Chromium/Firefox/WebKit engines, not physical devices."
+  ],
+  "artifact_checks": [
+    {
+      "path": "artifacts/packages/provenance.json",
+      "sha256": "fa5003e3dccdefd4c5622917c97b3bab1303cefe5a9765baa1ac9d1653db1d23"
+    },
+    {
+      "path": "artifacts/packages/symbols-verification.json",
+      "sha256": "15558f1ab23c0aebb4dd594a322a2a8bb062946e33f5c255c43a716b9266368c"
+    },
+    {
+      "path": "artifacts/gap-closure/release-tool-tests.log",
+      "sha256": "a9750257347a6e23fecf2f90f38797598ca72ca15035fe43fdc167840ce0b1dc"
+    },
+    {
+      "path": "artifacts/gap-closure/symbol-verifier-tests.log",
+      "sha256": "40b963af0f5a881cade69c0866936ef33bd1859f31682421ad4c116df66e53a7"
+    }
+  ]
+}

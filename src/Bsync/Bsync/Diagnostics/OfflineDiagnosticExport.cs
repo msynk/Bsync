@@ -23,6 +23,7 @@ public static class OfflineDiagnosticExport
     /// Scans at most 10000 records from the supplied account store/catalog. Omits account/content identities, endpoint
     /// URLs, pin owners, source versions, payloads, error text and credentials, including unknown feature records.
     /// Enumeration is live; stop writers for a settled report. It performs no network or blob verification.
+    /// Chunk journal classification adds at most one protection-marker lookup per scanned record, without accessing keys.
     /// </summary>
     public static async Task<OfflineDiagnosticReport> CaptureAsync(IOrchestrationStore store, int recordLimit = 1000,
         CancellationToken cancellationToken = default)
@@ -40,8 +41,23 @@ public static class OfflineDiagnosticExport
             foreach (var record in page)
             {
                 scanned++; after = record.Key;
+                if (record.Key.StartsWith("encrypted-chunk/v2/", StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        var generation = ChunkedEncryptedBlobCache.InventoryGeneration(record.Key);
+                        if (!int.TryParse(record.Payload, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var size) || size is < 28 or > 1048604)
+                        { unsupported++; continue; }
+                        var protectedGeneration = await store.ReadAsync("encrypted-protected/v2/" + generation, cancellationToken).ConfigureAwait(false) is not null;
+                        Add("blob.chunk_reserved_bytes", size);
+                        if (protectedGeneration) Add("blob.quarantined_reserved_bytes", size);
+                    }
+                    catch (Exception error) when (error is InvalidDataException or ArgumentException or OverflowException) { unsupported++; }
+                    continue;
+                }
                 // Unknown namespaces are not parsed: even their names may contain application data.
                 var kind = record.Key.StartsWith("transfers/", StringComparison.Ordinal) ? "transfer"
+                    : record.Key.StartsWith("repair/v1/", StringComparison.Ordinal) ? "repair"
                     : record.Key.StartsWith("cache/", StringComparison.Ordinal) ? "cache"
                     : record.Key.StartsWith("workflow/", StringComparison.Ordinal) ? "workflow"
                     : record.Key.StartsWith("background/", StringComparison.Ordinal) ? "background"
@@ -57,6 +73,11 @@ public static class OfflineDiagnosticExport
                     { unsupported++; continue; }
                     switch (kind)
                     {
+                        case "repair":
+                            var repair = (BlobRepairState)root.GetProperty("State").GetInt32();
+                            if (!Enum.IsDefined(repair)) { unsupported++; break; }
+                            Add("repair." + repair);
+                            break;
                         case "transfer":
                             var state = (BlobTransferState)root.GetProperty("State").GetInt32();
                             if (!Enum.IsDefined(state)) { unsupported++; break; }

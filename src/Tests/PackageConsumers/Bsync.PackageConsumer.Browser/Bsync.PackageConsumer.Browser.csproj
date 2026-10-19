@@ -9,6 +9,8 @@
     <PackageReference Include="Bsync" Version="$(BsyncPackageVersion)" />
     <PackageReference Include="Bsync.Blazor" Version="$(BsyncPackageVersion)" />
     <Compile Include="..\..\Bsync.Tests.BrowserHost\*.cs" Link="%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\Bsync.Tests\Fixtures\chunked-v2-vector.json" LogicalName="chunked-v2-vector.json" />
+    <Compile Include="..\..\Shared\ChunkedFormatVector.cs" Link="ChunkedFormatVector.cs" />
     <Content Include="..\..\Bsync.Tests.BrowserHost\wwwroot\index.html" Link="wwwroot\index.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -12,7 +12,7 @@ namespace Bsync.Samples.Tasks.Server;
 /// disk (<paramref name="partials"/>), because S3 multipart parts must be at least 5 MB and clients send smaller chunks; a
 /// verified upload is written to the bucket once (deduplicated by hash) and its partial file removed. With
 /// <see cref="PresignUploads"/>, clients instead send the whole content to a presigned URL under
-/// <c>{prefix}uploads/</c>, which finishing verifies (reading it back once) and copies to its object. Downloads are
+/// <c>{prefix}uploads/</c>, which finishing reads into a private disk snapshot, verifies and uploads to its object. Downloads are
 /// served by presigned URLs, so the bytes do not pass through the application server. Objects are stored under
 /// <c>{prefix}objects/ab/&lt;sha256&gt;</c>.
 /// </summary>
@@ -35,6 +35,9 @@ public sealed class S3BlobStore(IAmazonS3 s3, string bucket, FileSystemBlobStore
 
     /// <summary>Whether presigned URLs use <c>http</c> (local S3-compatible servers). Default <see langword="false"/>.</summary>
     public bool PresignHttp { get; init; }
+
+    /// <summary>Per-completion plaintext snapshot disk ceiling; hosts must also bound concurrent completions. Default 512 MiB.</summary>
+    public long MaximumStagedBytes { get; init; } = 512L * 1024 * 1024;
 
     /// <inheritdoc />
     public async Task<bool> ExistsAsync(string sha256, CancellationToken cancellationToken = default)
@@ -92,7 +95,9 @@ public sealed class S3BlobStore(IAmazonS3 s3, string bucket, FileSystemBlobStore
 
         if (!await ExistsAsync(sha256, cancellationToken).ConfigureAwait(false))
         {
-            await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = Key(sha256), FilePath = path, ContentType = "application/octet-stream" }, cancellationToken).ConfigureAwait(false);
+            await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = Key(sha256), FilePath = path,
+                ContentType = "application/octet-stream", UseChunkEncoding = false,
+                ChecksumSHA256 = Convert.ToBase64String(Convert.FromHexString(sha256)) }, cancellationToken).ConfigureAwait(false);
         }
 
         File.Delete(path);
@@ -183,23 +188,55 @@ public sealed class S3BlobStore(IAmazonS3 s3, string bucket, FileSystemBlobStore
         }
     }
 
-    /// <summary>Verifies a presigned upload by reading it back, and copies it to its object (unless that exists).</summary>
+    /// <summary>Publishes the exact verified snapshot, never a later copy of the mutable presigned-upload key.</summary>
     private async Task<bool> CompleteStagedAsync(string upload, string sha256, CancellationToken cancellationToken)
     {
-        string actual;
-        using (var response = await s3.GetObjectAsync(bucket, UploadKey(upload), cancellationToken).ConfigureAwait(false))
+        ArgumentOutOfRangeException.ThrowIfLessThan(MaximumStagedBytes, 1);
+        // A still-valid PUT ticket can replace the staging object after verification. A server-side copy by key
+        // would then publish bytes that were never hashed. Keep a private, exclusively opened snapshot instead.
+        var snapshot = partials.UploadFile(upload) + ".verify-" + Guid.NewGuid().ToString("N");
+        var created = false;
+        try
         {
-            actual = Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(response.ResponseStream, cancellationToken).ConfigureAwait(false));
+            await using var file = new FileStream(snapshot, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 81920,
+                FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+            created = true;
+            using (var response = await s3.GetObjectAsync(bucket, UploadKey(upload), cancellationToken).ConfigureAwait(false))
+            {
+                if (response.ContentLength < 0 || response.ContentLength > MaximumStagedBytes)
+                    throw new InvalidDataException("Staged object exceeds the completion snapshot limit.");
+                var buffer = new byte[81920];
+                long copied = 0;
+                while (true)
+                {
+                    var count = await response.ResponseStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                    if (count == 0) break;
+                    copied = checked(copied + count);
+                    if (copied > MaximumStagedBytes || copied > response.ContentLength)
+                        throw new InvalidDataException("Staged object exceeds its declared completion bounds.");
+                    await file.WriteAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
+                }
+                if (copied != response.ContentLength) throw new InvalidDataException("Staged object ended before its declared length.");
+            }
+            file.Position = 0;
+            var actual = Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(file, cancellationToken).ConfigureAwait(false));
+            var verified = string.Equals(actual, sha256, StringComparison.Ordinal);
+            if (verified && !await ExistsAsync(sha256, cancellationToken).ConfigureAwait(false))
+            {
+                file.Position = 0;
+                await s3.PutObjectAsync(new PutObjectRequest
+                {
+                    BucketName = bucket, Key = Key(sha256), InputStream = file,
+                    AutoCloseStream = false, ContentType = "application/octet-stream",
+                    // The snapshot already has a verified digest and known length. Send its checksum in a header,
+                    // avoiding aws-chunked encoding leaking into stored metadata on compatible services.
+                    UseChunkEncoding = false, ChecksumSHA256 = Convert.ToBase64String(Convert.FromHexString(actual))
+                }, cancellationToken).ConfigureAwait(false);
+            }
+            await s3.DeleteObjectAsync(bucket, UploadKey(upload), cancellationToken).ConfigureAwait(false);
+            return verified;
         }
-
-        var verified = string.Equals(actual, sha256, StringComparison.Ordinal);
-        if (verified && !await ExistsAsync(sha256, cancellationToken).ConfigureAwait(false))
-        {
-            await s3.CopyObjectAsync(bucket, UploadKey(upload), bucket, Key(sha256), cancellationToken).ConfigureAwait(false);
-        }
-
-        await s3.DeleteObjectAsync(bucket, UploadKey(upload), cancellationToken).ConfigureAwait(false);
-        return verified;
+        finally { if (created) File.Delete(snapshot); }
     }
 
     /// <summary>The object's stream, disposing the S3 response with it.</summary>

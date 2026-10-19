@@ -1,8 +1,15 @@
 namespace Bsync.Storage;
 
 /// <summary>Reference orchestration store for tests. Not durable; share an instance to model concurrent owners.</summary>
-public sealed class InMemoryOrchestrationStore(TimeProvider? timeProvider = null) : IOrchestrationStore
+public sealed class InMemoryOrchestrationStore(TimeProvider? timeProvider = null) : IOrchestrationFeatureStore
 {
+    /// <inheritdoc />
+    public Task RequireFeatureVersionAsync(int version, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (version is < 1 or > 2) throw new LocalStoreUnavailableException("outdated", "Unsupported feature version.");
+        return Task.CompletedTask; // There is no persistent format to downgrade in this test provider.
+    }
     private readonly Dictionary<string, OrchestrationRecord> _records = new(StringComparer.Ordinal);
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 

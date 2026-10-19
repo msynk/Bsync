@@ -1,0 +1,50 @@
+name: Optional real object-store qualification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  object-store:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pack unique local candidate and build runner
+        shell: pwsh
+        run: |
+          $suffix = "objectstore.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT"
+          foreach ($package in @('Bsync', 'Bsync.Server.AspNetCore')) {
+            dotnet pack "src/Bsync/$package" -c Release -o artifacts/packages "-p:VersionSuffix=$suffix"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $archives = @(Get-ChildItem artifacts/packages -Filter 'Bsync.Server.AspNetCore.*.nupkg')
+          if ($archives.Count -ne 1) { throw 'Expected exactly one server package archive.' }
+          $version = $archives[0].Name.Substring('Bsync.Server.AspNetCore.'.Length) -replace '\.nupkg$', ''
+          dotnet build src/Tools/Bsync.ObjectStoreQualification -c Release "-p:BsyncPackageVersion=$version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/playwright.ps1 install
+          exit $LASTEXITCODE
+      - name: Exercise configured service and browser CORS
+        shell: pwsh
+        env:
+          BSYNC_OBJECTSTORE_ENDPOINT: ${{ vars.BSYNC_OBJECTSTORE_ENDPOINT }}
+          BSYNC_OBJECTSTORE_BUCKET: ${{ vars.BSYNC_OBJECTSTORE_BUCKET }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BSYNC_OBJECTSTORE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BSYNC_OBJECTSTORE_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.BSYNC_OBJECTSTORE_SESSION_TOKEN }}
+        run: dotnet src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/Bsync.ObjectStoreQualification.dll artifacts/objectstore-qualification
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: object-store-evidence
+          path: |
+            artifacts/objectstore-qualification
+            artifacts/packages
+          if-no-files-found: warn

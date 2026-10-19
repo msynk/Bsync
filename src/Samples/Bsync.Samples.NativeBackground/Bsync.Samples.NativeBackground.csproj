@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Bsync/Bsync/Bsync.csproj" />
+    <ProjectReference Include="../../Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" />
   </ItemGroup>
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
     <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.11.2.1" />

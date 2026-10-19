@@ -108,6 +108,7 @@ public sealed class SyncEngine<TDocument>
         ArgumentNullException.ThrowIfNull(cloner);
 
         _options = options ?? new SyncOptions<TDocument>();
+        ArgumentNullException.ThrowIfNull(_options.TimeProvider);
         _options.Validate();
         _store = store;
         _transport = transport;
@@ -175,25 +176,29 @@ public sealed class SyncEngine<TDocument>
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(timeBudget, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxRuns, 1);
-        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        budget.CancelAfter(timeBudget);
+        if (timeBudget == TimeSpan.Zero)
+        {
+            Client.CooperativeDeadline.RecordStop("sync_for", cancellationToken, false, true);
+            cancellationToken.ThrowIfCancellationRequested();
+            return new SyncResult { HasRemainingWork = true };
+        }
+        using var budget = new Client.CooperativeDeadline(timeBudget, _options.TimeProvider, cancellationToken, "sync_for");
         var total = default(SyncResult);
         for (var run = 0; run < maxRuns; run++)
         {
-            SyncResult result;
             try
             {
-                result = await SyncAsync(budget.Token).ConfigureAwait(false);
+                _ = budget.Remaining;
+                var result = await SyncAsync(budget.Token).ConfigureAwait(false);
+                total += result;
+                // Include gate waits and callbacks that return successfully after ignoring cancellation.
+                _ = budget.Remaining;
+                if (!result.HasRemainingWork)
+                    return total with { HasRemainingWork = false };
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && budget.Expired)
             {
                 return total with { HasRemainingWork = true };
-            }
-
-            total += result;
-            if (!result.HasRemainingWork)
-            {
-                return total with { HasRemainingWork = false };
             }
         }
 

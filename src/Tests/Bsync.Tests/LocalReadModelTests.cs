@@ -59,7 +59,7 @@ public sealed class LocalReadModelTests
                 Assert.Empty((await (await model.OpenActiveAsync())!.ReadPageAsync(10)).Rows);
             }
         }
-        finally { SqliteConnection.ClearAllPools(); File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm"); }
+        finally { SqliteStorePool.Release(path); File.Delete(path); File.Delete(path + "-wal"); File.Delete(path + "-shm"); }
     }
 
     [Fact]

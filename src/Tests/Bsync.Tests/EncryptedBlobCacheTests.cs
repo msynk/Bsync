@@ -28,6 +28,74 @@ public sealed class EncryptedBlobCacheTests : IAsyncLifetime
     private static byte[] Content => Encoding.UTF8.GetBytes("Private offline attachment with a stable plaintext identity.");
 
     [Fact]
+    public async Task ManagedRotationKeepsLifetimeReservationWithoutHoldingMetadataDuringCrypto()
+    {
+        var blob = await Cache().ImportAsync(new MemoryStream(Content));
+        var crypto = new InspectEncryption();
+        var managed = new ManagedBlobCache(Cache(version: 2, encryption: crypto), _metadata,
+            new FileBlobCacheLock(Path.Combine(_root, "managed-locks")), 10000, 10000);
+        await managed.PinAsync(blob.Sha256, "app/draft");
+        var calls = 0;
+        crypto.Inspect = async ct =>
+        {
+            var entry = await managed.GetEntryAsync(blob.Sha256, ct);
+            Assert.Contains("app/draft", entry.Owners);
+            Assert.Contains(entry.Owners, owner => owner.StartsWith("reader-v2/", StringComparison.Ordinal));
+            Assert.True(entry.Bytes >= 2 * Content.Length + 56);
+            calls++;
+        };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await managed.RotateEncryptionAsync(blob.Sha256, timeout.Token);
+        Assert.Equal(1, calls);
+        Assert.Equal(["app/draft"], (await managed.GetEntryAsync(blob.Sha256)).Owners);
+    }
+
+    private sealed class InspectEncryption : BlobEncryption
+    {
+        public Func<CancellationToken, Task>? Inspect;
+        private readonly PlatformBlobEncryption _inner = new();
+        public override async ValueTask<byte[]> SealAsync(ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> plaintext, ReadOnlyMemory<byte> associatedData, CancellationToken cancellationToken = default)
+        {
+            if (Inspect is not null) await Inspect(cancellationToken);
+            return await _inner.SealAsync(key, plaintext, associatedData, cancellationToken);
+        }
+        public override ValueTask<byte[]> OpenAsync(ReadOnlyMemory<byte> key, ReadOnlyMemory<byte> envelope, ReadOnlyMemory<byte> associatedData, CancellationToken cancellationToken = default) => _inner.OpenAsync(key, envelope, associatedData, cancellationToken);
+    }
+
+    [Fact]
+    public async Task AutomaticPreparationDefersLockedKeysAndNeverOverwritesWrongKeyCiphertext()
+    {
+        var encrypted = Cache();
+        var blob = await encrypted.ImportAsync(new MemoryStream(Content));
+        var locks = new FileBlobCacheLock(Path.Combine(_root, "managed-locks"));
+        var managed = new ManagedBlobCache(encrypted, _metadata, locks, 4096, 4096);
+        using var http = new HttpClient(new NoRepairNetwork()) { BaseAddress = new("https://repair.test/") };
+        var transfers = new BlobTransferManager(_metadata, managed, new(http));
+        var packages = new OfflinePackageManager(_metadata, managed, transfers, locks, (_, _) => Task.FromResult(true));
+        await packages.StageAsync(new(1, "manual", "one", null, [new("file", blob.Sha256, blob.Size, true, [])]));
+        await packages.PrepareAsync("manual", TimeSpan.FromSeconds(5));
+        var before = await _metadata.ReadAsync("encrypted-blob/v1/" + blob.Sha256);
+        _keys.Locked = true;
+        Assert.Equal(BlobVerificationResult.KeyLocked, await BlobVerification.VerifyAsync(managed, blob.Sha256, blob.Size));
+        Assert.Equal(OfflinePackageReadiness.Incomplete, (await packages.PrepareAsync("manual", TimeSpan.FromSeconds(5))).Readiness);
+        Assert.Equal(BlobRepairState.Deferred, (await transfers.GetRepairAsync(blob.Sha256))!.State);
+        _keys.Locked = false; _keys.Wrong = true;
+        await transfers.SetStateAsync(blob.Sha256, BlobTransferDirection.Download, BlobTransferState.Queued);
+        Assert.Equal(BlobVerificationResult.AuthenticationFailed, await BlobVerification.VerifyAsync(managed, blob.Sha256, blob.Size));
+        await packages.PrepareAsync("manual", TimeSpan.FromSeconds(5));
+        Assert.Equal(BlobRepairState.RecoveryRequired, (await transfers.GetRepairAsync(blob.Sha256))!.State);
+        Assert.Equal(before, await _metadata.ReadAsync(before!.Key));
+        _keys.Wrong = false;
+        Assert.Equal(BlobVerificationResult.Verified, await BlobVerification.VerifyAsync(managed, blob.Sha256, blob.Size));
+    }
+
+    private sealed class NoRepairNetwork : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new Exception("Unreadable encrypted content must never trigger replacement.");
+    }
+
+    [Fact]
     public async Task PartialRestartCompleteAndSeekNeverPersistPlaintext()
     {
         var bytes = Content; var hash = Hash(bytes);

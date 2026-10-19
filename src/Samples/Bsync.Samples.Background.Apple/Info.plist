@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleDisplayName</key><string>Bsync headless reference</string>
+  <key>CFBundleIdentifier</key><string>com.bsync.samples.headless</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+  <key>UIBackgroundModes</key><array><string>processing</string></array>
+  <key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.bsync.samples.headless.processing</string></array>
+  <key>UILaunchScreen</key><dict/>
+</dict></plist>

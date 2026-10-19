@@ -15,7 +15,7 @@ public sealed class ReplicaWipeTests : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        foreach (var path in Directory.EnumerateFiles(_directory, "*.db")) SqliteStorePool.Release(path);
         Directory.Delete(_directory, recursive: true);
     }
 

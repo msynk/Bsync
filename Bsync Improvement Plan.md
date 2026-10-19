@@ -1,6 +1,18 @@
 # Bsync improvement plan — agent brief
 
 Status: execution brief for an AI coding agent. Date: 2026-10-05.
+Current execution status (2026-10-19): continue from the
+[0.4.0 gap-closure plan](Bsync-0.4.0-Gap-Closure-Implementation-Plan.md), which records implemented work and remaining
+qualification gates against the published 0.4.0 baseline. The original 0.1.0 brief below is retained as historical scope.
+
+Scope update (2026-10-19): the user explicitly deferred physical-device testing for now. Device-dependent acceptance
+items remain deferred, not verified; non-device builds, service checks and release qualification are still required.
+
+The [local qualification continuation](docs/review/gap-closure-local-qualification-2026-10-19.md) records the work
+available on this machine: bounded browser hashing, exact-package browser measurements, WASM/native AOT, trimmed
+Windows checks, and real loopback object-store expiry/CORS qualification. Its evidence distinguishes these from
+unavailable Android/Apple host, external deployment, independent review and release gates.
+
 Repository: https://github.com/msynk/bsync. Baseline commit: `54047855b2edbedd55487f033f4206beb7d42a7a`.
 Published packages at baseline (NuGet, `0.1.0`): `Bsync`, `Bsync.Blazor`, `Bsync.Storage.Sqlite`,
 `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql`, `Bsync.Testing`.

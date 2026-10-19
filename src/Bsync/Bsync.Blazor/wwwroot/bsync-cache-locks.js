@@ -8,11 +8,21 @@ export function tryAcquireAccount(name, exclusive) {
 function acquire(name, mode) {
   if (!navigator.locks) throw new Error('Web Locks are required for managed blob eviction.');
   return new Promise((resolve, reject) => {
-    navigator.locks.request(name, { ifAvailable: true, mode }, lock => {
+    const lifetime = { end: null, completed: null };
+    lifetime.completed = navigator.locks.request(name, { ifAvailable: true, mode }, lock => {
       if (!lock) { resolve(null); return; }
       const token = crypto.randomUUID();
-      return new Promise(release => { held.set(token, release); resolve(token); });
-    }).catch(reject);
+      return new Promise(release => { lifetime.end = release; held.set(token, lifetime); resolve(token); });
+    });
+    lifetime.completed.catch(reject);
   });
 }
-export function release(token) { const end = held.get(token); held.delete(token); end?.(); }
+export async function release(token) {
+  const lifetime = held.get(token);
+  if (!lifetime) return;
+  lifetime.end();
+  // Ending the callback requests release; the request promise confirms physical completion.
+  // Keep the entry until then so concurrent disposal callers join the same release.
+  try { await lifetime.completed; }
+  finally { held.delete(token); }
+}

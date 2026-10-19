@@ -1,0 +1,2679 @@
+{
+  "schema": 1,
+  "date": "2026-10-17",
+  "base_commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+  "working_tree_dirty": true,
+  "qualification": "development implementation evidence; experimental v2; not stable release qualification",
+  "environment": {
+    "os": "Windows 10 x64 10.0.19045",
+    "sdk": "10.0.401",
+    "runtime": "10.0.12",
+    "node_vector_generator": "26.1.0",
+    "sqlserver": "dedicated LocalDB BsyncGapClosure20261017, 17.0.4025.3"
+  },
+  "candidate": "0.4.0-gapclosure.20261017.3",
+  "tests": [
+    {
+      "path": "artifacts/gap-closure/continuation/chunked-browser-first.trx",
+      "sha256": "9263ef343ffd45f513efb322eb128bdd1e2bbcb104ef39a04a59c8e72fb682f1",
+      "bytes": 6023,
+      "outcome": "Completed",
+      "counters": {
+        "total": "3",
+        "executed": "3",
+        "passed": "3",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:25:26.7210413+03:30",
+        "queuing": "2026-10-17T15:25:26.7210419+03:30",
+        "start": "2026-10-17T15:25:03.4279870+03:30",
+        "finish": "2026-10-17T15:26:13.4568899+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/chunked-final.trx",
+      "sha256": "8bb077695f53b6d8d7911994e7943ef59779323aea0e48c3962633b9f5eede76",
+      "bytes": 18183,
+      "outcome": "Completed",
+      "counters": {
+        "total": "12",
+        "executed": "12",
+        "passed": "12",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:42:01.0779685+03:30",
+        "queuing": "2026-10-17T15:42:01.0779686+03:30",
+        "start": "2026-10-17T15:41:58.8300751+03:30",
+        "finish": "2026-10-17T15:43:09.4247033+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/chunked-first.trx",
+      "sha256": "31c8888bdb9a5f257fa67a108d758ff38a5e41de641965c9882e084b91bb7c40",
+      "bytes": 13812,
+      "outcome": "Completed",
+      "counters": {
+        "total": "9",
+        "executed": "9",
+        "passed": "9",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:22:05.0779677+03:30",
+        "queuing": "2026-10-17T15:22:05.0779679+03:30",
+        "start": "2026-10-17T15:22:03.3301676+03:30",
+        "finish": "2026-10-17T15:22:05.0846722+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/chunked-large.trx",
+      "sha256": "e64d38ac3df0d34f121d26dc9cd41b8f0e153888b22939b2ffb018e4af6db2a7",
+      "bytes": 5775,
+      "outcome": "Completed",
+      "counters": {
+        "total": "3",
+        "executed": "3",
+        "passed": "3",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:22:40.8814762+03:30",
+        "queuing": "2026-10-17T15:22:40.8814766+03:30",
+        "start": "2026-10-17T15:22:10.2808129+03:30",
+        "finish": "2026-10-17T15:22:46.3894648+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/chunked-process-lifetimes.trx",
+      "sha256": "dd554a13f473765604299cd8a4c43a15fc0bd642ec5b4b2388b1039b97578113",
+      "bytes": 24689,
+      "outcome": "Completed",
+      "counters": {
+        "total": "17",
+        "executed": "17",
+        "passed": "17",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:33:56.7293945+03:30",
+        "queuing": "2026-10-17T15:33:56.7293952+03:30",
+        "start": "2026-10-17T15:33:54.5086611+03:30",
+        "finish": "2026-10-17T15:33:57.8711759+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/continuation-api-final.trx",
+      "sha256": "64c43c2543e068a22caefc54b17178a85bb45861955ee29aa9a89096c22a72c2",
+      "bytes": 9306,
+      "outcome": "Completed",
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:48:17.1662875+03:30",
+        "queuing": "2026-10-17T15:48:17.1662883+03:30",
+        "start": "2026-10-17T15:48:14.6586052+03:30",
+        "finish": "2026-10-17T15:48:18.2009473+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/continuation-api.trx",
+      "sha256": "4b4001e6b141fa64476f9d17211ebd3da14e633750dc0f3a09671c4da77ba044",
+      "bytes": 9306,
+      "outcome": "Completed",
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:38:53.2739638+03:30",
+        "queuing": "2026-10-17T15:38:53.2739643+03:30",
+        "start": "2026-10-17T15:38:51.0601613+03:30",
+        "finish": "2026-10-17T15:38:53.3965887+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/continuation-browser.trx",
+      "sha256": "8b2df393adc4bf217452f839ed13c1b7eb5df62eaf3995d97cb557ddab02b3a6",
+      "bytes": 117393,
+      "outcome": "Completed",
+      "counters": {
+        "total": "81",
+        "executed": "81",
+        "passed": "81",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:44:51.6493128+03:30",
+        "queuing": "2026-10-17T15:44:51.6493129+03:30",
+        "start": "2026-10-17T15:44:46.1511966+03:30",
+        "finish": "2026-10-17T15:54:18.5836015+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/continuation-core-corrected.trx",
+      "sha256": "b4b2e97a00a73c5cf4935cd95440f8a89ba91c8af8895583a3c48a0412c5ae52",
+      "bytes": 1076634,
+      "outcome": "Completed",
+      "counters": {
+        "total": "785",
+        "executed": "785",
+        "passed": "785",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:51:27.3476415+03:30",
+        "queuing": "2026-10-17T15:51:27.3476424+03:30",
+        "start": "2026-10-17T15:51:26.0756950+03:30",
+        "finish": "2026-10-17T15:52:38.3812481+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/continuation-core-final.trx",
+      "sha256": "7f0c66ff1812cdb33812e88d6a563c421e6a7085267da8aff074999beac412b7",
+      "bytes": 1077872,
+      "outcome": "Failed",
+      "counters": {
+        "total": "785",
+        "executed": "785",
+        "passed": "784",
+        "failed": "1",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:48:56.0322131+03:30",
+        "queuing": "2026-10-17T15:48:56.0322138+03:30",
+        "start": "2026-10-17T15:48:53.3920188+03:30",
+        "finish": "2026-10-17T15:50:49.7357425+03:30"
+      },
+      "non_passing_results": [
+        {
+          "test": "C4 I08: the one-shot helper stops at its time budget with resumable work and finishes on the next call",
+          "outcome": "Failed",
+          "message": "Assert.InRange() Failure: Value not in range\r\nRange:  (1 - 49)\r\nActual: 0"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/continuation-core.trx",
+      "sha256": "880fe04fd53d4c096ff34ded1bd2bc8e66c6306c384bd6522f83159af1e780d2",
+      "bytes": 1071077,
+      "outcome": "Completed",
+      "counters": {
+        "total": "781",
+        "executed": "781",
+        "passed": "781",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:39:00.0352413+03:30",
+        "queuing": "2026-10-17T15:39:00.0352419+03:30",
+        "start": "2026-10-17T15:38:59.2893282+03:30",
+        "finish": "2026-10-17T15:39:52.3670751+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/format-maintenance-corrected.trx",
+      "sha256": "5de6f7f11fb3c487495a2e51dda8e8d3a8f2aa0e89c0354556a581d1ee396575",
+      "bytes": 35397,
+      "outcome": "Completed",
+      "counters": {
+        "total": "25",
+        "executed": "25",
+        "passed": "25",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:37:24.0787288+03:30",
+        "queuing": "2026-10-17T15:37:24.0787292+03:30",
+        "start": "2026-10-17T15:37:22.3658350+03:30",
+        "finish": "2026-10-17T15:37:24.9970120+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/integration-bridge.trx",
+      "sha256": "1c366f2d2aac93dc6242b6f8798b618d96ddf438c927db569f002c7b60cbf548",
+      "bytes": 13518,
+      "outcome": "Completed",
+      "counters": {
+        "total": "8",
+        "executed": "8",
+        "passed": "8",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:29:34.2476814+03:30",
+        "queuing": "2026-10-17T15:29:34.2476821+03:30",
+        "start": "2026-10-17T15:29:32.2805107+03:30",
+        "finish": "2026-10-17T15:29:34.5858365+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/integration-final.trx",
+      "sha256": "ed91eca3338e604aa16c01cf6b159f4e2ab4859c586fd9abeda15b80ad967b3c",
+      "bytes": 36543,
+      "outcome": "Completed",
+      "counters": {
+        "total": "24",
+        "executed": "24",
+        "passed": "24",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:53:33.2495679+03:30",
+        "queuing": "2026-10-17T15:53:33.2495682+03:30",
+        "start": "2026-10-17T15:53:27.9740223+03:30",
+        "finish": "2026-10-17T15:53:46.1977565+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/integration-sqlserver.trx",
+      "sha256": "80eaab49ff8ea38d4f694629f74b63940de53c05ed35cd4845501734671605e0",
+      "bytes": 35073,
+      "outcome": "Completed",
+      "counters": {
+        "total": "23",
+        "executed": "23",
+        "passed": "23",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:27:52.0933581+03:30",
+        "queuing": "2026-10-17T15:27:52.0933584+03:30",
+        "start": "2026-10-17T15:27:48.2930440+03:30",
+        "finish": "2026-10-17T15:28:02.3629587+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/maintenance-vector.trx",
+      "sha256": "19029f41ddb2765eae11bfb7ebe607580fe1c7dcc2ff05e94351b4d781b144fe",
+      "bytes": 19319,
+      "outcome": "Completed",
+      "counters": {
+        "total": "13",
+        "executed": "13",
+        "passed": "13",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:45:48.0891924+03:30",
+        "queuing": "2026-10-17T15:45:48.0891929+03:30",
+        "start": "2026-10-17T15:45:46.2941710+03:30",
+        "finish": "2026-10-17T15:45:48.2497103+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/ownership-protection-first.trx",
+      "sha256": "2224f3cc00b1acd71e2f6cf90d9bf593409e611b8ea71277c7dd38761aa5c3e4",
+      "bytes": 16504,
+      "outcome": "Completed",
+      "counters": {
+        "total": "11",
+        "executed": "11",
+        "passed": "11",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:18:07.9121846+03:30",
+        "queuing": "2026-10-17T15:18:07.9121849+03:30",
+        "start": "2026-10-17T15:18:05.8591879+03:30",
+        "finish": "2026-10-17T15:18:07.9709252+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/ownership-upgrade-maintenance.trx",
+      "sha256": "d48fb74c08ae5917d766b414a58d6278cc8620d752443bc048a25a0307595174",
+      "bytes": 36940,
+      "outcome": "Completed",
+      "counters": {
+        "total": "26",
+        "executed": "26",
+        "passed": "26",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:26:32.2306995+03:30",
+        "queuing": "2026-10-17T15:26:32.2307002+03:30",
+        "start": "2026-10-17T15:26:30.9543041+03:30",
+        "finish": "2026-10-17T15:26:32.5370885+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/package-consumer-final.trx",
+      "sha256": "aa8618fb7f5f520da87f0fe1144594677aeb98a3833b3f5c9120f55db2ae546c",
+      "bytes": 108657,
+      "outcome": "Completed",
+      "counters": {
+        "total": "71",
+        "executed": "71",
+        "passed": "71",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:54:39.6501595+03:30",
+        "queuing": "2026-10-17T15:54:39.6501598+03:30",
+        "start": "2026-10-17T15:54:37.9272929+03:30",
+        "finish": "2026-10-17T15:55:46.4104623+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview2-retention-regression.trx",
+      "sha256": "0b684270e72c754f93e90407353e3b9480e449f3e6d19dec015e8a0e6ccdbba6",
+      "bytes": 4943,
+      "outcome": "Failed",
+      "counters": {
+        "total": "1",
+        "executed": "1",
+        "passed": "0",
+        "failed": "1",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:56:21.8060338+03:30",
+        "queuing": "2026-10-17T15:56:21.8060345+03:30",
+        "start": "2026-10-17T15:56:20.9372411+03:30",
+        "finish": "2026-10-17T15:56:21.8124829+03:30"
+      },
+      "non_passing_results": [
+        {
+          "test": "Bsync.Tests.OwnedReadModelTests.AbortedLatestBuildCanBeCollectedAtGenerationCeilingWithoutStartingAnotherBuild",
+          "outcome": "Failed",
+          "message": "Assert.Equal() Failure: Values differ\r\nExpected: 128\r\nActual:   0"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-package-browser.trx",
+      "sha256": "37a159e283c8fe6b1cc9feb0e8e7977ae47f8dad1b1813b3616f16167eaf6984",
+      "bytes": 10418,
+      "outcome": "Completed",
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:57:03.2541960+03:30",
+        "queuing": "2026-10-17T15:57:03.2541965+03:30",
+        "start": "2026-10-17T15:56:35.8868851+03:30",
+        "finish": "2026-10-17T15:58:48.5823473+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-package-consumer.trx",
+      "sha256": "6992c8cbcb701601aed3bb7c2cd52b45b21cd6f4b859efcad36a0c5c38554250",
+      "bytes": 110149,
+      "outcome": "Completed",
+      "counters": {
+        "total": "72",
+        "executed": "72",
+        "passed": "72",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:56:25.4039704+03:30",
+        "queuing": "2026-10-17T15:56:25.4039710+03:30",
+        "start": "2026-10-17T15:56:24.4282917+03:30",
+        "finish": "2026-10-17T15:57:31.9349885+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/protected-policy-final.trx",
+      "sha256": "782efa10c3ce7863fc4eba2842600a3e1891516874dbd499b08ca10d25f2c15b",
+      "bytes": 9952,
+      "outcome": "Completed",
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:54:04.5296744+03:30",
+        "queuing": "2026-10-17T15:54:04.5296751+03:30",
+        "start": "2026-10-17T15:54:03.0546266+03:30",
+        "finish": "2026-10-17T15:54:04.5373656+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/retention-final.trx",
+      "sha256": "39638224c6d4dc461e7372743c7e2b16dc6d32283605bd57fea1d9040273e693",
+      "bytes": 23127,
+      "outcome": "Completed",
+      "counters": {
+        "total": "16",
+        "executed": "16",
+        "passed": "16",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:55:23.7826336+03:30",
+        "queuing": "2026-10-17T15:55:23.7826343+03:30",
+        "start": "2026-10-17T15:55:22.4155878+03:30",
+        "finish": "2026-10-17T15:55:24.0588509+03:30"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/sqlite-encrypted-continuation.trx",
+      "sha256": "5f60b51896f13f0da2f7b2aefb02d920e5a072a671344d0373d04a24aa851ec1",
+      "bytes": 46732,
+      "outcome": "Completed",
+      "counters": {
+        "total": "31",
+        "executed": "31",
+        "passed": "31",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "times": {
+        "creation": "2026-10-17T15:56:56.4619369+03:30",
+        "queuing": "2026-10-17T15:56:56.4619375+03:30",
+        "start": "2026-10-17T15:56:53.5226612+03:30",
+        "finish": "2026-10-17T15:56:58.0097185+03:30"
+      }
+    }
+  ],
+  "final_commands": [
+    "dotnet test src/Tests/Bsync.Tests -c Release -m:2 -nodeReuse:false --nologo --verbosity minimal --logger \"trx;LogFileName=continuation-core-corrected.trx\" --results-directory artifacts/gap-closure/continuation",
+    "dotnet test src/Tests/Bsync.Tests -c Release -m:2 -nodeReuse:false --nologo --verbosity minimal --filter \"FullyQualifiedName~OwnedReadModelTests|FullyQualifiedName~ProtectedOrchestrationStoreTests|FullyQualifiedName~PublicApi\" --logger \"trx;LogFileName=retention-final.trx\" --results-directory artifacts/gap-closure/continuation",
+    "dotnet test src/Tests/Bsync.Tests.Browser -c Release --nologo --verbosity minimal --filter \"FullyQualifiedName~IndexedDbBrowserTests\" --logger \"trx;LogFileName=continuation-browser.trx\" --results-directory artifacts/gap-closure/continuation",
+    "dotnet test src/Tests/Bsync.Tests.SqlServer -c Release -m:2 -nodeReuse:false --nologo --verbosity minimal --filter \"FullyQualifiedName~ExternalReceiverConformanceTests|FullyQualifiedName~VersionedFileBridgeTests|FullyQualifiedName~ExternalEffectOutboxTests|FullyQualifiedName~IntentLedgerTests|FullyQualifiedName~ProjectionOutboxTests|FullyQualifiedName~TaskApiPublicationTests|FullyQualifiedName~TaskAudiencePublicationTests\" --logger \"trx;LogFileName=integration-final.trx\" --results-directory artifacts/gap-closure/continuation",
+    "dotnet test src/Tests/Bsync.Tests.SqliteEncrypted -c Release -m:2 -nodeReuse:false --nologo --verbosity minimal --logger \"trx;LogFileName=sqlite-encrypted-continuation.trx\" --results-directory artifacts/gap-closure/continuation",
+    "& artifacts/gap-closure/continuation/pack-preview3.ps1",
+    "dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -m:2 -nodeReuse:false -p:BsyncPackageVersion=0.4.0-gapclosure.20261017.3 --nologo --verbosity minimal --logger \"trx;LogFileName=preview3-package-consumer.trx\" --results-directory artifacts/gap-closure/continuation",
+    "dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Browser -c Release -m:2 -nodeReuse:false -p:BsyncPackageVersion=0.4.0-gapclosure.20261017.3 -o artifacts/gap-closure/continuation/preview3-browser --nologo --verbosity minimal",
+    "BSYNC_BROWSER_HOST=<workspace>/artifacts/gap-closure/continuation/preview3-browser/wwwroot; dotnet test src/Tests/Bsync.Tests.Browser -c Release --no-build --nologo --verbosity minimal --filter \"FullyQualifiedName~ChunkedEncryptionResumesLargeObjectsAndProtectsAtomicPayloads|FullyQualifiedName~PackageAutomaticallyRepairsDamageAfterReloadWithStableReaders\" --logger \"trx;LogFileName=preview3-package-browser.trx\" --results-directory artifacts/gap-closure/continuation",
+    "dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -m:2 -nodeReuse:false -p:BsyncPackageVersion=0.4.0-gapclosure.20261017.3 -o artifacts/gap-closure/continuation/preview3-web --nologo --verbosity minimal",
+    "dotnet artifacts/gap-closure/continuation/preview3-web/Bsync.PackageConsumer.Web.dll --smoke",
+    "python -m unittest discover -s scripts -p 'test_*.py' -v",
+    "python scripts/verify_symbols_test.py artifacts/packages -v",
+    "python scripts/release.py preflight --tag v0.4.0 (expected refusal: dirty checkout)"
+  ],
+  "logs_and_commands": [
+    {
+      "path": "artifacts/gap-closure/continuation/android-dependencies.log",
+      "sha256": "059e50187ff2d669e2b7f9d0469d588b77109734c051c2e6c9d8e330e0d0b739",
+      "bytes": 19872
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/android-host-build.log",
+      "sha256": "ac20f01a6ce148cd708a850d0565983e359a2c34e96d1978dd1f020048199c6a",
+      "bytes": 3888
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/api-final.log",
+      "sha256": "f1e852164153799f93cb20014653e059870b15cc2ffc3a06c3932516e8a767b5",
+      "bytes": 3216
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/browser.log",
+      "sha256": "aa1495a63aadac9b76f5f4d8b9d54086b260477256281ce332c0e17c6a6df52b",
+      "bytes": 66002
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/chunked-final.log",
+      "sha256": "5ef149a8c6a498c5ffe4f5685e151d03e1344e04aeeb889fd3dd59a1956c3cd8",
+      "bytes": 3206
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/core-corrected.log",
+      "sha256": "bbc77296c28996e2e291bd84cae0d61c919a80d662f300400f9cb1cc665777d8",
+      "bytes": 3236
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/core-final.log",
+      "sha256": "cc36af614a47c65b2628b9d37831482908307c1139f006ff3c1cba4cb9064c15",
+      "bytes": 5034
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/core.log",
+      "sha256": "4deb0fafab172eb2846e7b8ead06d2955e7d98383b21ed1535a4bc5699e434eb",
+      "bytes": 796
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/integration-final.log",
+      "sha256": "d27d9ab105bcf04167f23c9d95b4f19b30c4e1d06542c11b4f5e581b5d6172f8",
+      "bytes": 5250
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/localdb-stop.log",
+      "sha256": "4f0fb6845988776ca0bf698dadc18e13dde65676de4ee8be2aca1b639d820460",
+      "bytes": 112
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/maintenance-vector.log",
+      "sha256": "994002373f6bf1538798fa28519fda5e6e2703e9acdbeed13ed6845b4e30033e",
+      "bytes": 3214
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/pack-preview3.log",
+      "sha256": "c3df7f984723614ddd136f2e43217606cd505da02214b9bf83269b43f58c8532",
+      "bytes": 8034
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/pack-preview3.ps1",
+      "sha256": "63f0b4b2f02f7dbacb4cd7025ccdd6f583a3c8c44dbb037fa56345556fb4a1f3",
+      "bytes": 1336
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/pack.log",
+      "sha256": "4bb5a4fba50cbb58734225a05758b4374c4bd43a0948d1e5c4b7f69061131c8f",
+      "bytes": 8034
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/pack.ps1",
+      "sha256": "697515b7e7915fab1ccca2daa16b1a423f95d43a78f5f5694f016f25034fe4a0",
+      "bytes": 1334
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/package-browser-publish.log",
+      "sha256": "f71e8a9d673fee229b26cb1f494061c575559918b51516f5f16ca3bd8a3fd1b2",
+      "bytes": 18400
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/package-tests.log",
+      "sha256": "4e6408c67da7b84516274a1d35ec4a392fef69c5e9c283faaded9f700185289c",
+      "bytes": 1634
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview2-retention-regression.log",
+      "sha256": "92b461328a723bac5c09e9aaa75809fbc8182c22c0b57c801e9d05231a1b8af8",
+      "bytes": 3804
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-browser-publish.log",
+      "sha256": "521fee1da8c127076bbb938880016fbff9af1c99a4b2abc7c4bdd1ea21cea5b8",
+      "bytes": 1946
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-package-browser.log",
+      "sha256": "cb7e0058a51000991de469973211d09a2b7f2f7b1105bcd11a15276c8a1a439f",
+      "bytes": 866
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-package-tests.log",
+      "sha256": "a4c4890660d89cc08b6de11d5e8dc8210403693f30ead26e8f612356266ffc2e",
+      "bytes": 1640
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-web.log",
+      "sha256": "2bb4045423ba6407f9d1e106caff42f3d5841206467e44a6084325a104acd9f3",
+      "bytes": 1824
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/protected-policy-final.log",
+      "sha256": "02645ee6c9992ae78c0ef7ad55b1d8c2d079f85e6c78637a645ca4efdc03b736",
+      "bytes": 3222
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/release-tool-tests.log",
+      "sha256": "89163ed59bfccdaf87b65aabb6920aec12cd80b9274eda785c4934d981fe177f",
+      "bytes": 2796
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/retention-final.log",
+      "sha256": "f159586873b537e5160c611376af848c96a5e15e52cd3b43ed60703d10721b5b",
+      "bytes": 4474
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/sqlite-encrypted.log",
+      "sha256": "fc72cdc603a11bf0ef6418983e548827527a28e8090773fa346184aabf4491a3",
+      "bytes": 2190
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/stable-preflight-refused.log",
+      "sha256": "e1d73ae4fe7a5ee15d32ce8f663ac787eba1a845aa2c8c8e2ddbdcf6f5b4e7bd",
+      "bytes": 858
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/symbol-tests.log",
+      "sha256": "d871646e1c83c0225ce41bd2d6336a645d9bb1d7eacd489e133d43be3cea821a",
+      "bytes": 1978
+    }
+  ],
+  "packages": [
+    {
+      "path": "artifacts/packages/Bsync.0.4.0-gapclosure.20261017.3.nupkg",
+      "sha256": "c76f5598a4598b5d9cfec19c72fcf45fb2324b47727b84af0bd8ff8760537522",
+      "bytes": 590869,
+      "consumed_cache_sha256": "c76f5598a4598b5d9cfec19c72fcf45fb2324b47727b84af0bd8ff8760537522",
+      "cache_matches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Blazor.0.4.0-gapclosure.20261017.3.nupkg",
+      "sha256": "6a4c0991c0800513edac251211ddab44b6ae7d41596bdd348514335693a8db5f",
+      "bytes": 126403,
+      "consumed_cache_sha256": "6a4c0991c0800513edac251211ddab44b6ae7d41596bdd348514335693a8db5f",
+      "cache_matches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.AspNetCore.0.4.0-gapclosure.20261017.3.nupkg",
+      "sha256": "aba26e012e331741d2d2c1f638cbd5d15e3c8424e520bd84b1c102c84b527a23",
+      "bytes": 64762,
+      "consumed_cache_sha256": "aba26e012e331741d2d2c1f638cbd5d15e3c8424e520bd84b1c102c84b527a23",
+      "cache_matches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.PostgreSql.0.4.0-gapclosure.20261017.3.nupkg",
+      "sha256": "e3775dd59a481efa53705ca61dcd7dac097c230426c69a78ae265e7d84d45870",
+      "bytes": 67411,
+      "consumed_cache_sha256": "e3775dd59a481efa53705ca61dcd7dac097c230426c69a78ae265e7d84d45870",
+      "cache_matches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.SqlServer.0.4.0-gapclosure.20261017.3.nupkg",
+      "sha256": "2e0ec6790f4d5d9401f5f81d34e87236d1a67dcea0323751756bd2f9ebfc0d3a",
+      "bytes": 84860,
+      "consumed_cache_sha256": "2e0ec6790f4d5d9401f5f81d34e87236d1a67dcea0323751756bd2f9ebfc0d3a",
+      "cache_matches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Storage.Sqlite.0.4.0-gapclosure.20261017.3.nupkg",
+      "sha256": "61cfbd8bfcd836eb424e07b12f0c518e7b40ad465f2e0825ea915b7cd4f214b4",
+      "bytes": 87732,
+      "consumed_cache_sha256": "61cfbd8bfcd836eb424e07b12f0c518e7b40ad465f2e0825ea915b7cd4f214b4",
+      "cache_matches": true
+    }
+  ],
+  "symbols": {
+    "SchemaVersion": 1,
+    "Commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+    "RemoteSourceDownloaded": false,
+    "EmbeddedChecksumsVerified": 205,
+    "RemoteChecksumsVerified": 0,
+    "UniqueSourcesDownloaded": 0,
+    "Symbols": [
+      {
+        "Package": "Bsync.0.4.0-gapclosure.20261017.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.dll",
+        "Pdb": "lib/net10.0/Bsync.pdb",
+        "PdbId": "fe6533ab-4c99-4588-890c-506dcb6d1c6d",
+        "Documents": 316,
+        "EmbeddedDocuments": 145,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "ef539390fb5b9b1fc47d2e764e391337495b7b661bde3954547d6a32a2f66d7b",
+          "3e79b22e0d067cb4347668c3a094d5723df50ddcf83c7951d23f45962a24ff91",
+          "97eba2649b47271c2cb02dfc7c8038797c0199de50ecac23d9c7488366095504",
+          "ba1f4b070b42e095e8c484ca62f8bf3176cafc61da204ec930db071b9c14cf47",
+          "5b977c0f766f4a14e800f63f5289077ec6bcdfd23dd0174cdd23b26dc0b7aab3",
+          "1842c82ac36c2eecb9f67e58c440415dae2eed1bdd4fdc641e73531fb48c673b",
+          "944fd4acd4ad9b0ced6a14c85f16e9b3271c12ee132747b12d73dcd103919232",
+          "14405324194cce7bd7590ae63c5b1c541527ed09fd3c71afcd0cf34364cdae3b",
+          "fd4d1a1dac0709b967e6c96dff37228747ac6754236f3546f2f47747211d9101",
+          "aa8e07758f8207db31ebc4c6545f9b7c0f42bbb1802db76c635a8cc838150eb8",
+          "42bd155ca46188b7b19f19577b1a3e97328d3448a67616fd6366e183cd0f68cf",
+          "0590d65801786ce5e83d9ad22acf9dcd8d020e825a1a0c7865958b746bf9e3a6",
+          "9f2f651d454077f804bc9930876ee82d479a3fdd9754b5e54b4734733a2c9f5c",
+          "c2bbaf1dbc2f772906f29c2827bd820e7f17845100b03ffc7119ea2b5d47d111",
+          "afc6a6d00ce52b73e1e0dc4b07b9522e2f146449d903ca65ee243b91152ad545",
+          "e3b2497e0d08212c59b051316f38e0aa59e014b49bbd0e0341836289bd060cb6",
+          "bd091deae84b8a2023d075bf28fd82e8f58a77886f8d2fc2f8ee8eb18158e87a",
+          "1db199d553cf43b2814ee008dcc094dd9f8d728769256751d77f0e717528c597",
+          "fdbedacf78c2aea8b666256f6ae3b3c1117d9bf696ba4d1394b71c17234cb0aa",
+          "247e291d01f338e01bc6afa7bc4156160ab275bc581b4f2de1d9bc941c79eb1f",
+          "ff664a0eb1543678fa0cd5fb60a160fd1cb98f6eb3fb3d7d680058cc1d78a03f",
+          "e5d0fc719cfd779cf39b43ecdc7a802b2a93ac804629f2a30e3aa15c0d5d6577",
+          "32cfbae5dcc9a67453f14f11790a5372d6bda29ee789b9de63161dafed0869cd",
+          "509b77457f15c86f13c3482f540188443319dab2861893f6f60d17a07ffee3ef",
+          "cb408bd72004c0ef0771a6702e4381159acd4a7addd114d47455a1064a8a91b7",
+          "91641b2a518e3392fb902188f6fc06476a33da8601e13830bded3fce1c2ab191",
+          "e0776d98e720c56c89f3c5d16459ca94f5bbd503211974fc1ee0608b0bfff046",
+          "52cdad2accb81a55fdd99005f6f264c91d274a0cb9417a44d96ffb60ebe18c5c",
+          "029751d4b6ce5f4e55090af06baa39b7cf912edc616483bdfcd66cffbb1e116c",
+          "c3e6b8d7abbe39c5b62a02f7b2a033b6146693c577d2626ddbc5ebf8d5c107a3",
+          "d71f6883a5afca93e5690efa651a7c6a7353f4b1359580cf7819455fdf19676d",
+          "4bc49ee23c1f1ef807adddf93fac4330557bd0977dbc7b003a7e7516455f3e43",
+          "9e2346ff6af4f7f745fd27af23e16dc5aff00651fcfa0b33a1b44f174ae94a21",
+          "59635c412445e8513485c4ea3df4e428c96c00fe2c5823c956bd4814d523571a",
+          "0ea04c4422c6d8fc9f834ad0bc72f2735265f599e5f00759548b4bd855f15b15",
+          "084d1ad694f57e7af37e5b97851d53c8f91eccc57d5c0c02ababdba04ab60104",
+          "89193b50c588c321ccfacddd2db61585d9b8cb44cd48b845f25fba69402733e6",
+          "393a5229e2252b8dc552f212b646876a0a42c788d627a37e10080af890828de8",
+          "4e2b8dbd4ea67912c4fdc5f603e0059cb15ba1738b317d5027847d8da8c87143",
+          "dd8c97f2473f62a70d933f50a08c86ba8ea49f48c39b97081bdabd9279694fb0",
+          "4a225c4e872502111b95082a4f9b8ea9d498965dccbbcb5f99c296cfffa27971",
+          "ce571eeec972c05374c698c75a9e40435523a77c8099bb4ea7e72631fb840c1d",
+          "ab7aa820d776035b58a0a341a3cccc1963025d749b8eaabb1347ca0c716c284d",
+          "67671e735ce57758ec8b6a93ccdf77340b1ca7f3f1fe415cd18a7250b9f292c1",
+          "efd9b3cb3f4b2f85bb880ca8576fc095cdaf568181166f70574d03f901bbe320",
+          "0dc8a9cc64e838b899f7335c2699a912f8175723995a7f13bc8e63fa08cdf2f9",
+          "d60bb6545c9d36dce4a6dac55225cdc1297cf393977b21ca26b64398cd25970b",
+          "63a9bf0cabc70eee15c6d611638d2958813e536a63c5cdfe459f1e9c36c81efc",
+          "96f12e47e2e607fea2aec78e04cc5f8fd115bcc2237e2e4097fa92f0d6b2622d",
+          "d9fb126c034001f1586b95e4224122807b348c09fb433ee94e85087954d54b84",
+          "a191f77b00d604d172a7dcbd722445ee9315ed84f6dee3dc3cb908845512fd18",
+          "078ff55fb05189a0c61395caf4ed2140eeb1c89287e85dd7518ae02ad46e1f3f",
+          "d138c642a17df5c8b2b745a2622608f34aae96a8f9b4faab3daf4e4c2670f2a9",
+          "22e738a9270c17c901e466e4eb097395fa4d3e7ac8aabfc92d546c27b2e919db",
+          "14546b761591bbe3eb38cb60365a3b3ac68edc45fd997bd219e83a0a42e49e9c",
+          "a46f58d6d52dfd8dddfbc261e60e4e3793f1e741225bcce54e5c3a09755acd59",
+          "c21d352f72813ed0f33df9dfc47b17e60ab16f787310c06b59f94058a22940d7",
+          "0c0dd6d784f6438d49fa65d1557ec5fbe651ce1890d9a0c921ad7982cccc404b",
+          "348e5ebb9860eb874a7258a41f524695625ec83251066fd213c580a4b49d0308",
+          "99c0cba1e4616123752f14e3d5dbdf2754693dfc92f10674af180b9db6a45ee4",
+          "90a4a3701ace9320a45728eeddcc4e7cbf6a93b84a11995b9f76b65f4cf7035d",
+          "d88fe678385a481485b579e7a87158eca6fdde62ce158d90b7368b2c45b502f2",
+          "932ecde8512762b811f696a23849b8138af4f5874d664d4639cfcab057630250",
+          "1d7acc3906474fe6176ca6fe5cb39e07ee2dd72973d7105f262033fde1f0c689",
+          "491627937fa77911522be9d78251fa0486a0c3e9b96bb640cb921fbbaf388adc",
+          "aefa9e221511ac6b70298410f98f89cd1d0933471a84d990845043b7c264fef1",
+          "e88eb6b897514b1a4135bc85fa05294bf437aaf083002f68c49a68e2bb76838b",
+          "7374d37861439d250a002e91633a47f9861c4f71a75e5e9b56b3d019a7a57017",
+          "7b9927e895aef322c344c12d5c561ac0522801e093b0de723d7646e0c90e3837",
+          "3ea1390d720d304664afdcd26dbfedc1f696082c7eb8a52b0f3b0de1115598dd",
+          "615db512205dc8b8b667a46d750f23685dce7dde8cc85f8a8275ef496ba1a59f",
+          "633982baa63623805c99d3943ed5aac41217f86203d19b2ff82811b105e0080b",
+          "87aa30b972ee4d409d9b8b88ce78c89cb812650a05af4c432ec6b7a82adf2a9f",
+          "680e1b9a120465e14580d4f723f9837447d7df2f4c70506d21568b7eaa8ebb5c",
+          "bdacbc3b927952125936d1c003d3d131bdac82d9196de644ffee090e22a3438a",
+          "43e4d5234e38958d23b31478c79d5a551df9937b08158ca33cbd044484d28a82",
+          "183a80c8558c9ac36fd289a4cee4a3782ff254b49adb750acaf7aedfc11c0930",
+          "a4306df2aac5a874cb241512da64c2475bb590a303084df9f7cb9831489a4908",
+          "8ddc44d7cc225926767d826217debce6a59ff48f5809166684d9dc7732be18e9",
+          "aefdf22ee945d8cff2ba74a05be878170417fae2d351301ae842288ff54783aa",
+          "73c4d6b18bed23212ab544d53fb2d3a397e8c04bae3197795809e45fbe5652a6",
+          "e3ef83f1119f134d8f11186d88290735d89bc3f2549f505141914426caf07edb",
+          "471e14f1bceb391be61ea935e19cac9dff33eed86ae72216cbecbdb067951361",
+          "bab322c6b49a99cfa1b6f7ce5c8a1db648df674e7eaffefb3652c04677f224bc",
+          "0422f2d1b26523c76ffbf15b4ada1e91f30ab12b97bd031fbad94e73c341bb1a",
+          "5a917e0861417312bca7020da8c3df440f5d6f8c430591d165d1f9913d1dd224",
+          "a015ea3ef780fc7c34486457b052ba09f0e8bab4c3046fb691f38440d70e5006",
+          "63737f934e7cfa38d3cca88bf1f425f3f7ed35264bc699da372cea63bb9cf3fc",
+          "abbe44ea7216b7b860a0e5546a68f2572ded9f02dba69f1e3ef634dbba58d2ca",
+          "c220ab35c0ca3b87f80db2e31b86245a6c1106a7649319e8a02ddb40f8de72ed",
+          "eb64dc02ed209dd53d6b52d93da92880b91530b862704aabc35b2d24865e5c53",
+          "a9646a0079fc2eed411aa283e92271ae852fcbfff916b4167dff9d954481b2d7",
+          "8197651f238156b0a74de801da1877c8201d3866d3c64e29d56e02244919eccf",
+          "6c9324a6166f2a7286aaffcea11fc38950a8e1cb7a4686f421f613a397c90aaf",
+          "516f837b845a729b20a54a7b48f0af332d775a91a5bceba6746cb5accc2dcdf7",
+          "997be8244c9dfee3708a1839800e849fe3ab782404f9502c121cca9714a19af4",
+          "7abf6f3cc19c6ba3ee3c0aca8a336e5c659112f80c6cf68b2234a3fc89d82079",
+          "c8f3fe61ca9f363ba290e2ed30581bd208fe3962083c36aaf541e170a9b7d33e",
+          "bc8a13d17b932835ee7eb24d04e8499014928bfff1cffa080d066a8b94d43d3d",
+          "77cbfcc8a71cd77f893412f8c7acffdb5ff7375cfcdb3d0c677f065cb5e14b74",
+          "8c5a0a17c74c9e926edd21111b9d4aca11442e4e924f282e0f7872aa1e82fff2",
+          "ea719491e1ab810c7db76eb606d9598837c717af5bef592f60ea1817dce66fd3",
+          "875239bfec0e606e0a3859b27fe09befe75c1f0bf7a3139afa2bff133c80cf7d",
+          "9bbd80db90d390d6f242a46a8d65ecb83e62c335f74bc4310887db9a3cf86e7a",
+          "f9871e8c171108c1092581a05c99a9c0a0e62aceaf5eebd11b0df8b423e92741",
+          "c75f6c6356c8841eb47c4febc6b96db0ba381f406b5f9c1e33f194daa88958ac",
+          "1b969e1b7b7b2103329719ea4c3945f558fb8330b8c0922027fee72ef1b977d9",
+          "52b07a4fbdc95c4323fecf225ea34a33d60e7aba623b7ddd2115564868261ed8",
+          "0fd1605512a1653f67c9ec264420c1df367009635ced660cef910d56b505362b",
+          "48e69b2ffda25e2db6ee7e63c2f173c6fbbdd29516482c193b70f72cc4a7831e",
+          "56094f76336a1f8cb3072ec0938dea79176eb29c161e2de9985a4fa34f6bcc37",
+          "e8da815a68045e7aa15ab47f889eceec10b3e89d5c026b4f0fca53cd0a00687e",
+          "238a8d4eb8ef32dd561f5812c355805926f559a75df5aad6d034593bbc9e2fa7",
+          "a6dde0e7c8459c488a251df8cacafef15e75b9b0ed7dac526c09117e2c3bebbc",
+          "2f0f4272fcfdb55ccb536816b94f93761cff6bf237a12bee8d90ec9d176be6a0",
+          "fb64a876e4ebc51eb5be71291bf1642fd4bbe9f6e1161aa70c0a621c753a252a",
+          "8625114a4951f606add19c3fd411a4e29afdda0eb94bfb4900c478e36360c573",
+          "6c4cf5db34a4c4ac2263b9fc455d0212c68d5816a0af78f0cda094251ac298d5",
+          "17105241628e70d941e3ceb3f84d6a290e00f92e4f2670051442e998e709a330",
+          "f2119f1601f1054b9735be882b064437d1d6be9341d8db9aaa563d81a00fa050",
+          "ad595e1b159322114aa7657229d83e36a49e808fe2265458c2593fea29265999",
+          "4121e38d23dd23aa4a097e1c2d33cd9734b94850d4228015fff256c33ddcc686",
+          "d2f58eba0a3649e40963c732575bfe160b325ff6113c8aafd154d2699767bff4",
+          "39768f0e5ab0cc7249d316ccd7500ff17e09a4727be61235dd0b8fcd8de60b85",
+          "e16b259608568e8fe08af138bad6b01111db85233a52558ae2d608da54975674",
+          "9b745efb321017cb602e510c794dc3728f2f3131d234e6167327da597c6d9066",
+          "57e921fcb8d7cb97d1cf515e8e4ea5427db07f8fed7685a064253299eec37982",
+          "e622e845afbeea53c2a9d7b7ec5b02e0ffa2b8f8e0cf104c3c3bd02c9d3fbd01",
+          "89a59527cecfa85c92e4274a6e903c4a6b77af8b61220f0323f562f4432ebeaf",
+          "50fb6a663963d4fc67f4db69d6174129f8b411add3c4867ffa0ea9aa660ab255",
+          "62ca8fe3bebcd4ee36ab7224c95e0e6a6eec00df9cb696fc8f32c39f40017da2",
+          "72d33185e3e53ea4f05b02ed265cb3123adeb13ed6436a008f77454a7f9bdc2c",
+          "ba63ff8963935b2e0a1936ce9f569d7ecdb4cef9012b64ac2a6cf05a80383abf",
+          "057fa7b2ca577edc468ea035a33975c6395862e9b9fb12e2d120fc40a8fa13db",
+          "c0de7f09054923bbcf1f0e9dbea31983cf5940f9fd9bcdc345bde25d86b13173",
+          "e17c85e176ca4056dd439c42d7d3ced2a970c337267e01c4edddf8f771595f29",
+          "dddabd64e4543e74b48422da975c4b5320f8c2387a08466607558027b8881cc8",
+          "e735712fd72efc8cf4a065b2ca92e271ab73a8bd528b37c1618c598de1c89623",
+          "f06a8791c258a4f5c65a89f72e11438420bc058309497c58dfa3f19f50d69089",
+          "a38b6f3173e8c37777a361c228ddf64ccd17a8a1e649e707aad853d12e70b90b",
+          "1161a2af9b050379ac3c04d8da7f0fd25ee7034ab326cdbefa7fc0b0d08913e0",
+          "d70defec1e0c75f732568b919fd35f9a25055be3d507b945d1f7d54de2b6e68f",
+          "51cb1ea232624067b8bb096c459679176e9f71908ca8657a450b354741aa200f"
+        ]
+      },
+      {
+        "Package": "Bsync.Blazor.0.4.0-gapclosure.20261017.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Blazor.dll",
+        "Pdb": "lib/net10.0/Bsync.Blazor.pdb",
+        "PdbId": "c3132d4b-801d-4b32-95f1-81f949b92037",
+        "Documents": 56,
+        "EmbeddedDocuments": 35,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "9d0568051346da8a85df8efd7c5591c8e8e390077259ba8085f14df9c9718d5f",
+          "4f2715c98a8bab68e4f4768af6d32d749b2d02ec5e7aa6c75ab852c0801b7c63",
+          "bee333eaa298a22f1d0b6d06aa17f6e3a588107824df9aad40a45b5f78fb1493",
+          "943d7c2a18346b3887455f70f559070eebf411096cdf421ebeacb39bfa33710c",
+          "528b690b54a29690fb0122d545c81f60583968ea11040f377d647d2bf5bd717b",
+          "c9a086415f4585aaad9b6b4fc5120f4cb194b8a92721f5e87455cd9db6e7e43a",
+          "8d55bd51c8ec0fa6e61a24af52e0a578057889aae4eb1091b3348208a6e12aa7",
+          "e61a0c011155669e395194e0a146ffffa76b3411ca21c82ce318ab689f6ba337",
+          "4fe63f0b7329879d5bfc45c7fb7310c1f18f3a0644133381ab3c2488cad57c36",
+          "52a577d47906637941f24df8dca7b335552b954bee85dd67a03be1b144ce4e56",
+          "2557b8117a7c8ab90d5e96ceea4e360f17de7740fb67c9547f9f61fb291d35e1",
+          "308a55c32b9a7b7495cbab696e34b3b0e07c8575fb49da875b02e7a60b4ad1d6",
+          "cfd69472039c057bf37c32a982ccc781186b9484d118bcf2a904904acaf36391",
+          "5a5240177744c891c2ca05a34fa3c0d92fb73290b777da643a9686864eae011e",
+          "caa854859f10f587182553d7f1220c15df7e04dd38814816bfdb3126e2998070",
+          "e752a68b1917e2c9beaac0c827b9cf2e332070b9a6b2974497d3fb93ca6f20e3",
+          "9d7cd16fdacf440b034ff9f6a3f0b7473ab9b089a65dd918dcbcbf33e63431cc",
+          "474176f427efb3867ee7e2164327720adde2bc2bdfb05d545b5ec39254b35d33",
+          "ba5903102bcd3311d72998f6ebc70eb3751e4885507d9014b7bc267c5748b8bf",
+          "6c964f4b615bef878a7451c280e381f647dbcbab29e2e37282fa024d58434207",
+          "e3ea0cbd24e8a6bc9060c0a3a7767fdec867e08286c7030150ca9e7ae827785e",
+          "cb05c146d68f88d3de9fe43e1982a5a5277f512834baf0158302e40a3ec4c5a8",
+          "e63c81149dab6508a708db0560135f20a37f266a99a4f5e977b0b094f46d5ad7",
+          "210f7a2fc87630c6a959c677a3492ca2745b0a2fd8a99f76af6b865a03516da1",
+          "b7ff68acddafd2740e5662aefeac1db6652c983eb9b17dab099e6d31d61f1482",
+          "5e452aa26f0f872ca0a712aaba6b9a003d1b95a2725c20be5cf0f2e7a6ec2ee9",
+          "c60d4a29c9ef0d4c3bce8a1743d2f14001e74a302e7bedf4b177348f717818ef",
+          "21e2e80579f956061a6332e2336044e1a2282dad812fe3880da69a2d639edea6",
+          "06a3f74145ecb8e370302a7f9da622b812fe393ab005337d60221273f834bf5f",
+          "661b8fefc4ada2a2abd895fc806d40daf79c14bd100c89bce570cc8dce4988eb",
+          "4e3dab9b16c5372a48fadbcf165c0d8f483c6d2dbb838a96db1a3e593aeb177d",
+          "38eb6f99809fcb0c30ad1b82b70e834bf0293a179bd1c2c1a38b37db94854920",
+          "65cdee67ca59e6c8963496a23e8ed97ed552859f51bb2209cf17931fe2f27b70"
+        ]
+      },
+      {
+        "Package": "Bsync.Server.AspNetCore.0.4.0-gapclosure.20261017.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Server.AspNetCore.dll",
+        "Pdb": "lib/net10.0/Bsync.Server.AspNetCore.pdb",
+        "PdbId": "8ab675cd-aaff-4217-a350-16d8df1cde20",
+        "Documents": 12,
+        "EmbeddedDocuments": 4,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "d3470f065a908ff76f47b8073859bbfa1c6f6b7bf48893540a94598b298c367d",
+          "9ac5d926806050976dd01a41cfc94c33f92e7b45a6ba7d52043975e14a42cfa6"
+        ]
+      },
+      {
+        "Package": "Bsync.Server.PostgreSql.0.4.0-gapclosure.20261017.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Server.PostgreSql.dll",
+        "Pdb": "lib/net10.0/Bsync.Server.PostgreSql.pdb",
+        "PdbId": "309e84e5-2aa8-44ad-8200-5eeea6a1e59a",
+        "Documents": 7,
+        "EmbeddedDocuments": 3,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "299d817ad63ca72148104a889c548a95b6cbcc675d956e00e550b240f6220586"
+        ]
+      },
+      {
+        "Package": "Bsync.Server.SqlServer.0.4.0-gapclosure.20261017.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Server.SqlServer.dll",
+        "Pdb": "lib/net10.0/Bsync.Server.SqlServer.pdb",
+        "PdbId": "6d21f0c0-94a1-4282-a6bf-ca4a5fb60e1a",
+        "Documents": 15,
+        "EmbeddedDocuments": 9,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "566f76f5548c2f30e0c7b7c2d213085b9ebc2d578b674bd306d03257106cacc6",
+          "7639d20d93d93eee9c3a8e819dedbda8dc5408cbeb47430a190a6289f0faeade",
+          "c74a964cca27d6b8935c1232bcdfafa513a4ada9ed6a4322e49c95b5096a5082",
+          "6bc2a8055130a22b24983c04e134ee36a98c0377de81233b9ba161c587fb9a03",
+          "bca61cbe3f377cd522dac9262774baa260f535cd5b8553c91b9403675398077d",
+          "e4795b5b3cdd6ecec9640f6e77a86ef18351a0e5d11b016e2b572c7c5d61b8a9",
+          "119e423a12f35347d817a275cfdcd3e4f0779f2d4711ed98ed8a62b2cc6c86e8"
+        ]
+      },
+      {
+        "Package": "Bsync.Storage.Sqlite.0.4.0-gapclosure.20261017.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Storage.Sqlite.dll",
+        "Pdb": "lib/net10.0/Bsync.Storage.Sqlite.pdb",
+        "PdbId": "4fe94a4a-252e-4147-981b-bbf1cb39abee",
+        "Documents": 21,
+        "EmbeddedDocuments": 9,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "dbe1405ee9cf9f0d29c6d438a8525c1b80df281e90c66e6be5dde37792bb5acf",
+          "aa1ec5e84debcb5e7b1ab778ab00520723bfb1b61f843cccb0985c22c750dff5",
+          "b744e0d7a76991b60ee6fb9c11e06284ed2d46ab694a57e4ba58a8d0d7fe37d3",
+          "2c0b1d4878555ebcaec38e819ecb4b9cc6312f0a6fece660a788ae8108f09592",
+          "350f00a2aa6bb77e6b9df5658add6e4042f7a1e9ca7f69c2a1f61c5cca035432",
+          "9cfbf9285e49a0058e83e6e2364b997860194dad57b2aa128d82357358c724f8",
+          "e357773382e29be626cece1fb15b2a39bba5e53dd837639b8b31c3cfa30d2a7e"
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "schemaVersion": 1,
+    "createdUtc": "2026-10-17T12:26:07.538905+00:00",
+    "source": {
+      "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+      "dirty": true,
+      "versionPrefix": "0.4.0"
+    },
+    "packageVersion": "0.4.0-gapclosure.20261017.3",
+    "dotnetInfo": ".NET SDK:\n Version:           10.0.401\n Commit:            e34a38d2ae\n Workload version:  10.0.401\n MSBuild version:   18.9.11+e34a38d2a\n\nRuntime Environment:\n OS Name:     Windows\n OS Version:  10.0.19045\n OS Platform: Windows\n RID:         win-x64\n Base Path:   C:\\Program Files\\dotnet\\sdk\\10.0.401\\\n\n.NET workloads installed:\n [android]\n   Installation Source: SDK 10.0.400\n   Manifest Version:    36.1.69/10.0.100\n   Manifest Path:       C:\\Program Files\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.sdk.android\\36.1.69\\WorkloadManifest.json\n   Install Type:              Msi\n\n [maui-windows]\n   Installation Source: SDK 10.0.400\n   Manifest Version:    10.0.20/10.0.100\n   Manifest Path:       C:\\Program Files\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.sdk.maui\\10.0.20\\WorkloadManifest.json\n   Install Type:              Msi\n\n [wasm-tools]\n   Installation Source: SDK 10.0.400\n   Manifest Version:    10.0.112/10.0.100\n   Manifest Path:       C:\\Program Files\\dotnet\\sdk-manifests\\10.0.100\\microsoft.net.workload.mono.toolchain.current\\10.0.112\\WorkloadManifest.json\n   Install Type:              Msi\n\nConfigured to use workload sets when installing new manifests.\n\nHost:\n  Version:      10.0.12\n  Architecture: x64\n  Commit:       95017c711e\n\n.NET SDKs installed:\n  10.0.302 [C:\\Program Files\\dotnet\\sdk]\n  10.0.400-preview.0.26322.102 [C:\\Program Files\\dotnet\\sdk]\n  10.0.401 [C:\\Program Files\\dotnet\\sdk]\n\n.NET runtimes installed:\n  Microsoft.AspNetCore.App 10.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.10 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\n  Microsoft.AspNetCore.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\n  Microsoft.NETCore.App 10.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.10 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\n  Microsoft.NETCore.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\n  Microsoft.WindowsDesktop.App 10.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\n  Microsoft.WindowsDesktop.App 10.0.10 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\n  Microsoft.WindowsDesktop.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\n\nOther architectures found:\n  x86   [C:\\Program Files (x86)\\dotnet]\n    registered at [HKLM\\SOFTWARE\\dotnet\\Setup\\InstalledVersions\\x86\\InstallLocation]\n\nEnvironment variables:\n  Not set\n\nglobal.json file:\n  Not found\n\nLearn more:\n  https://aka.ms/dotnet/info\n\nDownload .NET:\n  https://aka.ms/dotnet/download",
+    "artifacts": [
+      {
+        "file": "Bsync.0.4.0-gapclosure.20261017.3.nupkg",
+        "sha256": "c76f5598a4598b5d9cfec19c72fcf45fb2324b47727b84af0bd8ff8760537522",
+        "id": "Bsync",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.0.4.0-gapclosure.20261017.3.snupkg",
+        "sha256": "24ecf85503f5755e3710c3f9559e0bb58f5cadf3cdf142047da5b5e464535c44",
+        "id": "Bsync",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Blazor.0.4.0-gapclosure.20261017.3.nupkg",
+        "sha256": "6a4c0991c0800513edac251211ddab44b6ae7d41596bdd348514335693a8db5f",
+        "id": "Bsync.Blazor",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Blazor.0.4.0-gapclosure.20261017.3.snupkg",
+        "sha256": "7f53db04a0ff90ef6c5700583d09b3c68e5d358c783e871a6a29f44c32a27306",
+        "id": "Bsync.Blazor",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Server.AspNetCore.0.4.0-gapclosure.20261017.3.nupkg",
+        "sha256": "aba26e012e331741d2d2c1f638cbd5d15e3c8424e520bd84b1c102c84b527a23",
+        "id": "Bsync.Server.AspNetCore",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Server.AspNetCore.0.4.0-gapclosure.20261017.3.snupkg",
+        "sha256": "9a87fc513810e004ee627c7b638034a924f941e839fb62ffd140e10a061da9b3",
+        "id": "Bsync.Server.AspNetCore",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Server.PostgreSql.0.4.0-gapclosure.20261017.3.nupkg",
+        "sha256": "e3775dd59a481efa53705ca61dcd7dac097c230426c69a78ae265e7d84d45870",
+        "id": "Bsync.Server.PostgreSql",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Server.PostgreSql.0.4.0-gapclosure.20261017.3.snupkg",
+        "sha256": "f35514eb5debd4fa4d959227f1232e3e807aa7c770cf6299d46060523a042bd1",
+        "id": "Bsync.Server.PostgreSql",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Server.SqlServer.0.4.0-gapclosure.20261017.3.nupkg",
+        "sha256": "2e0ec6790f4d5d9401f5f81d34e87236d1a67dcea0323751756bd2f9ebfc0d3a",
+        "id": "Bsync.Server.SqlServer",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Server.SqlServer.0.4.0-gapclosure.20261017.3.snupkg",
+        "sha256": "e992ea75d5858821f68fd5517e41bdaf20119ac8fe341c64f3ac0c9dfe00538a",
+        "id": "Bsync.Server.SqlServer",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Storage.Sqlite.0.4.0-gapclosure.20261017.3.nupkg",
+        "sha256": "61cfbd8bfcd836eb424e07b12f0c518e7b40ad465f2e0825ea915b7cd4f214b4",
+        "id": "Bsync.Storage.Sqlite",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      },
+      {
+        "file": "Bsync.Storage.Sqlite.0.4.0-gapclosure.20261017.3.snupkg",
+        "sha256": "a515e127dbdf941b9e073c9a6801a98bc3577f226ce492976c4c454dbd2ae867",
+        "id": "Bsync.Storage.Sqlite",
+        "version": "0.4.0-gapclosure.20261017.3",
+        "repository": {
+          "type": "git",
+          "url": "https://github.com/msynk/Bsync",
+          "branch": "refs/heads/main",
+          "commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+        }
+      }
+    ],
+    "sourceLinkBuildMaps": {
+      "Bsync": {
+        "documents": {
+          "/_/*": "https://raw.githubusercontent.com/msynk/Bsync/e4286fe2141d0d1e836cfc88dbfa5dfd82154d37/*"
+        }
+      },
+      "Bsync.Blazor": {
+        "documents": {
+          "/_/*": "https://raw.githubusercontent.com/msynk/Bsync/e4286fe2141d0d1e836cfc88dbfa5dfd82154d37/*"
+        }
+      },
+      "Bsync.Server.AspNetCore": {
+        "documents": {
+          "/_/*": "https://raw.githubusercontent.com/msynk/Bsync/e4286fe2141d0d1e836cfc88dbfa5dfd82154d37/*"
+        }
+      },
+      "Bsync.Server.PostgreSql": {
+        "documents": {
+          "/_/*": "https://raw.githubusercontent.com/msynk/Bsync/e4286fe2141d0d1e836cfc88dbfa5dfd82154d37/*"
+        }
+      },
+      "Bsync.Server.SqlServer": {
+        "documents": {
+          "/_/*": "https://raw.githubusercontent.com/msynk/Bsync/e4286fe2141d0d1e836cfc88dbfa5dfd82154d37/*"
+        }
+      },
+      "Bsync.Storage.Sqlite": {
+        "documents": {
+          "/_/*": "https://raw.githubusercontent.com/msynk/Bsync/e4286fe2141d0d1e836cfc88dbfa5dfd82154d37/*"
+        }
+      }
+    },
+    "apiBaselines": {
+      "Bsync.Blazor.txt": "1c669867e3e571b5a6c6f2e4eede2109127ff3689f145d642d0c747434c0f0dc",
+      "Bsync.Server.AspNetCore.txt": "2459a0232fd778972add4aacda8895fcf8f6022fe0b2aa3fe0712a77aaf134b6",
+      "Bsync.Server.PostgreSql.txt": "584ab8dc287454f57b83fe0d1d717e6e51bf53f19adba88782aa0fb0d26bd2f5",
+      "Bsync.Server.SqlServer.txt": "ff4f94215db74b63b3e66d69c49edc239f9b24d798494e37fc4f30934444d268",
+      "Bsync.Storage.Sqlite.txt": "39ba663b4d65d3234057a0f117d15dfb0cf7fbeaa1f963e6b0ed445bb1034435",
+      "Bsync.txt": "8f37f528c50b8656d65bf3f3f0022324bf7150222be667dd93d1d6a410a71d77"
+    }
+  },
+  "packaged_browser_assets": [
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-browser/wwwroot/_content/Bsync.Blazor/bsync-blobs.js",
+      "sha256": "f0e7af6ca07ab974487545d738b3b1a64e2e9553e9c992fc543db4cff16e465f",
+      "bytes": 8790,
+      "archive_entry": "staticwebassets/bsync-blobs.js",
+      "matches_package": true
+    },
+    {
+      "path": "artifacts/gap-closure/continuation/preview3-browser/wwwroot/_content/Bsync.Blazor/bsync-orchestration.js",
+      "sha256": "0aa5a483cabccfb8f739553c7b048e691341e159761e4e858fa323ed17ba467e",
+      "bytes": 4570,
+      "archive_entry": "staticwebassets/bsync-orchestration.js",
+      "matches_package": true
+    }
+  ],
+  "library_source_files_at_validation": [
+    {
+      "path": "src/Bsync/Bsync.Blazor/Blobs/BrowserBlobCacheLock.cs",
+      "sha256": "91320c9a0cb8c2ff6d2f27080c5b9622fafd7f10c6dde358266f5ee441b595b5",
+      "bytes": 2416
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Blobs/BrowserBlobEncryption.cs",
+      "sha256": "ea3ba3d910225fbd8bc220cb4d747823bc274bf21477c31735532d19b680976a",
+      "bytes": 2497
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Blobs/BrowserBlobStore.cs",
+      "sha256": "c32c11af35ae65472134f92fc9f3cfe25dcbddd4a0d9234093bf29576f5bb216",
+      "bytes": 13317
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Bsync.Blazor.csproj",
+      "sha256": "b796f8e8062f670a4925adac2868d6f514b465f83494d6c0b61937bbe7531dc4",
+      "bytes": 1285
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/BsyncServiceCollectionExtensions.cs",
+      "sha256": "48cf831a4a8a6f0dc28e9cd102bd5ee0216338bf6e9d0b62839b96b7304c7a22",
+      "bytes": 3062
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/BrowserAccountResourceLock.cs",
+      "sha256": "78c602ce479d1b6db3b86d3c1429b30094cdde8b61409680ec0a120582ec6374",
+      "bytes": 1838
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/BrowserLifecycleWatcher.cs",
+      "sha256": "8c182f78f759196689124f3a2aa6ffe8edb7c10a64775be6c81e47c35df721fb",
+      "bytes": 2050
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbCommitEntry.cs",
+      "sha256": "bd46d230b33a7f64f57fb8c37611ecfa5c7d4d63a0143c2cec5a25a8909bbbb6",
+      "bytes": 322
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbCursor.cs",
+      "sha256": "4a4ebc01e333c15fd9d03eb8bd9af6b3ac4527e9d93b02080fd257c8b0a03d48",
+      "bytes": 339
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbJsonContext.cs",
+      "sha256": "3c25da8b62900187f78abc1bea9fa223d090ea53d842a4c797a6463b942c9a8a",
+      "bytes": 682
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbMeta.cs",
+      "sha256": "b40283d06ad8160473184605c7f64b2b648ac3366e8f0965423fbddef8a0bd69",
+      "bytes": 396
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbMetaUpdate.cs",
+      "sha256": "cbdf32a6e2824473138f0ce629d4d681313cdd2f6f97207160df58157c27e6e9",
+      "bytes": 306
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbRead.cs",
+      "sha256": "114c1bdd718bd141a983dd6a728e904533561b3e4988315cfb97c373ac881491",
+      "bytes": 307
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbRecord.cs",
+      "sha256": "fc1f461577d0f1031ee492162d53daa11c545d3a910ee5e3fdb7026d4d929d19",
+      "bytes": 2274
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbLocalStore.cs",
+      "sha256": "b9cede84ed6d18a0a241e85efde31f37a0799e03579c1a5481dbb7ee93db835e",
+      "bytes": 27054
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbOrchestrationStore.cs",
+      "sha256": "ec58481037156710fe5a4dfeb10628337572198ff3dd8f92aa62ba6c7160db9a",
+      "bytes": 5200
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbReplicaLease.cs",
+      "sha256": "a5d5a4205cdc900ed1f11a3bbae4864f703dedb8ace5866b557c78b223b51edd",
+      "bytes": 2488
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbStoreOptions.cs",
+      "sha256": "eb83eb7980b0e9fe4fb1362581fe06110dd71c3c9677c35e44d683135dc3b9c7",
+      "bytes": 1789
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbSyncServiceCollectionExtensions.cs",
+      "sha256": "d90efc02460bd6e2f6c67bea7c5b89a523286ad98f4b89f093bb07a1a123a776",
+      "bytes": 5591
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/ServerSyncClock.cs",
+      "sha256": "c722a8a07f9ad9e0f7bf7d09246dc9e81d53705003a100b29048dc33df5ff40e",
+      "bytes": 534
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/ServerSyncCollection.cs",
+      "sha256": "9f5d59cedae612133a1dac390835d6bceaf6f8fa3fd12cb52663881629bb527c",
+      "bytes": 14088
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Unsubscriber.cs",
+      "sha256": "b073cac63e94048accacf1dcc5e9275ce60c58e824672302cc7b8fceb45a5763",
+      "bytes": 350
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-blob-encryption.js",
+      "sha256": "de8cca40175759083de5b036c0bf0cd0cdff8ca08b0f78638dd08807f6bf556e",
+      "bytes": 1393
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-blobs.js",
+      "sha256": "f0e7af6ca07ab974487545d738b3b1a64e2e9553e9c992fc543db4cff16e465f",
+      "bytes": 8790
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-cache-locks.js",
+      "sha256": "698090f0d77d46cd27126614a77fca8f84ae6696992b657af49aef57a9091489",
+      "bytes": 783
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-indexeddb.js",
+      "sha256": "e3c22b2f8e7c835b19d2b9a2e92414443ad9d486440fa4cb7afad7caf721d705",
+      "bytes": 30505
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-orchestration.js",
+      "sha256": "0aa5a483cabccfb8f739553c7b048e691341e159761e4e858fa323ed17ba467e",
+      "bytes": 4570
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/Blobs/BlobStores.cs",
+      "sha256": "c840b34586c5b25a98d06db1a2ad839f24f60697bc88438d22934f7b42bfa35a",
+      "bytes": 13207
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/Blobs/SyncBlobEndpoints.cs",
+      "sha256": "9bb344c00c27bad44264b73995a1e620fcf1b2d30bbb699c057cdd0e0105a061",
+      "bytes": 14304
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/Bsync.Server.AspNetCore.csproj",
+      "sha256": "8b93ac243cd19354be80ec294167d9df9eebf0e448972124f881289b50c954c4",
+      "bytes": 744
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/LimitedReadStream.cs",
+      "sha256": "f9379049eff8ac00e46eb3a5866fca75a55c5f766a5b81d6b35195f50772d49e",
+      "bytes": 1751
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/ServerLog.cs",
+      "sha256": "d15931734d1969d641c646778d3df1491b30dd22cf91328e1388875333665ab0",
+      "bytes": 1162
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncCollectionGroupBuilder.cs",
+      "sha256": "ba838be02e2140a3a176331a455c6113a0452b76b238c39d60f7634ba70cef8c",
+      "bytes": 2775
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncEndpointOptions.cs",
+      "sha256": "51a6170aeedfc8ce653f30be803a182f1d81d798ba8e939569ba7e819ad10e2d",
+      "bytes": 1954
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncEndpoints.cs",
+      "sha256": "6d3b65de32c8d4e084416639cdfc12fa3a818f0d1a704e817e8876efb4fe5835",
+      "bytes": 31181
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncRetentionService.cs",
+      "sha256": "5aa199f9e59c6fa58b6bc8161be8ce90b6ab3fb37749886225a4d9d49538bb65",
+      "bytes": 3000
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/Bsync.Server.PostgreSql.csproj",
+      "sha256": "0f08078538e2a641ef1f9d62c456a9d7b437a39c8155494940d73fb1681cab0e",
+      "bytes": 749
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSchema.cs",
+      "sha256": "40344e2c490549dac3c3d979946ecb87cece1f41f8f43619ea0d0ec2c5164eb9",
+      "bytes": 5670
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSchemaException.cs",
+      "sha256": "efe2fd2687e4df6f69a26cffe9dc64a264afa28fcb6ae7f7e32395717cd5c241",
+      "bytes": 298
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSyncAuthority.cs",
+      "sha256": "76dc579f0cf9e169e6c9bb676f398a80e4dd6efb0e1928686220ae6bbdede182",
+      "bytes": 58974
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSyncAuthorityOptions.cs",
+      "sha256": "db7632b7f698ab869d0bd5ba2bf4041f65b0e7d9e52c6d10e427c54c57998ca2",
+      "bytes": 3246
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/Bsync.Server.SqlServer.csproj",
+      "sha256": "4060dfdb84ac9d8d10caaced551c9477962f867d634f9670294eb4747114515d",
+      "bytes": 1146
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerJson.cs",
+      "sha256": "57098e4d3c8bc684d6d89e0a4968fcbefaeb63ed99fd5cbd8f7b917c1976c12c",
+      "bytes": 299
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerReplicaAudit.cs",
+      "sha256": "8606874a2068c673f5f84319d49a91ba41ab3603306416d69cbfa8d4a2d5b7f6",
+      "bytes": 6641
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSchema.cs",
+      "sha256": "9a5b802d060303c19cd9d875edc109183f6e1d64c4b202f8c857c1e86e6faf96",
+      "bytes": 9266
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSchemaException.cs",
+      "sha256": "dd8654f3749d00a8037c8df22cf6f33ca5112bddedbad162f1d44ef8967220b5",
+      "bytes": 291
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSyncAuthority.cs",
+      "sha256": "19d6e0ce56108e91efa407a3a5515c9c8fa9fb7039442bfeea0d084b166b3203",
+      "bytes": 70193
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSyncAuthorityOptions.cs",
+      "sha256": "c3212b9b7f533ac8c51d5322f0a4fb490a5171ca78b78299abfdd7b8599609bc",
+      "bytes": 4383
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj",
+      "sha256": "e90341c90e26f451a4c042cca350643b8d5b759ef8cf38ad0fe29ce70b16d63e",
+      "bytes": 1076
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteDurability.cs",
+      "sha256": "1e541e4c8a75e328056c454075fabd79443bed66c2dc03cc6d93a25065704d61",
+      "bytes": 806
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteEncryption.cs",
+      "sha256": "cf3855e663fd9574db868e8ff1afcd8dfc4d64f15eebdcfe353ee7b2fe5484da",
+      "bytes": 5438
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteJson.cs",
+      "sha256": "1e455cf604b3d8b622328ab33e2c7a59e0d08858f6a7d27a6d705739d25e0a93",
+      "bytes": 507
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteLocalStore.cs",
+      "sha256": "38a64144ed2fc54bed9ece637935783b126132416474b7441e177d1ec43e2436",
+      "bytes": 51075
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteLocalStoreOptions.cs",
+      "sha256": "40203c389b4c910b71d91a65c99d7f88c6f74277ba23eb3e2da7652581b1fe73",
+      "bytes": 1698
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteOrchestrationStore.cs",
+      "sha256": "99315e2b1d66a4a9f7b515500ef4f28b9f1c237726e5cca59439f895527c80b7",
+      "bytes": 12183
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteRebuildReport.cs",
+      "sha256": "ba14844273d2c8deca409e1810b163b083a5ec340cb00b68a7230aca98767471",
+      "bytes": 1032
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteSchema.cs",
+      "sha256": "d585a6cbf6cb4ead005db3de811f499370f9fddc741c7d8f9040fe72816afb74",
+      "bytes": 8569
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStorePool.cs",
+      "sha256": "85bab602153c811e28a2ca9e94a19dcb480181b07f4cc30fe5ceb033780b00a6",
+      "bytes": 4876
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStoreRecovery.cs",
+      "sha256": "e7b6a42c7ac905202318074865846166b8a4e1a95154f36a8c88f411d49a790e",
+      "bytes": 14457
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStoreSchemaException.cs",
+      "sha256": "a4ffe8922044a57149cb3954b5287b9570ca0defdbf64303649e4a51092112d1",
+      "bytes": 384
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStoreUnreadableException.cs",
+      "sha256": "ec05ab17caa5d8db34ba21ee31e197df3d4f769ae8fd704f26605cd17692fc21",
+      "bytes": 453
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobCacheLock.cs",
+      "sha256": "65aee0aba44f7da329af59d6c15faf591dad5738448b628a5db9f34ec3bcfadc",
+      "bytes": 3047
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobChunkStore.cs",
+      "sha256": "429f332a410874c9216a7f6e38f20ba57a80b73de2270fe56de3c307c8df6b38",
+      "bytes": 4187
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobEncryption.cs",
+      "sha256": "854bb6bc72e9daac2d340cee69822ae8ef27a42d7e0709a96d532f3ef203d54c",
+      "bytes": 2860
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobInventoryMaintenance.cs",
+      "sha256": "a5d978f181c339fa37a59c3f9be2106e04e5036b052027bdf1241ac1b48e9f4d",
+      "bytes": 4470
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobOwnerMaintenance.cs",
+      "sha256": "cdf0063bad9148207327267541f8495b690121d2a503aab98d3cb53176dbb3e0",
+      "bytes": 5030
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobRepair.cs",
+      "sha256": "7bc1cd504750247b5eda999f7e67706261e393ef50887702e62fd3027e43f93d",
+      "bytes": 11066
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobTransferManager.cs",
+      "sha256": "5ce0ef29e90540949036a316ebbc65605e7f001920c214458f6e147e3e41a3e4",
+      "bytes": 27235
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobVerification.cs",
+      "sha256": "c3a48f0652a572776940514524015ce85bf0080c1c32f964a261ceba31de2de1",
+      "bytes": 3638
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/Blobs.cs",
+      "sha256": "f7d2cbbc5035a590c4254e180cb3ee364a11b27497b9a4e6865f57524c3746ad",
+      "bytes": 6343
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/ChunkedEncryptedBlobCache.cs",
+      "sha256": "a72617e36ef1a742b6dce5cbce17ae26bfbfe84665add3c16463a3ccfb891a9d",
+      "bytes": 40130
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/EncryptedBlobCache.cs",
+      "sha256": "54ceabb28c228f7f6aa27798ea27a60e8f4e46b864a976a645c7f5aa7620c111",
+      "bytes": 24016
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/FileBlobCache.cs",
+      "sha256": "cdd2049470484194db71b6b932792f926ce970d6b93aa76f1ca5953e06d96464",
+      "bytes": 11211
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/HttpBlobTransfer.cs",
+      "sha256": "d5fd6c27e201e04f6509b21c68877878ee22b8f3652c5b4c601f9bdb7b8bfb01",
+      "bytes": 22371
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/ManagedBlobCache.cs",
+      "sha256": "dae3b4f943e798dff552f4a606424c4c55dca6616cf923f42bfc1380680ffcbe",
+      "bytes": 27491
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/OfflinePackageManager.cs",
+      "sha256": "be44f9fdcf84d44b8ea2521463e19c403b3f9bd4d20cdb9685b2032e5623d118",
+      "bytes": 29513
+    },
+    {
+      "path": "src/Bsync/Bsync/Bsync.csproj",
+      "sha256": "08cf5c40850a37e696fbbfe35d3bf803cc6d2972e812dce2afb7446a2afcc7b8",
+      "bytes": 1070
+    },
+    {
+      "path": "src/Bsync/Bsync/Checkpoint.cs",
+      "sha256": "1a62b966abdbd282871ecc9f131a755a33f70d59957b2126e5b7f730cebb9f52",
+      "bytes": 1114
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountComposition.cs",
+      "sha256": "281caf9547742d9ce75e0acca573c6abe0accecc622e7da7cc5297716ed1f87c",
+      "bytes": 8726
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountLifecycle.cs",
+      "sha256": "8c82e6ad3f0650286e6f479b4009ba2a8bc02fdd507c0463a29de0e05d0dc058",
+      "bytes": 23516
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountResourceLock.cs",
+      "sha256": "ae00467b8a9c31b80a1fbb2638bf0814bf38efee0140e8df026a6f9dafa77182",
+      "bytes": 2619
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountScope.cs",
+      "sha256": "35e1fee2e77206bba41af7dd4e31020eece1eba31265862b80bbfd803ced6252",
+      "bytes": 1944
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/BackgroundWork.cs",
+      "sha256": "2b76e4d20ba99cc5b6f8bb96be528eed6d94cac1468e2f6e39f2b3233a4b9df7",
+      "bytes": 10719
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/ClientServiceCollectionExtensions.cs",
+      "sha256": "ee3be886849b6488bdd8819c029c27a55b39503f81ea4bb6147e54b81a2918ec",
+      "bytes": 2425
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/CooperativeDeadline.cs",
+      "sha256": "5d99624851776b40427579eb96cca2bdbb006b5c3ee6cb35402270e7193a5acd",
+      "bytes": 1235
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/CredentialRenewal.cs",
+      "sha256": "113feb1d7da1e0200343bb22448928957fadb752fb3eb2e5e08853054fcc5be5",
+      "bytes": 837
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/CredentialRenewals.cs",
+      "sha256": "914fda48bd2e5dafedbc0d80015050cb181c73cce03675325975aba48bb53632",
+      "bytes": 2108
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/ExecutionLease.cs",
+      "sha256": "aff5fdc7c6b754eb277dbd4870b1c9792b99baf044b21e9f7003863e406523b3",
+      "bytes": 4769
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/ISyncCollection.cs",
+      "sha256": "a22565de7571362af2410db3933df9135dbb496ebfd21a782f688b768547f8df",
+      "bytes": 7029
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/IntentRequest.cs",
+      "sha256": "8efda385bd597f8f27e7a3cdb0cd1f122a756336ff98f725d3bd91bcb9aaa3e6",
+      "bytes": 8223
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalKeyAccess.cs",
+      "sha256": "773f3515cf0f614226732ee9fffff16cfc6d20ed37a708000e2bb645448ccff1",
+      "bytes": 4782
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalReadModel.cs",
+      "sha256": "218bb2800b8211b803ae1f5663a4a0f4d4abe10959e34fd9655468d8197a408b",
+      "bytes": 23962
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalReplica.cs",
+      "sha256": "39dd0d12e1d0af78e42f5b23f0708683d1ae43deb51c7c701b0590cb7360eb7e",
+      "bytes": 1062
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalSyncCollection.cs",
+      "sha256": "7f4a5e2c17b9ce81aab0d1d229305d6d4cdf4a7b58fc39e175d3d7520d630140",
+      "bytes": 13311
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/Queries.cs",
+      "sha256": "31c313bc9cfe026b2a0ab96f376b057bfef78f387a04a6b618f06ace53d9f45d",
+      "bytes": 1602
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/RecoverableWorkflow.cs",
+      "sha256": "de7e3a018b0361fa5aa30c5c928b1bbd4639a6ce6a4caff1f976afa5c611ae5b",
+      "bytes": 9180
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SessionLog.cs",
+      "sha256": "a7e652d6c839959fe1dc9cf2880843c7ecebbac5408bdbb4489a13fe8283d66b",
+      "bytes": 1081
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SessionTransport.cs",
+      "sha256": "fd17df26ed8005f4f42abb9677d50a33f493cfb13ff5a2627fe91069e3b3b269",
+      "bytes": 3123
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncCapabilities.cs",
+      "sha256": "f198b06add8b37cc7f9b06b013608d055d7c845d0c16f9e366ac9ebdbf533058",
+      "bytes": 659
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncConfirmation.cs",
+      "sha256": "474df9e41b48a144dfcbdbfa30009bb18e94ecd25572a5d8c27a181b2b448303",
+      "bytes": 656
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncCoordinator.cs",
+      "sha256": "23d87aafdd81b73dbc56319772f16dd50a451fee58edae4f18c64210f2075d7e",
+      "bytes": 21513
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncDocumentConflict.cs",
+      "sha256": "ee75a18602571c38253fd7ff49fe4bed09c6b074596d6be10611e7e2de20fb47",
+      "bytes": 851
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncGoal.cs",
+      "sha256": "4eebd019ba666e4dc7a1c90049dad0463a74a86d167d67f29c1c9b80a50c4db7",
+      "bytes": 3889
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncIssue.cs",
+      "sha256": "6a3e14e54abbfcd3902fe7d213a451d12bd065073cb4d52352e330543c184430",
+      "bytes": 1428
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncItemState.cs",
+      "sha256": "46165e2870a6d6658ebbc814f894b4529b6431c9465f703d36c2cc7458d2001d",
+      "bytes": 887
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncItemStatus.cs",
+      "sha256": "82a4f77176aaaa848289c285aaca1b3c3e46f7c12204ee03b3c6a588f802fec4",
+      "bytes": 516
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncQuery.cs",
+      "sha256": "f05ccbde7b3da80ff46c75fe063321d171366f17c90b393dbe6e982fb52e5163",
+      "bytes": 2651
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncSession.cs",
+      "sha256": "2c24a64f2c29a87d30b9ffa4fc2d5113ab4367e81436350241fbda43c0d107db",
+      "bytes": 35538
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncSessionOptions.cs",
+      "sha256": "67b333a403fad6e20696c02cf8bfad40b3067ed9ab40a1f0a05c72a58aa277ba",
+      "bytes": 5398
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncState.cs",
+      "sha256": "270a50f4c15e340107942f8dd007c93bd8a0b79d28cd51675790fbbfe4cd8743",
+      "bytes": 1041
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncStatus.cs",
+      "sha256": "fc514d2cd633aa84ad9f903467a88c2113ae1b2b7ac7f5ed5d518cbab09334b8",
+      "bytes": 2582
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncWriteResult.cs",
+      "sha256": "92aa62855709d7663e76459f59856422d64fc9e7a7f5fd1af4397078510cdf04",
+      "bytes": 645
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/Unsubscriber.cs",
+      "sha256": "5cbc94f011f8cce7a6438f4bc30eafd8350becba4dc40cd40df7302d914393d2",
+      "bytes": 267
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/ClockDriftException.cs",
+      "sha256": "d126fd35357a3a545baef452a401d2d4a95d5e741657575d159f283c8f0b5a3e",
+      "bytes": 622
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/HlcTimestamp.cs",
+      "sha256": "8440508e066e84efebe416bc6b923e55427351fd93959fbf2011a1741df8a538",
+      "bytes": 8368
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/HybridLogicalClock.cs",
+      "sha256": "f21b7433abf613c042d0b402f1b5eab4aaec1d71135f0be6fad1e84d17647d64",
+      "bytes": 7494
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/IPhysicalClock.cs",
+      "sha256": "e1a34af2cb282f6437d9204f345afa5fb809bc33384b4ed71dc03e847ab22ece",
+      "bytes": 397
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/SystemPhysicalClock.cs",
+      "sha256": "67ce40eefb15304b0f728d398705a6ef14b77d14ba05cc2163d1d11da3c33a90",
+      "bytes": 420
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ClientWinsConflictHandler.cs",
+      "sha256": "5b925c10115e731095a71b994f68618d89ff79bf9e2e885148bc25431176ad1f",
+      "bytes": 1316
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ConflictContext.cs",
+      "sha256": "650a54b9f98ac1a2aed1cf0fa08c095651fe63a2ee909e4021f2b691ddaac38a",
+      "bytes": 1056
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ConflictOutcome.cs",
+      "sha256": "a9caca0c581733bca34fb199a77d0ec904d41990b29f12dee24e72c8da5b49cb",
+      "bytes": 1014
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ConflictResolution.cs",
+      "sha256": "def61e9ad5955b79f67d0b8c4a044d7a15a8466fac96e9860b2c43060cca8967",
+      "bytes": 1691
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/DeferConflictHandler.cs",
+      "sha256": "e24d66abb5a9d185977bfb554137e1e1442c372352336626a650bca59c4b7eb3",
+      "bytes": 716
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/DelegateConflictHandler.cs",
+      "sha256": "a1835a01b49fc519a8632a408c8cc7c76bb7397fd714b238f184e47ea302d0d0",
+      "bytes": 944
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/IConflictHandler.cs",
+      "sha256": "ae67036d47881bbd209d4fc3f5676ce073aff141ba5f33a75e672b9e0370a4d0",
+      "bytes": 786
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/KeptConflictView.cs",
+      "sha256": "e901ab9e194e52845f804994d7679f5f2a2490cc231b85a825908a353db13f87",
+      "bytes": 758
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/LastWriteWinsConflictHandler.cs",
+      "sha256": "009bd17494e43703937c365bfa0b7d2ec4b7e0240d6f2cbc8a60b9f3bdaa8052",
+      "bytes": 1323
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ServerWinsConflictHandler.cs",
+      "sha256": "15d103138300026b468c35b31698baa15c9e4781ab07e132fd3932bfe1c3027a",
+      "bytes": 639
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMerge.cs",
+      "sha256": "8bf96277bc5c3fee26aaa19727ae7a8b8a3734a9bf92a6fae20aed1fd4dc4d9c",
+      "bytes": 9305
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMergeConflictHandler.cs",
+      "sha256": "1ad4c1e088f34d5dbff4e8e76f79bb654024d7355046e899b8340d30ad3c208d",
+      "bytes": 2088
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMergeOptions.cs",
+      "sha256": "e5e7c4ffe09068cecf86c43c6be7bf5cea78f41ab029402fbd4e52b65ef27544",
+      "bytes": 1201
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMergeResult.cs",
+      "sha256": "06d6384c3e7cbc03564bc4e5c1e80b932bb16ffa93b531b25c89c9798a53e16b",
+      "bytes": 1011
+    },
+    {
+      "path": "src/Bsync/Bsync/Diagnostics/OfflineDiagnosticExport.cs",
+      "sha256": "e937aaa7f9996a8f24379aa87e4ed2c0f6b3dd6940a2d5270b1a290197298014",
+      "bytes": 8408
+    },
+    {
+      "path": "src/Bsync/Bsync/Diagnostics/OfflineMetrics.cs",
+      "sha256": "13e3ff2fc1b446a09b86e541eeb9511207c0d62a786ae881e980f4acb786c050",
+      "bytes": 5874
+    },
+    {
+      "path": "src/Bsync/Bsync/Diagnostics/SyncDiagnostics.cs",
+      "sha256": "a61a0589995fd6851c75193f964d47dc596b08ff4e9cf003852c03e2d46ec309",
+      "bytes": 5720
+    },
+    {
+      "path": "src/Bsync/Bsync/Documents/DocumentCloner.cs",
+      "sha256": "2951577172429ed053412544f2a5b42e3fbc6d02683bebbcfa84e8a8fb0442d2",
+      "bytes": 4998
+    },
+    {
+      "path": "src/Bsync/Bsync/Documents/DocumentUpgrade.cs",
+      "sha256": "e855b564bb80664f1a754987134f4b714d63edb956983bf5238d7e8433a20f8d",
+      "bytes": 1964
+    },
+    {
+      "path": "src/Bsync/Bsync/ISyncEntity.cs",
+      "sha256": "37525635f47ff38685957a474da963364bd4e4ba99ea424b20d2b4076065c9f4",
+      "bytes": 1678
+    },
+    {
+      "path": "src/Bsync/Bsync/LocalWriteReceipt.cs",
+      "sha256": "2e38d933a77529123dce89c54bf1ebed0d0299e69f896d73d9ceb8869e81767b",
+      "bytes": 886
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/CheckpointJsonConverter.cs",
+      "sha256": "71ce9221d17165a40d87703e7b879d387962d059ab36d8bed6b176eba633ee6c",
+      "bytes": 1133
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/HlcTimestampJsonConverter.cs",
+      "sha256": "c22a39c8418fc102f82abedf13124b32f53dd18d411024cd651334d3ec8abfd0",
+      "bytes": 1032
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PullRequest.cs",
+      "sha256": "339f599df174b4cf978c69a1962c32c0dcb37b38929b6f06d20bfee91af51949",
+      "bytes": 1345
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PullResult.cs",
+      "sha256": "c56035d4bb924d9ea9b6a26285963a97672e5dc7754be8f973b163a2d5705749",
+      "bytes": 2939
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushErrorCodes.cs",
+      "sha256": "969c598573b9c63d249090badfedf5bc2f1c843b33d914b2dfc22586b9f0e883",
+      "bytes": 2552
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOperation.cs",
+      "sha256": "89999b28a841c758b1db8bd3a2ec2df7bcc854bb85642e3595cb9104ebefce9c",
+      "bytes": 2218
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOutcome.cs",
+      "sha256": "450954100f525a4b27468f3006a99f64e8401b2db6f5107dc8a5b0cf0b0ffa78",
+      "bytes": 3529
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOutcomeKind.cs",
+      "sha256": "c8116173e1e2f60f84bf0a3cf56cbdd725064afd51694f319237786b87696c38",
+      "bytes": 1096
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOutcomeKindJsonConverter.cs",
+      "sha256": "f27ddd5a996d204c3c4dbfab1fb57916a1ca901f7e24dfca7fc5606ed7f890ca",
+      "bytes": 514
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushRequest.cs",
+      "sha256": "3c887c02ad55879e5593f4b87b69d2395437af3ba79f6a8916b6dcd478f9ab04",
+      "bytes": 640
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushResult.cs",
+      "sha256": "2374222759414543024f497b1537b69442259446a0be65679d071bf9192fbccf",
+      "bytes": 587
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/RemoteChange.cs",
+      "sha256": "18e8d0374408ead721a5681dd1ef556db9fa9479ba5ccb800f2c61cbdad2dca9",
+      "bytes": 893
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/StreamEvent.cs",
+      "sha256": "d81165f41eaa2e76af95100fed9f945d5532985cead520a999c562d4b1e8d242",
+      "bytes": 1459
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/StreamEventKind.cs",
+      "sha256": "1825eadb0f0e3f330f8804fdbbd12c2c0de96d91c01b8b60e051c14387ab3034",
+      "bytes": 612
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/SyncFeatures.cs",
+      "sha256": "f2be9ed9d6b0b6eb3dbcea9bed1fd4cba28df498a604d70c4633974f45d5a31a",
+      "bytes": 1985
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/SyncJsonTypes.cs",
+      "sha256": "d62f0eab74fd0b2f3ff13ec004e2a37a42f7c7563958ced3dbcc6afa4ce56e50",
+      "bytes": 1803
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/SyncLimits.cs",
+      "sha256": "03b0c93e195cf239bd17b03d20162794a66e27fb13da6b039acc65b36f59ec15",
+      "bytes": 674
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/WireInt64JsonConverter.cs",
+      "sha256": "2ae1e4160e76826c21c1e090154bfee588033873f9d4688323af4fd98e6de60d",
+      "bytes": 1925
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/WireNullableInt64JsonConverter.cs",
+      "sha256": "d5cc788c52f8454c06d0909f68c2435ed829450c229f286c44722e4cef6e1449",
+      "bytes": 966
+    },
+    {
+      "path": "src/Bsync/Bsync/ResetReasons.cs",
+      "sha256": "e8d5baf7a48e2c52a04d07151b3cc244e4506640e76f01f608360583848917c6",
+      "bytes": 730
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/AuthorityCommit.cs",
+      "sha256": "c1c8c5ee9659bd3b99cc4082077d6c5ef5cc677d983deac8b7befd795f5eac63",
+      "bytes": 370
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/AuthorityLimits.cs",
+      "sha256": "6f55b66e51083179a774d4a10d7f232b18dabec398d15afbd16599b22c554cf1",
+      "bytes": 368
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncAuthority.cs",
+      "sha256": "4c04023cc614bee3e6213423760a4d9e109aaac6be3633eea23b4f9746cccc56",
+      "bytes": 1300
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncCommitNotifier.cs",
+      "sha256": "03d82ac079bbe9f1ddd441cf9f2bf866f062c4cfff634ea3e34d6ec0c856abcd",
+      "bytes": 482
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncDocumentReader.cs",
+      "sha256": "e6eea8d1a76d3031c8de65dd0031fea8aab07f84e423fc9e46583a716a22d172",
+      "bytes": 1096
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncPublisher.cs",
+      "sha256": "7efc8475348060f70a47c60185d1031ae5cf429aeb47cea6c4dbad6d47c42e04",
+      "bytes": 2985
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncWriteHandler.cs",
+      "sha256": "21a0f35f4a2fd4299d538e654d0bfec6c2a692c1cf34bf8c8b8ebf39731d7c4c",
+      "bytes": 1312
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InMemorySyncServer.cs",
+      "sha256": "42a4dfaebc02f4d3a65049652ae18e45f2a5fb777e779182398c5a5175c09a4a",
+      "bytes": 42741
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InMemorySyncServerBackup.cs",
+      "sha256": "dc43903fa460ad723895d9a891f0546e326585b5435d87c3a75c3c6464e8a314",
+      "bytes": 1294
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InMemorySyncServerOptions.cs",
+      "sha256": "a9c724599ca1b8357800a2e0c2185876b0ef960794a00372bea6f7e711371b50",
+      "bytes": 5295
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InProcessTransport.cs",
+      "sha256": "8c56b7c58c4ed745bd6979f7038a90103ceb03ea126f04123ae3cdb77701a545",
+      "bytes": 2219
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ScopedAuthority.cs",
+      "sha256": "b34dd16646e32dc39742560efb835c2cd86db343d5838c69663cdf67bc29361f",
+      "bytes": 5066
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/StoredDocument.cs",
+      "sha256": "b41261ca03a7cc2fc63c0f6adb35b354c9038d3730bdf51e01e2115d667a08c8",
+      "bytes": 532
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncCallContext.cs",
+      "sha256": "283751d3d638da483ce4424e2c536f7d9fb06fbeb62d44af18aff8e81da5f247",
+      "bytes": 1005
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncPublishResult.cs",
+      "sha256": "e76ffd465d0942386df9eb423f53854bdae9a653847ce8fdcd5eaad0e02fe934",
+      "bytes": 828
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncReplicaAudit.cs",
+      "sha256": "bb58c340338c41c4a515504fbdd7335989414a83dcc91ac6c5b3fc5b1d70b6b0",
+      "bytes": 2999
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncRetention.cs",
+      "sha256": "3dfe4d782b8f024ded3f6d1edeeba556e85b512170dcdf43f791266728e2a426",
+      "bytes": 6400
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncWriteContext.cs",
+      "sha256": "f76148248a128851b17e9e9262a082e919969be70b23c107d43b22f2f2519742",
+      "bytes": 1956
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncWriteDecision.cs",
+      "sha256": "333d47b2689d5df3b3de7da98557750d8314c5e7c3d35ccfdb275cb5f602cff7",
+      "bytes": 3823
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ILocalStore.cs",
+      "sha256": "7ee910da17747bed11784e3fc7e4e3bf5581e63a899faf23bf5eb9927fc6c435",
+      "bytes": 9657
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/InMemoryLocalStore.cs",
+      "sha256": "a2f082bb06eae23c7bfa87c692c016662b07fe4d9e56fe4f5b0fb96f09c8431f",
+      "bytes": 19494
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/InMemoryOrchestrationStore.cs",
+      "sha256": "fb182258d06b5faf89ee06e327dd715bf0f288b9781de9375d11cd9da7b8b676",
+      "bytes": 3268
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/LocalStoreIndexing.cs",
+      "sha256": "a324ff4f8304c38d885e6a3f932d1c2533441395f630082e488f463f7ace817c",
+      "bytes": 3841
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/LocalStoreUnavailableException.cs",
+      "sha256": "7bc591b287129b6e4f7b026ee1a90453a06e956105d956f3e0162a4b5883c360",
+      "bytes": 851
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/OrchestrationPayloadPolicy.cs",
+      "sha256": "24fe04007ba9f0c498ff0c8474344b4f2ab6eb33a3b448368e39a24d8d02ed36",
+      "bytes": 2622
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/OrchestrationStore.cs",
+      "sha256": "a8401ff8bdf04688f72b3c48af6d4d518dbd4728595a0e0f79d459ea837e4e97",
+      "bytes": 5801
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/PendingOperation.cs",
+      "sha256": "9fe4e0255915868054434ae3beeb586a7fd7899395aa81ae16aedf2f8b791f77",
+      "bytes": 990
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ProtectedOrchestrationStore.cs",
+      "sha256": "f47d9c803e748e14898f7b31c7643e25da144bb882283c90a19c627c18fd2208",
+      "bytes": 9720
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/RecordUpdate.cs",
+      "sha256": "dda9df891b5583eaf7fb57390970e94e2d4233c92a378871eb061ee0f08193d2",
+      "bytes": 1310
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/RecordUpdateResult.cs",
+      "sha256": "97222e1c094c95c2e8a1a1590b5a408c1229e69122d396f48833001b591120b0",
+      "bytes": 521
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ReplicaCursor.cs",
+      "sha256": "9568ec6e734325cbaee6d5b019c007e397479e2db5076cf11df3174e350ac1ee",
+      "bytes": 1261
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ReplicaIdentity.cs",
+      "sha256": "0a428abab5feaebd80b715e903f01088f2124589ec2a1643780f8dc6875c2668",
+      "bytes": 520
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncConflict.cs",
+      "sha256": "178fb8c75f390c3885a235d801ff6198a7190fe100f9c87946ffac0f36b7236d",
+      "bytes": 667
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncGroup.cs",
+      "sha256": "7bb3e77541412e447179f8aa8b70e712c54f8fe00f5289578abc4fcf57def2f7",
+      "bytes": 321
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncIndex.cs",
+      "sha256": "bca078fb52fb14268f8bea445ddc49730721dabb4d327d90130d015b9702cd42",
+      "bytes": 10209
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncIssueCounts.cs",
+      "sha256": "ba2eb6eb6685602e5bb5280a0593ae715f89ff2bd30e91001c90031cdbc2df77",
+      "bytes": 695
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncRecord.cs",
+      "sha256": "29e888f0efe9d0b40c45112cf9949584362476a2f190c052fe4982dfaa7e2b17",
+      "bytes": 4372
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncRejection.cs",
+      "sha256": "a549fcc3a8a6b574027bba48ee585656d251d5768fded2b3434c116505c2615b",
+      "bytes": 1417
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncChange.cs",
+      "sha256": "17c60b0c03c7f2bcc218d9791bf21f7d0b4efadd9e54080e527a16b5592a59c2",
+      "bytes": 527
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncChangeKind.cs",
+      "sha256": "056924fb3a99b981012bf9ceb6d61c16a39df8df4a78bb2d762ee0e9a448613f",
+      "bytes": 681
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncEngine.cs",
+      "sha256": "3ca245f2c4d6d65b762e93154c773acee93331b70bf7a3007c44d75c0346fa67",
+      "bytes": 81321
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncErrorCodes.cs",
+      "sha256": "97cbaaaf700aa2584ddf12c8e90533e22d6cc9d6dde148e2ad364906d08783e0",
+      "bytes": 1258
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncIds.cs",
+      "sha256": "41d40083c384d4a0519c3fde3a7f1fee85c2e4e7a69bc179639e446b302bbf17",
+      "bytes": 1939
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncMode.cs",
+      "sha256": "fac34b5d96c75e4ddb7fa37d26d5be156c17f82863f7cfd05961da48cd1deed2",
+      "bytes": 675
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncOptions.cs",
+      "sha256": "596ddd4872b4ddc642644b1fa5791091156b48cd290e27fee7ce8552253b02ee",
+      "bytes": 4345
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncProtocolException.cs",
+      "sha256": "4e1da39a3a2b8c0a665fe9d7b72ee821d80778fb0c9630fe2d30449fe4f4258a",
+      "bytes": 740
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncReadOnlyException.cs",
+      "sha256": "7d7989420f3b8c613c5d1ab8b076a082f44b38939920c4befb7c85273e8c068d",
+      "bytes": 419
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncResetRequiredException.cs",
+      "sha256": "835ed0abc8439d7b3ca7bdd98ef6678e6f89d1a8075ae19693e56d863ee760de",
+      "bytes": 636
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncResult.cs",
+      "sha256": "de341802661f28c7bd80278f930e67cae960eef0055888d993bd260eceb740de",
+      "bytes": 3604
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncTransportException.cs",
+      "sha256": "e90c4a0e19f921dd8da9b2f1292b5d75350b2845ca7a1c1773a9322e347393ee",
+      "bytes": 1319
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityCapabilities.cs",
+      "sha256": "435713137f90d1f4f374fcbc2638d498b392c4d833f761e8b836e8a7ea2dfd01",
+      "bytes": 1619
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityConformance.cs",
+      "sha256": "6e8380d4328c11c8e366727fd16811899da3b7fa59eaec856b43719da08dd2dd",
+      "bytes": 37792
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityConformanceCase.cs",
+      "sha256": "bef623b1973c0e2be89bb25954ae49c2105380c6ac6b9ebc7082fab415024c31",
+      "bytes": 606
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityConformanceOptions.cs",
+      "sha256": "043d2d193ce330190e8975e215ad74a724bea9e8c6f4ce7eea56a6fdf89e6792",
+      "bytes": 1609
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityUnderTest.cs",
+      "sha256": "ebe765123030d69984531b485e96ad4a4f26fee6d14cc201c426add0af5dbdea",
+      "bytes": 2771
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/Check.cs",
+      "sha256": "9db7d83ffffd740ca955eb7bcc04926d4f0e2bff8f392c0b3074181c45cf6069",
+      "bytes": 2603
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceCase.cs",
+      "sha256": "619d643d9b5fb63bd575299d1196e22433a89afa7dc874a0991ee0c3b86ab0e6",
+      "bytes": 527
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceDocument.cs",
+      "sha256": "d1cc8b96c2e712bcac91e01d1ea8b8101546a0d27064a5885b5b6702752f6c6b",
+      "bytes": 536
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceFailure.cs",
+      "sha256": "b499403d15fa106b2e766dd8363ca56aea3f495396d373f0e4a56f217c70f1d3",
+      "bytes": 175
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceFault.cs",
+      "sha256": "a4d40f885e2190d5fe3db066eec0dded8e59645a977a7614c49d9acba14d3865",
+      "bytes": 198
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceJsonContext.cs",
+      "sha256": "37c891929461d0a46d16d08da6fc9c0b0ea56f863fecd830a28ff83925912c3f",
+      "bytes": 598
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/FixedClock.cs",
+      "sha256": "7ff415c7e4388f8b762a031fc50ea60c878986d600dec4045375a28c0f599d1a",
+      "bytes": 278
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/HttpAuthorityDriver.cs",
+      "sha256": "74868a4501f77f043c087b20557e7f525d3ac7fee07998623e9a5161dccedcf0",
+      "bytes": 3304
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/HttpConformanceServer.cs",
+      "sha256": "9113f9c1af1db60b1a0163c264a95734ceb2fbb0948d32eb484e74955e8a0984",
+      "bytes": 849
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/IAuthorityConformanceDriver.cs",
+      "sha256": "66d0bb18ba623223b9007f0ab0f6c1a8f1859a0b6060761d6a7d9762bb0134be",
+      "bytes": 729
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/InMemoryAuthorityDriver.cs",
+      "sha256": "679451407deec68275c6eacdec28eeee9fa88d3cab707df755b35ac8f892cbd3",
+      "bytes": 6082
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/LocalStoreConformance.cs",
+      "sha256": "2fe8b95344a2a07bb5fd19537f405a9700c96c00f1413d8965f1e5fe1f8e4a8c",
+      "bytes": 21886
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/LocalStoreIndexConformance.cs",
+      "sha256": "bd5a007ee161d4534c2a4468eeb9968b6943c9a54d46246fdcc240e68da82d83",
+      "bytes": 8166
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpProblems.cs",
+      "sha256": "b34e7ce745528f8d72f7477852748979b85e6c625351e252a2d494ea32ad028a",
+      "bytes": 3768
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpPullBatch.cs",
+      "sha256": "169de0418fec3e7cbac585a648cee04f54a53a8b3e45955420615ae684bf8975",
+      "bytes": 7416
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpSyncHints.cs",
+      "sha256": "043d42fe799159a915229ef8cf81b245ff661a3e1605e48b39184256dcc71544",
+      "bytes": 4583
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpSyncTransport.cs",
+      "sha256": "0412027f4ea292121cc8917d9f848022d2149d53060d49fc5455bd0ba4d3cbf2",
+      "bytes": 9740
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpSyncTransportOptions.cs",
+      "sha256": "de7e7aa6d0c9290883e868ecdba47315705f4dc766f85fabd9de2e08631b8f33",
+      "bytes": 1425
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/ISyncTransport.cs",
+      "sha256": "5850230215742e9e644ee51a9bed8de1279f4a0dc721c360a07de797bd7ef59f",
+      "bytes": 2058
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/replica-0.4.0.db",
+      "sha256": "fed5125552b97f4b175e41d655d2e026e49e372c56f9fd5eb01c4383f5e7a6ea",
+      "bytes": 45056
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/published040.zip",
+      "sha256": "3b0f95e1571ef52d6cf307f64cf94c362774f3fd741e84cdbce2bbfcfb77475a",
+      "bytes": 7339
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/chunked-v2-vector.json",
+      "sha256": "61d23a626e7b4386b82974752088c678b938938c590d755328731aa719b87549",
+      "bytes": 89476
+    }
+  ],
+  "downgrade_probe": {
+    "Before": "FDE054EED89920CF296333ECDC87FCD8CE2ECC67BB14EA579C0F095FC359576C",
+    "After": "FDE054EED89920CF296333ECDC87FCD8CE2ECC67BB14EA579C0F095FC359576C",
+    "Unchanged": true
+  },
+  "superseded_previews": {
+    "0.4.0-gapclosure.20261017.1": "initial repair slice",
+    "0.4.0-gapclosure.20261017.2": "71 old cases passed; newly added abandoned-latest-build regression fails as expected; preserved in preview2-feed"
+  },
+  "open_gates": [
+    "independent cryptographic review and reviewed key invocation policy",
+    "named-target performance/memory/JS duplication measurements",
+    "complete Android/Apple builds, signing and physical devices",
+    "real external-service ticket/CORS/orphan policy",
+    "quarantine metrics gauge",
+    "clean immutable new-version tag and remote source checksums",
+    "ten consecutive designated qualification runs"
+  ],
+  "conditional_not_selected": "B7 grouped preparation; no declared workload requiring grouped activation"
+}

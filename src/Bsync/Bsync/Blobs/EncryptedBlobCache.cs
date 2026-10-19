@@ -293,7 +293,7 @@ public sealed class EncryptedBlobCache : IBlobCache, IBlobCacheInventory
         ValidateHash(record.Key[Prefix.Length..]);
         var state = JsonSerializer.Deserialize(record.Payload, EncryptedBlobJson.Default.EncryptedBlobState)
             ?? throw new InvalidDataException("Missing encrypted blob metadata.");
-        if (state.Schema != 1) throw new InvalidDataException("Unsupported encrypted blob schema.");
+        if (state.Schema != 1) throw new LocalStoreUnavailableException("outdated", "Unsupported encrypted blob schema; ciphertext retained.");
         foreach (var part in new[] { state.Complete, state.Partial })
         {
             if (part is null) continue;

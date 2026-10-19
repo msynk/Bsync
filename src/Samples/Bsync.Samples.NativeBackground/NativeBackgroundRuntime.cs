@@ -16,8 +16,10 @@ public interface IBackgroundAccountScope : IAsyncDisposable
 /// </summary>
 public sealed class NativeBackgroundRuntime(
     Func<string, CancellationToken, Task<IBackgroundAccountScope?>> openAccount,
-    Func<CancellationToken, Task<IReadOnlyList<string>>> pendingAccounts)
+    Func<CancellationToken, Task<IReadOnlyList<string>>> pendingAccounts,
+    TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     // A host may replace this only during application bootstrap, never while jobs are running.
     public static NativeBackgroundRuntime? Current { get; set; }
 
@@ -27,17 +29,22 @@ public sealed class NativeBackgroundRuntime(
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
         if (storageKey.Length != 64 || storageKey.Any(c => !(c is >= '0' and <= '9' or >= 'a' and <= 'f')))
             return BackgroundWorkOutcome.Failed;
-        using var deadline = new CancellationTokenSource(budget);
+        using var deadline = new CancellationTokenSource(budget, _time);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
-        var started = System.Diagnostics.Stopwatch.StartNew();
+        var started = _time.GetTimestamp();
         try
         {
-            await using var scope = await openAccount(storageKey, stop.Token).ConfigureAwait(false);
+            BackgroundWorkOutcome outcome;
+            await using (var scope = await openAccount(storageKey, stop.Token).ConfigureAwait(false))
+            {
             if (scope is null) return BackgroundWorkOutcome.DeferredByHost;
             if (scope.Account.StorageKey != storageKey) return BackgroundWorkOutcome.Failed;
-            var remaining = budget - started.Elapsed;
+            var remaining = budget - _time.GetElapsedTime(started);
             if (remaining <= TimeSpan.Zero || stop.IsCancellationRequested) return BackgroundWorkOutcome.Canceled;
-            return await scope.Dispatcher.RunAsync(scope.Account, remaining, (_, ct) => scope.ExecuteAsync(ct), stop.Token).ConfigureAwait(false);
+            outcome = await scope.Dispatcher.RunAsync(scope.Account, remaining, (_, ct) => scope.ExecuteAsync(ct), stop.Token).ConfigureAwait(false);
+            }
+            // Disposal is joined even when the host ignores cancellation; report overruns after ownership is released.
+            return stop.IsCancellationRequested || _time.GetElapsedTime(started) >= budget ? BackgroundWorkOutcome.Canceled : outcome;
         }
         catch (ReplicaKeyUnavailableException) { return BackgroundWorkOutcome.KeyUnavailable; }
         catch (OperationCanceledException) { return BackgroundWorkOutcome.Canceled; }
@@ -48,15 +55,15 @@ public sealed class NativeBackgroundRuntime(
     public async Task<bool> ReconcileAsync(TimeSpan budget, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
-        using var deadline = new CancellationTokenSource(budget);
+        using var deadline = new CancellationTokenSource(budget, _time);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
-        var started = System.Diagnostics.Stopwatch.StartNew();
+        var started = _time.GetTimestamp();
         var accounts = await pendingAccounts(stop.Token).ConfigureAwait(false);
         if (accounts.Count > 100) throw new InvalidOperationException("Background account enumeration exceeds its declared bound.");
         var complete = true;
         foreach (var storageKey in accounts.Distinct(StringComparer.Ordinal))
         {
-            var remaining = budget - started.Elapsed;
+            var remaining = budget - _time.GetElapsedTime(started);
             if (remaining <= TimeSpan.Zero || stop.IsCancellationRequested) return false;
             var outcome = await RunAsync(storageKey, remaining, stop.Token).ConfigureAwait(false);
             complete &= outcome == BackgroundWorkOutcome.Completed;

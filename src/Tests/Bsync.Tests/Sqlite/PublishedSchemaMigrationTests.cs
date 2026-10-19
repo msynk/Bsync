@@ -19,7 +19,7 @@ public sealed class PublishedSchemaMigrationTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
+        SqliteStorePool.Release(_path);
         File.Delete(_path);
     }
 
@@ -45,6 +45,7 @@ public sealed class PublishedSchemaMigrationTests : IDisposable
     [Theory(DisplayName = "Published replicas preserve pending work, conflicts, rejections, groups and unknown members")]
     [InlineData("0.1.0")]
     [InlineData("0.2.0")]
+    [InlineData("0.4.0")]
     public async Task UpgradesAndKeepsEverything(string version)
     {
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", $"replica-{version}.db"), _path);

@@ -50,3 +50,18 @@ jobs:
         run: dotnet build src/Samples/Bsync.Samples.NativeBackground -t:InstallAndroidDependencies -p:NativeBackgroundTarget=net10.0-android "-p:AndroidSdkDirectory=$env:ANDROID_HOME" "-p:JavaSdkDirectory=$env:JAVA_HOME" -p:AcceptAndroidSdkLicenses=True
       # Compilation cannot establish OS delivery, protected-key behavior or background entitlements.
       - run: dotnet build src/Samples/Bsync.Samples.NativeBackground -c Release -p:NativeBackgroundTarget=${{ matrix.target }}
+      - name: Build complete Android reference host
+        if: matrix.workload == 'android'
+        shell: pwsh
+        run: dotnet build src/Samples/Bsync.Samples.Background.Android -c Release -r android-arm64 "-p:AndroidSdkDirectory=$env:ANDROID_HOME" "-p:JavaSdkDirectory=$env:JAVA_HOME"
+      - name: Build complete Apple simulator reference host
+        if: matrix.workload == 'ios'
+        run: dotnet build src/Samples/Bsync.Samples.Background.Apple -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-host-${{ matrix.workload }}
+          path: |
+            src/Samples/Bsync.Samples.Background.Android/bin/Release/**/*.apk
+            src/Samples/Bsync.Samples.Background.Apple/bin/Release/**/*.app/**
+          if-no-files-found: warn

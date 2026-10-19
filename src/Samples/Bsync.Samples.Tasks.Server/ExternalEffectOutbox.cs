@@ -7,7 +7,7 @@ namespace Bsync.Samples.Tasks.Server;
 /// <summary>An immutable application effect. The receiver must deduplicate IdempotencyKey, including after lost replies.</summary>
 public sealed record ExternalEffect(string Scope, string CommandId, string Payload, string IdempotencyKey);
 /// <summary>Receiver outcome. RetryLater retains the exact request; Rejected is a final business refusal.</summary>
-public enum ExternalEffectOutcome { Succeeded, RetryLater, Rejected }
+public enum ExternalEffectOutcome { Succeeded, RetryLater, Rejected, ReconciliationRequired, CredentialsUnavailable }
 
 /// <summary>
 /// Optional SQL Server application-transaction outbox recipe, separate from projection publication. Dispatch runs with
@@ -16,6 +16,25 @@ public enum ExternalEffectOutcome { Succeeded, RetryLater, Rejected }
 /// </summary>
 public sealed class ExternalEffectOutbox(string connectionString)
 {
+    /// <summary>
+    /// Dispatches through explicit receiver guarantees. Claims persist the attempt before sending, so a crash in that
+    /// window is conservatively ambiguous. A receiver without deduplication/status lookup is never blindly redelivered.
+    /// </summary>
+    public Task<int> DrainAsync(IExternalEffectReceiver receiver,
+        Func<SqlConnection, SqlTransaction, ExternalEffect, ExternalEffectOutcome, CancellationToken, Task> publishResult,
+        int limit = 32, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(receiver);
+        return DrainAsync(async (effect, token) =>
+        {
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(token);
+            await using var command = new SqlCommand("SELECT Attempts FROM dbo.ExternalEffectOutbox WHERE EffectKey=@key", connection);
+            Identify(command, effect.Scope, effect.CommandId);
+            var attempts = (int)(await command.ExecuteScalarAsync(token) ?? throw new InvalidDataException("Missing claimed effect."));
+            return await ExternalEffectDelivery.DispatchAsync(receiver, effect, attempts > 1, token);
+        }, publishResult, limit, cancellationToken);
+    }
     /// <summary>Installs the isolated example table. Production deployments use an explicit reviewed migration.</summary>
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -111,6 +130,7 @@ public sealed class ExternalEffectOutbox(string connectionString)
                 linked.Token.ThrowIfCancellationRequested();
                 if (!Enum.IsDefined(outcome)) throw new InvalidOperationException("Unknown receiver outcome.");
                 if (outcome == ExternalEffectOutcome.RetryLater) { await FailAsync(effect, claim, cancellationToken); continue; }
+                if (outcome == ExternalEffectOutcome.CredentialsUnavailable) { await FailAsync(effect, claim, cancellationToken, credentials: true); continue; }
                 await using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync(cancellationToken);
                 await using var transaction = connection.BeginTransaction();
@@ -121,7 +141,7 @@ public sealed class ExternalEffectOutbox(string connectionString)
                     WHERE EffectKey=@key AND State='queued' AND Claim=@claim AND LeaseUntil>SYSUTCDATETIME()
                     """, connection, transaction);
                 Identify(acknowledge, item.Scope, item.Id); acknowledge.Parameters.AddWithValue("@claim", claim);
-                acknowledge.Parameters.AddWithValue("@state", outcome == ExternalEffectOutcome.Succeeded ? "succeeded" : "rejected");
+                acknowledge.Parameters.AddWithValue("@state", outcome switch { ExternalEffectOutcome.Succeeded => "succeeded", ExternalEffectOutcome.Rejected => "rejected", _ => "reconciliation" });
                 if (await acknowledge.ExecuteNonQueryAsync(cancellationToken) == 0) continue;
                 await transaction.CommitAsync(cancellationToken);
                 completed++;
@@ -132,16 +152,18 @@ public sealed class ExternalEffectOutbox(string connectionString)
         return completed;
     }
 
-    private async Task FailAsync(ExternalEffect effect, Guid claim, CancellationToken ct)
+    private async Task FailAsync(ExternalEffect effect, Guid claim, CancellationToken ct, bool credentials = false)
     {
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var failed = new SqlCommand("""
-            UPDATE dbo.ExternalEffectOutbox SET State=CASE WHEN Attempts>=5 THEN 'quarantined' ELSE 'queued' END,
+            UPDATE dbo.ExternalEffectOutbox SET State=CASE WHEN @credentials=0 AND Attempts>=5 THEN 'quarantined' ELSE 'queued' END,
+                Attempts=Attempts-CASE WHEN @credentials=1 THEN 1 ELSE 0 END,
                 Claim=NULL,LeaseUntil=NULL,RetryAt=DATEADD(second,30,SYSUTCDATETIME())
             WHERE EffectKey=@key AND State='queued' AND Claim=@claim AND LeaseUntil>SYSUTCDATETIME()
             """, connection);
         Identify(failed, effect.Scope, effect.CommandId); failed.Parameters.AddWithValue("@claim", claim);
+        failed.Parameters.AddWithValue("@credentials", credentials);
         await failed.ExecuteNonQueryAsync(ct);
     }
 

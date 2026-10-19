@@ -4,7 +4,79 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
 [docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
 
-## Unreleased (0.4.0)
+## 0.5.0 - 2026-10-19
+
+- Bound full-content SHA-256 on WebAssembly instead of using the runtime's whole-input buffering fallback. Keep
+  native platform hashing, plaintext identities and formats unchanged; add independent digest and allocation regressions.
+  Add exact-package browser memory/I/O workloads and source-generated reports for trimmed/native AOT qualification.
+  Record executable identity for embedded-assembly publications instead of attempting to hash an unavailable DLL path.
+  Avoid rereading the entire ciphertext inventory on every append when no hard capacity budget is configured;
+  finite budgets retain their serialized physical-capacity checks.
+
+- Send explicit checksums and known-length S3 sample uploads so compatible services do not persist transfer encoding
+  as object content encoding. Add isolated real SeaweedFS qualification with expiry, refresh and three-engine CORS checks.
+
+- Close the S3 sample's verification/publication race by uploading an exclusively held, bounded snapshot of the exact
+  verified bytes. Add a configurable real-service/CORS qualification runner; emulator evidence remains separate.
+
+- Avoid HTML escaping of Base64 in internal encrypted-v2 storage envelopes, reducing JSON scratch-buffer pressure.
+  Existing escaped records remain readable; encrypted plaintext manifests, wire formats and public APIs are unchanged.
+
+- Avoid a redundant plaintext chunk buffer for aligned encrypted-v2 appends. Preserve caller memory and partial-tail
+  semantics; add isolated exact-package memory workloads with enforced GC caps and retained failure evidence.
+
+- Add bounded, resumable authentication scrubs for sealed chunk generations, with encrypted durable checkpoints and
+  explicit freshness limits. Journal generation key obligations through partials, rotation, live readers and quarantine.
+- Preserve nested execution causes through session/coordinator lifecycle and transport aliases. Add native storage
+  measurement tooling; physical-device, independent crypto and release qualification remain separate gates.
+
+- Preserve observed budget and lease causes through nested cooperative deadlines and registered library-owned token
+  aliases. Keep existing cancellation outcomes and diagnostic precedence; remove token associations when scopes close.
+
+- Observe admitted session lease loss between runs and while paused; wake ordinary idle waits without bypassing pause
+  or server `Retry-After`. Join and detach the observer before normal lease disposal, and report one ownership stop signal
+  independently of acquisition/run observations.
+- Join superseded account hint listeners before starting replacements; ignore late hints and stale unsupported-stream
+  responses. Reject late/lost lease acquisition before status reads or replication, and classify acquisition and hint
+  lifetime stop signals without treating normal lease disposal or unsupported hints as cancellation.
+- Include account resolution, replica opening, local observations and synchronous progress callbacks in session goal-wait
+  budgets. Isolate wait cancellation/progress failures from shared replication, join observations before closing the replica,
+  and expose `SyncGoalResult.HasObservation` so an unobserved zero pending count cannot imply success.
+- Stop paused sessions polling storage in a tight loop. Add `TimeProvider` budgets to one-shot sync, preserve unrelated
+  cancellation errors, reject late completion, and distinguish session-run cancellation from execution lease loss in diagnostics.
+- Add opt-in dependent audience publication to the Tasks sample's API, sync and intent writers, with explicit transaction
+  ownership and lock ordering; cover rollback, replay, deletes and competing authenticated API/sync requests on SQL Server.
+- Include workflow lease acquisition in its execution budget; prevent late transfer callbacks acknowledging completion.
+  Add bounded-invocation stop diagnostics and byte/time-limited blob verification with bounded reads and explicit deferral.
+- Add opt-in account maintenance with exclusive ownership, durable page checkpoints, urgent-work deferral, dry runs and
+  item/byte/time allowances. Restore durable package/transfer pins and conservatively reconcile abandoned built-in owners.
+- Join physical Web Lock release before browser account/cache disposal completes, including concurrent disposal calls.
+- Add bounded quarantine observations and cached repair/quarantine gauges; count committed repair transitions without
+  identity tags. Advance native retired-file cleanup past live readers with resumable cursors, and keep cache metadata
+  available during v1 rotation.
+- Add opt-in experimental chunked AES-GCM storage up to 1 GiB, authenticated ranges, resumable rotation, explicit
+  v1 migration and quarantine-preserving recovery. Independent crypto review and device/performance gates remain open.
+- Add account resource composition, protected orchestration payloads with atomic CAS/fences, explicit payload policies,
+  and a permanent provider downgrade barrier before new-format writes.
+- Add owned read-model generations, retention limits, paged cache reconciliation and application-owner maintenance;
+  account for retired native replacement files until physical readers release them.
+- Add headless bootstrap and complete Android/Apple reference-host source projects, receiver reconciliation contracts,
+  and a versioned external-file blob adapter. Mobile builds/devices and external deployment qualification remain open;
+  the named real loopback object-store implementation is covered by the qualification recorded above.
+- Automatically repair missing, truncated and same-length damaged package content on opted-in managed
+  plaintext caches, including an older active revision while a newer candidate is incomplete. Durable repair
+  journals preserve staging and recover interrupted promotion; unreadable encrypted content remains protected.
+- Preserve browser async readers across replacement and apply one cooperative budget to package preparation
+  and upload prerequisites, including queueing and transfer ownership waits.
+- Journal terminal transfer pin release and expose bounded recovery with `ReconcileReleasedAsync`.
+- Add structured verification and optional replacement capability without changing `IBlobCache` or the wire protocol.
+  See [ADR-026](docs/architecture/adr-026-verified-content-repair.md) for limits and compatibility.
+
+## 0.4.0 (published; observed 2026-10-17)
+
+All six downloaded archives declare source commit `e4286fe2141d0d1e836cfc88dbfa5dfd82154d37`.
+This corrects the former unreleased heading; it does not assert a historical tag or clean-build provenance.
+Archive hashes and new regression evidence are in the [execution record](docs/review/gap-closure-2026-10-17.md).
 
 - Fixed direct document reads/listing to enforce reader membership in all three authorities before page limits.
 - Added optional AES-GCM encrypted blob caches for native and browser storage, with bounded authenticated ranges,

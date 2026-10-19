@@ -3,7 +3,63 @@
 Tiers (ADR-012): **Verified** = executed tests or a recorded run; **Build-only** = compiles or publishes,
 not executed; **Planned** = not implemented. Nothing here is Verified unless the evidence column says how.
 
-Release status: [README](../README.md#status). Current development target: **0.4.0 (unreleased)**.
+Release status: [README](../README.md#status). **0.4.0 is published**; the next release targets **0.5.0 (not yet published)**.
+The source uses the 0.5.0 prefix; local candidate packs must use unique preview suffixes.
+
+Physical-device testing is deferred by user instruction as of 2026-10-19; those targets are not newly verified.
+The [local qualification continuation](review/gap-closure-local-qualification-2026-10-19.md) adds bounded browser
+SHA-256, browser memory/I/O measurements, WASM/native AOT and trimmed Windows checks. Its source suite has 928 passing tests
+and exact-preview consumer suite 210. SeaweedFS 4.48 on loopback passed all 12 service/CORS checks, including expiry,
+refresh and Chromium/Firefox/WebKit. That result does not qualify a cloud deployment's TLS/IAM policy or mobile OS.
+The [non-device continuation](review/gap-closure-nondevice-2026-10-19.md) adds verified-snapshot S3 completion and a
+service/CORS qualification runner. LocalDB/moto regression and three-engine CORS checks passed, but moto's failure
+to enforce signed-URL expiry is retained as failed qualification. No real-service or mobile-build support is inferred.
+The [deadline continuation](review/gap-closure-deadlines-2026-10-17.md) records workflow/transfer deadline regressions,
+bounded verification and stop diagnostics. It does not establish new device, external-service or performance support.
+The [gap-closure execution record](review/gap-closure-2026-10-17.md) tracks the subsequent repair slice and
+its remaining gates separately from historical qualification below.
+
+The later [gap-closure continuation](review/gap-closure-continuation-2026-10-17.md) supersedes that slice for new
+capabilities. It includes native large-object tests (17/256/1024 MiB), owned read-model and account lifetimes,
+protected SQLite/IndexedDB payloads, independent encryption vectors, published 0.4.0 upgrade/downgrade fixtures,
+SQL Server receiver/file-bridge scenarios and fresh exact-preview consumers. Consult its evidence inventory for
+the final counts, failed attempts and which package/browser build each run used.
+
+The [ownership continuation](review/gap-closure-ownership-2026-10-17.md) adds exclusive account maintenance,
+durable pin reconciliation and native process tests for concurrent foreground writes/network ownership. Browser
+checkpoint reload tests use IndexedDB and Web Locks; this adds no mobile OS or physical-device qualification.
+
+| New capability | Qualification boundary |
+|---|---|
+| Plaintext automatic repair | Windows native and Playwright browser-engine tests; joined commits and old readers |
+| Chunked encrypted v2 | Experimental; Windows native/AOT large-object checks, trimmed-consumer checks and desktop browser workloads through 1 GiB (Chromium/Firefox) or 256 MiB (WebKit). See the local qualification record for operation/profile scope; independent crypto review and device performance remain open |
+| Protected orchestration | Atomic provider tests; permanent feature upgrade requires all old processes/tabs closed first |
+| Owned read-model retention | Portable/physical-lock tests; legacy namespace retains historical no-cleanup semantics |
+| External receiver/file bridge | SQL Server 2025 LocalDB and simulated receiver; S3 sample also verified against real loopback SeaweedFS 4.48 with expiry/refresh and three-engine CORS. External deployment policies remain unqualified |
+| Full Android/Apple reference hosts | Source supplied, build CI added; Android SDK download failed locally, Apple unavailable here; no signed/device execution |
+
+The [2026-10-18 continuation](review/gap-closure-completion-2026-10-18.md) adds durable chunk scrubbing, key-retention
+observations, lifecycle cause propagation and a native measurement harness. Measurements separate chunk payload
+writes, OS logical I/O and sampled managed heap; they do not certify physical-media amplification or browser copies.
+
+The [native memory continuation](review/gap-closure-memory-2026-10-18.md) adds fresh-process exact-package checks under
+explicit managed GC caps. Aligned appends avoid a redundant plaintext buffer. Original `.2` and exploratory-source
+31 MiB failures are retained separately from exact `.3` results on Windows x64/.NET 10.0.13. A larger-cap result cannot
+close the separate under-32-MiB cache-buffer target. The optional CI workflow has not been executed remotely.
+
+The [envelope memory continuation](review/gap-closure-envelope-memory-2026-10-19.md) scopes relaxed JSON escaping to
+internal encrypted Base64 envelopes, preserves old escaped records and records fifteen passing exact-package
+31 MiB workloads (three each at 1/16/17/256/1024 MiB, all ten stages).
+Its native workload evidence does not qualify browser memory duplication, physical devices or aggregate concurrent streams.
+
+No new stable package version, clean tagged provenance, remote source verification or ten-run qualification is claimed.
+
+Gap-closure repair checkpoint (2026-10-17, dirty working tree): core 753 plus one separately executed cancellation
+case, 78 source browser cases, 58 exact-preview package cases, three packaged browser repair cases and web smoke passed.
+The packaged browser cases each exercise three damage modes in Chromium, Firefox and WebKit. The preview is
+`0.4.0-gapclosure.20261017.1`; all six consumed archives matched the packed hashes. An earlier source browser run was
+interrupted after 66 passes and is retained as aborted evidence. These runs do not qualify physical devices,
+large encrypted v2 objects, full plan completion, clean remote-source provenance or the ten-run release gate.
 
 2026-10-16 R0 update: [baseline and validation evidence](review/release-baseline-2026-10-16.md).
 The six 0.2.0 packages are published, with an unresolved source-provenance mismatch. Older rows below

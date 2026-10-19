@@ -1,0 +1,3155 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "candidate": "0.4.0-gapclosure.20261018.3",
+  "baseCommit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+  "workingTreeDirty": true,
+  "scope": "Aligned append allocation reduction, four caller-buffer regressions, native measurement tooling and documentation",
+  "changedLibraryFiles": [
+    "src/Bsync/Bsync/Blobs/ChunkedEncryptedBlobCache.cs"
+  ],
+  "unchangedLibraryFiles": 237,
+  "library_source_files_at_validation": [
+    {
+      "path": "src/Bsync/Bsync.Blazor/Blobs/BrowserBlobCacheLock.cs",
+      "sha256": "91320c9a0cb8c2ff6d2f27080c5b9622fafd7f10c6dde358266f5ee441b595b5",
+      "bytes": 2416
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Blobs/BrowserBlobEncryption.cs",
+      "sha256": "ea3ba3d910225fbd8bc220cb4d747823bc274bf21477c31735532d19b680976a",
+      "bytes": 2497
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Blobs/BrowserBlobStore.cs",
+      "sha256": "c32c11af35ae65472134f92fc9f3cfe25dcbddd4a0d9234093bf29576f5bb216",
+      "bytes": 13317
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Bsync.Blazor.csproj",
+      "sha256": "b796f8e8062f670a4925adac2868d6f514b465f83494d6c0b61937bbe7531dc4",
+      "bytes": 1285
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/BsyncServiceCollectionExtensions.cs",
+      "sha256": "48cf831a4a8a6f0dc28e9cd102bd5ee0216338bf6e9d0b62839b96b7304c7a22",
+      "bytes": 3062
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/BrowserAccountResourceLock.cs",
+      "sha256": "78c602ce479d1b6db3b86d3c1429b30094cdde8b61409680ec0a120582ec6374",
+      "bytes": 1838
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/BrowserLifecycleWatcher.cs",
+      "sha256": "8c182f78f759196689124f3a2aa6ffe8edb7c10a64775be6c81e47c35df721fb",
+      "bytes": 2050
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbCommitEntry.cs",
+      "sha256": "bd46d230b33a7f64f57fb8c37611ecfa5c7d4d63a0143c2cec5a25a8909bbbb6",
+      "bytes": 322
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbCursor.cs",
+      "sha256": "4a4ebc01e333c15fd9d03eb8bd9af6b3ac4527e9d93b02080fd257c8b0a03d48",
+      "bytes": 339
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbJsonContext.cs",
+      "sha256": "3c25da8b62900187f78abc1bea9fa223d090ea53d842a4c797a6463b942c9a8a",
+      "bytes": 682
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbMeta.cs",
+      "sha256": "b40283d06ad8160473184605c7f64b2b648ac3366e8f0965423fbddef8a0bd69",
+      "bytes": 396
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbMetaUpdate.cs",
+      "sha256": "cbdf32a6e2824473138f0ce629d4d681313cdd2f6f97207160df58157c27e6e9",
+      "bytes": 306
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbRead.cs",
+      "sha256": "114c1bdd718bd141a983dd6a728e904533561b3e4988315cfb97c373ac881491",
+      "bytes": 307
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IdbRecord.cs",
+      "sha256": "fc1f461577d0f1031ee492162d53daa11c545d3a910ee5e3fdb7026d4d929d19",
+      "bytes": 2274
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbLocalStore.cs",
+      "sha256": "b9cede84ed6d18a0a241e85efde31f37a0799e03579c1a5481dbb7ee93db835e",
+      "bytes": 27054
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbOrchestrationStore.cs",
+      "sha256": "ec58481037156710fe5a4dfeb10628337572198ff3dd8f92aa62ba6c7160db9a",
+      "bytes": 5200
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbReplicaLease.cs",
+      "sha256": "a5d5a4205cdc900ed1f11a3bbae4864f703dedb8ace5866b557c78b223b51edd",
+      "bytes": 2488
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbStoreOptions.cs",
+      "sha256": "eb83eb7980b0e9fe4fb1362581fe06110dd71c3c9677c35e44d683135dc3b9c7",
+      "bytes": 1789
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/IndexedDb/IndexedDbSyncServiceCollectionExtensions.cs",
+      "sha256": "d90efc02460bd6e2f6c67bea7c5b89a523286ad98f4b89f093bb07a1a123a776",
+      "bytes": 5591
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/ServerSyncClock.cs",
+      "sha256": "c722a8a07f9ad9e0f7bf7d09246dc9e81d53705003a100b29048dc33df5ff40e",
+      "bytes": 534
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/ServerSyncCollection.cs",
+      "sha256": "9f5d59cedae612133a1dac390835d6bceaf6f8fa3fd12cb52663881629bb527c",
+      "bytes": 14088
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/Unsubscriber.cs",
+      "sha256": "b073cac63e94048accacf1dcc5e9275ce60c58e824672302cc7b8fceb45a5763",
+      "bytes": 350
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-blob-encryption.js",
+      "sha256": "de8cca40175759083de5b036c0bf0cd0cdff8ca08b0f78638dd08807f6bf556e",
+      "bytes": 1393
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-blobs.js",
+      "sha256": "f0e7af6ca07ab974487545d738b3b1a64e2e9553e9c992fc543db4cff16e465f",
+      "bytes": 8790
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-cache-locks.js",
+      "sha256": "9a79a07e269f75c739025f89f48a553c185d8e6a760905707309aa44b099ee74",
+      "bytes": 1181
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-indexeddb.js",
+      "sha256": "e3c22b2f8e7c835b19d2b9a2e92414443ad9d486440fa4cb7afad7caf721d705",
+      "bytes": 30505
+    },
+    {
+      "path": "src/Bsync/Bsync.Blazor/wwwroot/bsync-orchestration.js",
+      "sha256": "0aa5a483cabccfb8f739553c7b048e691341e159761e4e858fa323ed17ba467e",
+      "bytes": 4570
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/Blobs/BlobStores.cs",
+      "sha256": "c840b34586c5b25a98d06db1a2ad839f24f60697bc88438d22934f7b42bfa35a",
+      "bytes": 13207
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/Blobs/SyncBlobEndpoints.cs",
+      "sha256": "9bb344c00c27bad44264b73995a1e620fcf1b2d30bbb699c057cdd0e0105a061",
+      "bytes": 14304
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/Bsync.Server.AspNetCore.csproj",
+      "sha256": "8b93ac243cd19354be80ec294167d9df9eebf0e448972124f881289b50c954c4",
+      "bytes": 744
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/LimitedReadStream.cs",
+      "sha256": "f9379049eff8ac00e46eb3a5866fca75a55c5f766a5b81d6b35195f50772d49e",
+      "bytes": 1751
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/ServerLog.cs",
+      "sha256": "d15931734d1969d641c646778d3df1491b30dd22cf91328e1388875333665ab0",
+      "bytes": 1162
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncCollectionGroupBuilder.cs",
+      "sha256": "ba838be02e2140a3a176331a455c6113a0452b76b238c39d60f7634ba70cef8c",
+      "bytes": 2775
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncEndpointOptions.cs",
+      "sha256": "51a6170aeedfc8ce653f30be803a182f1d81d798ba8e939569ba7e819ad10e2d",
+      "bytes": 1954
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncEndpoints.cs",
+      "sha256": "6d3b65de32c8d4e084416639cdfc12fa3a818f0d1a704e817e8876efb4fe5835",
+      "bytes": 31181
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.AspNetCore/SyncRetentionService.cs",
+      "sha256": "5aa199f9e59c6fa58b6bc8161be8ce90b6ab3fb37749886225a4d9d49538bb65",
+      "bytes": 3000
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/Bsync.Server.PostgreSql.csproj",
+      "sha256": "0f08078538e2a641ef1f9d62c456a9d7b437a39c8155494940d73fb1681cab0e",
+      "bytes": 749
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSchema.cs",
+      "sha256": "40344e2c490549dac3c3d979946ecb87cece1f41f8f43619ea0d0ec2c5164eb9",
+      "bytes": 5670
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSchemaException.cs",
+      "sha256": "efe2fd2687e4df6f69a26cffe9dc64a264afa28fcb6ae7f7e32395717cd5c241",
+      "bytes": 298
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSyncAuthority.cs",
+      "sha256": "76dc579f0cf9e169e6c9bb676f398a80e4dd6efb0e1928686220ae6bbdede182",
+      "bytes": 58974
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.PostgreSql/PostgreSqlSyncAuthorityOptions.cs",
+      "sha256": "db7632b7f698ab869d0bd5ba2bf4041f65b0e7d9e52c6d10e427c54c57998ca2",
+      "bytes": 3246
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/Bsync.Server.SqlServer.csproj",
+      "sha256": "4060dfdb84ac9d8d10caaced551c9477962f867d634f9670294eb4747114515d",
+      "bytes": 1146
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerJson.cs",
+      "sha256": "57098e4d3c8bc684d6d89e0a4968fcbefaeb63ed99fd5cbd8f7b917c1976c12c",
+      "bytes": 299
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerReplicaAudit.cs",
+      "sha256": "8606874a2068c673f5f84319d49a91ba41ab3603306416d69cbfa8d4a2d5b7f6",
+      "bytes": 6641
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSchema.cs",
+      "sha256": "9a5b802d060303c19cd9d875edc109183f6e1d64c4b202f8c857c1e86e6faf96",
+      "bytes": 9266
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSchemaException.cs",
+      "sha256": "dd8654f3749d00a8037c8df22cf6f33ca5112bddedbad162f1d44ef8967220b5",
+      "bytes": 291
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSyncAuthority.cs",
+      "sha256": "19d6e0ce56108e91efa407a3a5515c9c8fa9fb7039442bfeea0d084b166b3203",
+      "bytes": 70193
+    },
+    {
+      "path": "src/Bsync/Bsync.Server.SqlServer/SqlServerSyncAuthorityOptions.cs",
+      "sha256": "c3212b9b7f533ac8c51d5322f0a4fb490a5171ca78b78299abfdd7b8599609bc",
+      "bytes": 4383
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj",
+      "sha256": "e90341c90e26f451a4c042cca350643b8d5b759ef8cf38ad0fe29ce70b16d63e",
+      "bytes": 1076
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteDurability.cs",
+      "sha256": "1e541e4c8a75e328056c454075fabd79443bed66c2dc03cc6d93a25065704d61",
+      "bytes": 806
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteEncryption.cs",
+      "sha256": "cf3855e663fd9574db868e8ff1afcd8dfc4d64f15eebdcfe353ee7b2fe5484da",
+      "bytes": 5438
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteJson.cs",
+      "sha256": "1e455cf604b3d8b622328ab33e2c7a59e0d08858f6a7d27a6d705739d25e0a93",
+      "bytes": 507
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteLocalStore.cs",
+      "sha256": "38a64144ed2fc54bed9ece637935783b126132416474b7441e177d1ec43e2436",
+      "bytes": 51075
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteLocalStoreOptions.cs",
+      "sha256": "40203c389b4c910b71d91a65c99d7f88c6f74277ba23eb3e2da7652581b1fe73",
+      "bytes": 1698
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteOrchestrationStore.cs",
+      "sha256": "99315e2b1d66a4a9f7b515500ef4f28b9f1c237726e5cca59439f895527c80b7",
+      "bytes": 12183
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteRebuildReport.cs",
+      "sha256": "ba14844273d2c8deca409e1810b163b083a5ec340cb00b68a7230aca98767471",
+      "bytes": 1032
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteSchema.cs",
+      "sha256": "d585a6cbf6cb4ead005db3de811f499370f9fddc741c7d8f9040fe72816afb74",
+      "bytes": 8569
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStorePool.cs",
+      "sha256": "85bab602153c811e28a2ca9e94a19dcb480181b07f4cc30fe5ceb033780b00a6",
+      "bytes": 4876
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStoreRecovery.cs",
+      "sha256": "e7b6a42c7ac905202318074865846166b8a4e1a95154f36a8c88f411d49a790e",
+      "bytes": 14457
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStoreSchemaException.cs",
+      "sha256": "a4ffe8922044a57149cb3954b5287b9570ca0defdbf64303649e4a51092112d1",
+      "bytes": 384
+    },
+    {
+      "path": "src/Bsync/Bsync.Storage.Sqlite/SqliteStoreUnreadableException.cs",
+      "sha256": "ec05ab17caa5d8db34ba21ee31e197df3d4f769ae8fd704f26605cd17692fc21",
+      "bytes": 453
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobCacheLock.cs",
+      "sha256": "65aee0aba44f7da329af59d6c15faf591dad5738448b628a5db9f34ec3bcfadc",
+      "bytes": 3047
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobChunkStore.cs",
+      "sha256": "429f332a410874c9216a7f6e38f20ba57a80b73de2270fe56de3c307c8df6b38",
+      "bytes": 4187
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobEncryption.cs",
+      "sha256": "854bb6bc72e9daac2d340cee69822ae8ef27a42d7e0709a96d532f3ef203d54c",
+      "bytes": 2860
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobInventoryMaintenance.cs",
+      "sha256": "fab6148a14fd54c064cf00d1aece90d5190fea2262f499e55f0c37cb688a6354",
+      "bytes": 4554
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobOwnerMaintenance.cs",
+      "sha256": "a907b20650337810ae1e7f8915537df1e80ceb6edb70bf1d02671a083dd61f76",
+      "bytes": 5610
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobRepair.cs",
+      "sha256": "813772352a4b62fe8f46e3a5832c301347c53904e4109e41cbd49aa170bbc25f",
+      "bytes": 12285
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobRetiredCollectionResult.cs",
+      "sha256": "400d0b68e9d21ddb7e98ddc1edf24d9eab1f706abf109d7549a2df6e4b3a7e5e",
+      "bytes": 553
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobTransferManager.cs",
+      "sha256": "94364761797d9e1960c8bc12e36367a82165818457c2f01bd2691dde784db11c",
+      "bytes": 28069
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BlobVerification.cs",
+      "sha256": "c923e239d6ab845bc108f790c5109b85a266bccb365759890abfe6720cdeb12c",
+      "bytes": 6484
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/Blobs.cs",
+      "sha256": "f7d2cbbc5035a590c4254e180cb3ee364a11b27497b9a4e6865f57524c3746ad",
+      "bytes": 6343
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/BuiltInOwnerMaintenance.cs",
+      "sha256": "e46cea0b472cfce0083da9a377ca69460b53cb20b2ca4241b7f30321685b4bb9",
+      "bytes": 13651
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/ChunkIntegrityMaintenance.cs",
+      "sha256": "d82f487cf861e6bc98596d2a87b3e7e7d22811e8f66f0be64194be94f8810ebf",
+      "bytes": 11158
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/ChunkStorageObservation.cs",
+      "sha256": "fda86462d1c812eaf4e8aea6e28f0ec3318eae9e9346a2c6fa0a60f286e99280",
+      "bytes": 3897
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/ChunkedEncryptedBlobCache.cs",
+      "sha256": "54f28419962ef1cec5f154a11d3dd3971e27a4f14f6faae86f2f18a0f21ffa17",
+      "bytes": 42335
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/EncryptedBlobCache.cs",
+      "sha256": "54ceabb28c228f7f6aa27798ea27a60e8f4e46b864a976a645c7f5aa7620c111",
+      "bytes": 24016
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/FileBlobCache.cs",
+      "sha256": "fff767dabc71e38570052aec73f016552d22f1fa18db48c943ee31450d31243a",
+      "bytes": 13194
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/HttpBlobTransfer.cs",
+      "sha256": "d5fd6c27e201e04f6509b21c68877878ee22b8f3652c5b4c601f9bdb7b8bfb01",
+      "bytes": 22371
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/ManagedBlobCache.cs",
+      "sha256": "87278267fea9d21516978c83ad54df4768393a28417aeef0f5a08f3d1a238530",
+      "bytes": 28120
+    },
+    {
+      "path": "src/Bsync/Bsync/Blobs/OfflinePackageManager.cs",
+      "sha256": "011e1f555de7f66fd924a91f6aa259a9929c8ddce9acab48774ec147f8c4e382",
+      "bytes": 29928
+    },
+    {
+      "path": "src/Bsync/Bsync/Bsync.csproj",
+      "sha256": "08cf5c40850a37e696fbbfe35d3bf803cc6d2972e812dce2afb7446a2afcc7b8",
+      "bytes": 1070
+    },
+    {
+      "path": "src/Bsync/Bsync/Checkpoint.cs",
+      "sha256": "1a62b966abdbd282871ecc9f131a755a33f70d59957b2126e5b7f730cebb9f52",
+      "bytes": 1114
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountComposition.cs",
+      "sha256": "721fa0255a62f12cb6acf80274d389ff10ac84fff532a993a15374efc7f5a6c0",
+      "bytes": 9857
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountLifecycle.cs",
+      "sha256": "8f3ad101def305e9bc24b3e28bf44ee197db64dca422019cd77f6547ea8c1753",
+      "bytes": 23329
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountMaintenance.cs",
+      "sha256": "2a30429133909254f0f5ae61d25255e563d69048ddf5a344ca242a68393bc014",
+      "bytes": 12173
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountResourceLock.cs",
+      "sha256": "ae00467b8a9c31b80a1fbb2638bf0814bf38efee0140e8df026a6f9dafa77182",
+      "bytes": 2619
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/AccountScope.cs",
+      "sha256": "35e1fee2e77206bba41af7dd4e31020eece1eba31265862b80bbfd803ced6252",
+      "bytes": 1944
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/BackgroundWork.cs",
+      "sha256": "1ef91579e18a80b3f4ab1a817a4ad4a9b3f4d1cb419155bc620bc68fd0525325",
+      "bytes": 11026
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/ClientServiceCollectionExtensions.cs",
+      "sha256": "ee3be886849b6488bdd8819c029c27a55b39503f81ea4bb6147e54b81a2918ec",
+      "bytes": 2425
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/CooperativeDeadline.cs",
+      "sha256": "ef50bbe6da6a1961d41f507ce12c4b2045f14c445cda93ca544ced920d1cf621",
+      "bytes": 6813
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/CredentialRenewal.cs",
+      "sha256": "113feb1d7da1e0200343bb22448928957fadb752fb3eb2e5e08853054fcc5be5",
+      "bytes": 837
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/CredentialRenewals.cs",
+      "sha256": "914fda48bd2e5dafedbc0d80015050cb181c73cce03675325975aba48bb53632",
+      "bytes": 2108
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/ExecutionLease.cs",
+      "sha256": "aff5fdc7c6b754eb277dbd4870b1c9792b99baf044b21e9f7003863e406523b3",
+      "bytes": 4769
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/ISyncCollection.cs",
+      "sha256": "a22565de7571362af2410db3933df9135dbb496ebfd21a782f688b768547f8df",
+      "bytes": 7029
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/IntentRequest.cs",
+      "sha256": "8efda385bd597f8f27e7a3cdb0cd1f122a756336ff98f725d3bd91bcb9aaa3e6",
+      "bytes": 8223
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalKeyAccess.cs",
+      "sha256": "773f3515cf0f614226732ee9fffff16cfc6d20ed37a708000e2bb645448ccff1",
+      "bytes": 4782
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalReadModel.cs",
+      "sha256": "93362987f61fa7726fb3343cfcb1ec7958aa0c990d4f67519ac9b9f98f8dfa3c",
+      "bytes": 24833
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalReplica.cs",
+      "sha256": "39dd0d12e1d0af78e42f5b23f0708683d1ae43deb51c7c701b0590cb7360eb7e",
+      "bytes": 1062
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/LocalSyncCollection.cs",
+      "sha256": "911232eacba338920729bacab5cd6372a29394daa5d9abd9c46e4c024baabb91",
+      "bytes": 13237
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/Queries.cs",
+      "sha256": "31c313bc9cfe026b2a0ab96f376b057bfef78f387a04a6b618f06ace53d9f45d",
+      "bytes": 1602
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/RecoverableWorkflow.cs",
+      "sha256": "5d4d315a009ee45785a4dc00df67070d279b369089ef876a147605612ab39932",
+      "bytes": 9934
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SessionLog.cs",
+      "sha256": "a7e652d6c839959fe1dc9cf2880843c7ecebbac5408bdbb4489a13fe8283d66b",
+      "bytes": 1081
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SessionTransport.cs",
+      "sha256": "4b032ba26f60fe4de2c44c35b95704ea9ad1a187530c73ea36282a71d6f3cb45",
+      "bytes": 3468
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncCapabilities.cs",
+      "sha256": "f198b06add8b37cc7f9b06b013608d055d7c845d0c16f9e366ac9ebdbf533058",
+      "bytes": 659
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncConfirmation.cs",
+      "sha256": "474df9e41b48a144dfcbdbfa30009bb18e94ecd25572a5d8c27a181b2b448303",
+      "bytes": 656
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncCoordinator.cs",
+      "sha256": "870a323bbaea4da140e6cfeed9ac0b92ed77fbcdc8c90ab46ec47059d9d360e3",
+      "bytes": 23871
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncDocumentConflict.cs",
+      "sha256": "ee75a18602571c38253fd7ff49fe4bed09c6b074596d6be10611e7e2de20fb47",
+      "bytes": 851
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncGoal.cs",
+      "sha256": "56b3cea6e419ec7265e2d7c5c098e7f0e55ccb61e3e8b3032b5c707c5bf56ecc",
+      "bytes": 4365
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncIssue.cs",
+      "sha256": "6a3e14e54abbfcd3902fe7d213a451d12bd065073cb4d52352e330543c184430",
+      "bytes": 1428
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncItemState.cs",
+      "sha256": "46165e2870a6d6658ebbc814f894b4529b6431c9465f703d36c2cc7458d2001d",
+      "bytes": 887
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncItemStatus.cs",
+      "sha256": "82a4f77176aaaa848289c285aaca1b3c3e46f7c12204ee03b3c6a588f802fec4",
+      "bytes": 516
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncQuery.cs",
+      "sha256": "f05ccbde7b3da80ff46c75fe063321d171366f17c90b393dbe6e982fb52e5163",
+      "bytes": 2651
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncSession.cs",
+      "sha256": "dde16c2cd248823b5342b0ecbc8130f0e087ade3f08ee31aac8582821f586cd8",
+      "bytes": 41138
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncSessionOptions.cs",
+      "sha256": "d35cfeff4e5a1bdeee2d9397a16940fc10bd0df303d8fd7f9296e855eb31f3ec",
+      "bytes": 5570
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncState.cs",
+      "sha256": "270a50f4c15e340107942f8dd007c93bd8a0b79d28cd51675790fbbfe4cd8743",
+      "bytes": 1041
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncStatus.cs",
+      "sha256": "fc514d2cd633aa84ad9f903467a88c2113ae1b2b7ac7f5ed5d518cbab09334b8",
+      "bytes": 2582
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/SyncWriteResult.cs",
+      "sha256": "92aa62855709d7663e76459f59856422d64fc9e7a7f5fd1af4397078510cdf04",
+      "bytes": 645
+    },
+    {
+      "path": "src/Bsync/Bsync/Client/Unsubscriber.cs",
+      "sha256": "5cbc94f011f8cce7a6438f4bc30eafd8350becba4dc40cd40df7302d914393d2",
+      "bytes": 267
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/ClockDriftException.cs",
+      "sha256": "d126fd35357a3a545baef452a401d2d4a95d5e741657575d159f283c8f0b5a3e",
+      "bytes": 622
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/HlcTimestamp.cs",
+      "sha256": "8440508e066e84efebe416bc6b923e55427351fd93959fbf2011a1741df8a538",
+      "bytes": 8368
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/HybridLogicalClock.cs",
+      "sha256": "f21b7433abf613c042d0b402f1b5eab4aaec1d71135f0be6fad1e84d17647d64",
+      "bytes": 7494
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/IPhysicalClock.cs",
+      "sha256": "e1a34af2cb282f6437d9204f345afa5fb809bc33384b4ed71dc03e847ab22ece",
+      "bytes": 397
+    },
+    {
+      "path": "src/Bsync/Bsync/Clocks/SystemPhysicalClock.cs",
+      "sha256": "67ce40eefb15304b0f728d398705a6ef14b77d14ba05cc2163d1d11da3c33a90",
+      "bytes": 420
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ClientWinsConflictHandler.cs",
+      "sha256": "5b925c10115e731095a71b994f68618d89ff79bf9e2e885148bc25431176ad1f",
+      "bytes": 1316
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ConflictContext.cs",
+      "sha256": "650a54b9f98ac1a2aed1cf0fa08c095651fe63a2ee909e4021f2b691ddaac38a",
+      "bytes": 1056
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ConflictOutcome.cs",
+      "sha256": "a9caca0c581733bca34fb199a77d0ec904d41990b29f12dee24e72c8da5b49cb",
+      "bytes": 1014
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ConflictResolution.cs",
+      "sha256": "def61e9ad5955b79f67d0b8c4a044d7a15a8466fac96e9860b2c43060cca8967",
+      "bytes": 1691
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/DeferConflictHandler.cs",
+      "sha256": "e24d66abb5a9d185977bfb554137e1e1442c372352336626a650bca59c4b7eb3",
+      "bytes": 716
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/DelegateConflictHandler.cs",
+      "sha256": "a1835a01b49fc519a8632a408c8cc7c76bb7397fd714b238f184e47ea302d0d0",
+      "bytes": 944
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/IConflictHandler.cs",
+      "sha256": "ae67036d47881bbd209d4fc3f5676ce073aff141ba5f33a75e672b9e0370a4d0",
+      "bytes": 786
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/KeptConflictView.cs",
+      "sha256": "e901ab9e194e52845f804994d7679f5f2a2490cc231b85a825908a353db13f87",
+      "bytes": 758
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/LastWriteWinsConflictHandler.cs",
+      "sha256": "009bd17494e43703937c365bfa0b7d2ec4b7e0240d6f2cbc8a60b9f3bdaa8052",
+      "bytes": 1323
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ServerWinsConflictHandler.cs",
+      "sha256": "15d103138300026b468c35b31698baa15c9e4781ab07e132fd3932bfe1c3027a",
+      "bytes": 639
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMerge.cs",
+      "sha256": "8bf96277bc5c3fee26aaa19727ae7a8b8a3734a9bf92a6fae20aed1fd4dc4d9c",
+      "bytes": 9305
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMergeConflictHandler.cs",
+      "sha256": "1ad4c1e088f34d5dbff4e8e76f79bb654024d7355046e899b8340d30ad3c208d",
+      "bytes": 2088
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMergeOptions.cs",
+      "sha256": "e5e7c4ffe09068cecf86c43c6be7bf5cea78f41ab029402fbd4e52b65ef27544",
+      "bytes": 1201
+    },
+    {
+      "path": "src/Bsync/Bsync/Conflicts/ThreeWayMergeResult.cs",
+      "sha256": "06d6384c3e7cbc03564bc4e5c1e80b932bb16ffa93b531b25c89c9798a53e16b",
+      "bytes": 1011
+    },
+    {
+      "path": "src/Bsync/Bsync/Diagnostics/OfflineDiagnosticExport.cs",
+      "sha256": "c8d5e9a117232b45d046ba8e750148fe0f506a4a4f4cf4604ae69e5da1a880d7",
+      "bytes": 9971
+    },
+    {
+      "path": "src/Bsync/Bsync/Diagnostics/OfflineMetrics.cs",
+      "sha256": "18e8aa6233fbddc436a680284ce0464f02019b98ad2977346af6819e3964fdd1",
+      "bytes": 6410
+    },
+    {
+      "path": "src/Bsync/Bsync/Diagnostics/SyncDiagnostics.cs",
+      "sha256": "a61a0589995fd6851c75193f964d47dc596b08ff4e9cf003852c03e2d46ec309",
+      "bytes": 5720
+    },
+    {
+      "path": "src/Bsync/Bsync/Documents/DocumentCloner.cs",
+      "sha256": "2951577172429ed053412544f2a5b42e3fbc6d02683bebbcfa84e8a8fb0442d2",
+      "bytes": 4998
+    },
+    {
+      "path": "src/Bsync/Bsync/Documents/DocumentUpgrade.cs",
+      "sha256": "e855b564bb80664f1a754987134f4b714d63edb956983bf5238d7e8433a20f8d",
+      "bytes": 1964
+    },
+    {
+      "path": "src/Bsync/Bsync/ISyncEntity.cs",
+      "sha256": "37525635f47ff38685957a474da963364bd4e4ba99ea424b20d2b4076065c9f4",
+      "bytes": 1678
+    },
+    {
+      "path": "src/Bsync/Bsync/LocalWriteReceipt.cs",
+      "sha256": "2e38d933a77529123dce89c54bf1ebed0d0299e69f896d73d9ceb8869e81767b",
+      "bytes": 886
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/CheckpointJsonConverter.cs",
+      "sha256": "71ce9221d17165a40d87703e7b879d387962d059ab36d8bed6b176eba633ee6c",
+      "bytes": 1133
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/HlcTimestampJsonConverter.cs",
+      "sha256": "c22a39c8418fc102f82abedf13124b32f53dd18d411024cd651334d3ec8abfd0",
+      "bytes": 1032
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PullRequest.cs",
+      "sha256": "339f599df174b4cf978c69a1962c32c0dcb37b38929b6f06d20bfee91af51949",
+      "bytes": 1345
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PullResult.cs",
+      "sha256": "c56035d4bb924d9ea9b6a26285963a97672e5dc7754be8f973b163a2d5705749",
+      "bytes": 2939
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushErrorCodes.cs",
+      "sha256": "969c598573b9c63d249090badfedf5bc2f1c843b33d914b2dfc22586b9f0e883",
+      "bytes": 2552
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOperation.cs",
+      "sha256": "89999b28a841c758b1db8bd3a2ec2df7bcc854bb85642e3595cb9104ebefce9c",
+      "bytes": 2218
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOutcome.cs",
+      "sha256": "450954100f525a4b27468f3006a99f64e8401b2db6f5107dc8a5b0cf0b0ffa78",
+      "bytes": 3529
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOutcomeKind.cs",
+      "sha256": "c8116173e1e2f60f84bf0a3cf56cbdd725064afd51694f319237786b87696c38",
+      "bytes": 1096
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushOutcomeKindJsonConverter.cs",
+      "sha256": "f27ddd5a996d204c3c4dbfab1fb57916a1ca901f7e24dfca7fc5606ed7f890ca",
+      "bytes": 514
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushRequest.cs",
+      "sha256": "3c887c02ad55879e5593f4b87b69d2395437af3ba79f6a8916b6dcd478f9ab04",
+      "bytes": 640
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/PushResult.cs",
+      "sha256": "2374222759414543024f497b1537b69442259446a0be65679d071bf9192fbccf",
+      "bytes": 587
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/RemoteChange.cs",
+      "sha256": "18e8d0374408ead721a5681dd1ef556db9fa9479ba5ccb800f2c61cbdad2dca9",
+      "bytes": 893
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/StreamEvent.cs",
+      "sha256": "d81165f41eaa2e76af95100fed9f945d5532985cead520a999c562d4b1e8d242",
+      "bytes": 1459
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/StreamEventKind.cs",
+      "sha256": "1825eadb0f0e3f330f8804fdbbd12c2c0de96d91c01b8b60e051c14387ab3034",
+      "bytes": 612
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/SyncFeatures.cs",
+      "sha256": "f2be9ed9d6b0b6eb3dbcea9bed1fd4cba28df498a604d70c4633974f45d5a31a",
+      "bytes": 1985
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/SyncJsonTypes.cs",
+      "sha256": "d62f0eab74fd0b2f3ff13ec004e2a37a42f7c7563958ced3dbcc6afa4ce56e50",
+      "bytes": 1803
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/SyncLimits.cs",
+      "sha256": "03b0c93e195cf239bd17b03d20162794a66e27fb13da6b039acc65b36f59ec15",
+      "bytes": 674
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/WireInt64JsonConverter.cs",
+      "sha256": "2ae1e4160e76826c21c1e090154bfee588033873f9d4688323af4fd98e6de60d",
+      "bytes": 1925
+    },
+    {
+      "path": "src/Bsync/Bsync/Protocol/WireNullableInt64JsonConverter.cs",
+      "sha256": "d5cc788c52f8454c06d0909f68c2435ed829450c229f286c44722e4cef6e1449",
+      "bytes": 966
+    },
+    {
+      "path": "src/Bsync/Bsync/ResetReasons.cs",
+      "sha256": "e8d5baf7a48e2c52a04d07151b3cc244e4506640e76f01f608360583848917c6",
+      "bytes": 730
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/AuthorityCommit.cs",
+      "sha256": "c1c8c5ee9659bd3b99cc4082077d6c5ef5cc677d983deac8b7befd795f5eac63",
+      "bytes": 370
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/AuthorityLimits.cs",
+      "sha256": "6f55b66e51083179a774d4a10d7f232b18dabec398d15afbd16599b22c554cf1",
+      "bytes": 368
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncAuthority.cs",
+      "sha256": "4c04023cc614bee3e6213423760a4d9e109aaac6be3633eea23b4f9746cccc56",
+      "bytes": 1300
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncCommitNotifier.cs",
+      "sha256": "03d82ac079bbe9f1ddd441cf9f2bf866f062c4cfff634ea3e34d6ec0c856abcd",
+      "bytes": 482
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncDocumentReader.cs",
+      "sha256": "e6eea8d1a76d3031c8de65dd0031fea8aab07f84e423fc9e46583a716a22d172",
+      "bytes": 1096
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncPublisher.cs",
+      "sha256": "7efc8475348060f70a47c60185d1031ae5cf429aeb47cea6c4dbad6d47c42e04",
+      "bytes": 2985
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ISyncWriteHandler.cs",
+      "sha256": "21a0f35f4a2fd4299d538e654d0bfec6c2a692c1cf34bf8c8b8ebf39731d7c4c",
+      "bytes": 1312
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InMemorySyncServer.cs",
+      "sha256": "42a4dfaebc02f4d3a65049652ae18e45f2a5fb777e779182398c5a5175c09a4a",
+      "bytes": 42741
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InMemorySyncServerBackup.cs",
+      "sha256": "dc43903fa460ad723895d9a891f0546e326585b5435d87c3a75c3c6464e8a314",
+      "bytes": 1294
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InMemorySyncServerOptions.cs",
+      "sha256": "a9c724599ca1b8357800a2e0c2185876b0ef960794a00372bea6f7e711371b50",
+      "bytes": 5295
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/InProcessTransport.cs",
+      "sha256": "8c56b7c58c4ed745bd6979f7038a90103ceb03ea126f04123ae3cdb77701a545",
+      "bytes": 2219
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/ScopedAuthority.cs",
+      "sha256": "b34dd16646e32dc39742560efb835c2cd86db343d5838c69663cdf67bc29361f",
+      "bytes": 5066
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/StoredDocument.cs",
+      "sha256": "b41261ca03a7cc2fc63c0f6adb35b354c9038d3730bdf51e01e2115d667a08c8",
+      "bytes": 532
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncCallContext.cs",
+      "sha256": "283751d3d638da483ce4424e2c536f7d9fb06fbeb62d44af18aff8e81da5f247",
+      "bytes": 1005
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncPublishResult.cs",
+      "sha256": "e76ffd465d0942386df9eb423f53854bdae9a653847ce8fdcd5eaad0e02fe934",
+      "bytes": 828
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncReplicaAudit.cs",
+      "sha256": "bb58c340338c41c4a515504fbdd7335989414a83dcc91ac6c5b3fc5b1d70b6b0",
+      "bytes": 2999
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncRetention.cs",
+      "sha256": "3dfe4d782b8f024ded3f6d1edeeba556e85b512170dcdf43f791266728e2a426",
+      "bytes": 6400
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncWriteContext.cs",
+      "sha256": "f76148248a128851b17e9e9262a082e919969be70b23c107d43b22f2f2519742",
+      "bytes": 1956
+    },
+    {
+      "path": "src/Bsync/Bsync/Server/SyncWriteDecision.cs",
+      "sha256": "333d47b2689d5df3b3de7da98557750d8314c5e7c3d35ccfdb275cb5f602cff7",
+      "bytes": 3823
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ILocalStore.cs",
+      "sha256": "7ee910da17747bed11784e3fc7e4e3bf5581e63a899faf23bf5eb9927fc6c435",
+      "bytes": 9657
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/InMemoryLocalStore.cs",
+      "sha256": "a2f082bb06eae23c7bfa87c692c016662b07fe4d9e56fe4f5b0fb96f09c8431f",
+      "bytes": 19494
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/InMemoryOrchestrationStore.cs",
+      "sha256": "fb182258d06b5faf89ee06e327dd715bf0f288b9781de9375d11cd9da7b8b676",
+      "bytes": 3268
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/LocalStoreIndexing.cs",
+      "sha256": "a324ff4f8304c38d885e6a3f932d1c2533441395f630082e488f463f7ace817c",
+      "bytes": 3841
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/LocalStoreUnavailableException.cs",
+      "sha256": "7bc591b287129b6e4f7b026ee1a90453a06e956105d956f3e0162a4b5883c360",
+      "bytes": 851
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/OrchestrationPayloadPolicy.cs",
+      "sha256": "24fe04007ba9f0c498ff0c8474344b4f2ab6eb33a3b448368e39a24d8d02ed36",
+      "bytes": 2622
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/OrchestrationStore.cs",
+      "sha256": "a8401ff8bdf04688f72b3c48af6d4d518dbd4728595a0e0f79d459ea837e4e97",
+      "bytes": 5801
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/PendingOperation.cs",
+      "sha256": "9fe4e0255915868054434ae3beeb586a7fd7899395aa81ae16aedf2f8b791f77",
+      "bytes": 990
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ProtectedOrchestrationStore.cs",
+      "sha256": "f47d9c803e748e14898f7b31c7643e25da144bb882283c90a19c627c18fd2208",
+      "bytes": 9720
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/RecordUpdate.cs",
+      "sha256": "dda9df891b5583eaf7fb57390970e94e2d4233c92a378871eb061ee0f08193d2",
+      "bytes": 1310
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/RecordUpdateResult.cs",
+      "sha256": "97222e1c094c95c2e8a1a1590b5a408c1229e69122d396f48833001b591120b0",
+      "bytes": 521
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ReplicaCursor.cs",
+      "sha256": "9568ec6e734325cbaee6d5b019c007e397479e2db5076cf11df3174e350ac1ee",
+      "bytes": 1261
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/ReplicaIdentity.cs",
+      "sha256": "0a428abab5feaebd80b715e903f01088f2124589ec2a1643780f8dc6875c2668",
+      "bytes": 520
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncConflict.cs",
+      "sha256": "178fb8c75f390c3885a235d801ff6198a7190fe100f9c87946ffac0f36b7236d",
+      "bytes": 667
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncGroup.cs",
+      "sha256": "7bb3e77541412e447179f8aa8b70e712c54f8fe00f5289578abc4fcf57def2f7",
+      "bytes": 321
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncIndex.cs",
+      "sha256": "bca078fb52fb14268f8bea445ddc49730721dabb4d327d90130d015b9702cd42",
+      "bytes": 10209
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncIssueCounts.cs",
+      "sha256": "ba2eb6eb6685602e5bb5280a0593ae715f89ff2bd30e91001c90031cdbc2df77",
+      "bytes": 695
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncRecord.cs",
+      "sha256": "29e888f0efe9d0b40c45112cf9949584362476a2f190c052fe4982dfaa7e2b17",
+      "bytes": 4372
+    },
+    {
+      "path": "src/Bsync/Bsync/Storage/SyncRejection.cs",
+      "sha256": "a549fcc3a8a6b574027bba48ee585656d251d5768fded2b3434c116505c2615b",
+      "bytes": 1417
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncChange.cs",
+      "sha256": "17c60b0c03c7f2bcc218d9791bf21f7d0b4efadd9e54080e527a16b5592a59c2",
+      "bytes": 527
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncChangeKind.cs",
+      "sha256": "056924fb3a99b981012bf9ceb6d61c16a39df8df4a78bb2d762ee0e9a448613f",
+      "bytes": 681
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncEngine.cs",
+      "sha256": "bb1facd9709913d8082ee884fd95d54b1676075d106bd72d5454cf2a234c501b",
+      "bytes": 81814
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncErrorCodes.cs",
+      "sha256": "97cbaaaf700aa2584ddf12c8e90533e22d6cc9d6dde148e2ad364906d08783e0",
+      "bytes": 1258
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncIds.cs",
+      "sha256": "41d40083c384d4a0519c3fde3a7f1fee85c2e4e7a69bc179639e446b302bbf17",
+      "bytes": 1939
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncMode.cs",
+      "sha256": "fac34b5d96c75e4ddb7fa37d26d5be156c17f82863f7cfd05961da48cd1deed2",
+      "bytes": 675
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncOptions.cs",
+      "sha256": "6f478ff718d74c6d58edf3c47cb177b234f413ac3b0ff835c1383977401f5029",
+      "bytes": 4603
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncProtocolException.cs",
+      "sha256": "4e1da39a3a2b8c0a665fe9d7b72ee821d80778fb0c9630fe2d30449fe4f4258a",
+      "bytes": 740
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncReadOnlyException.cs",
+      "sha256": "7d7989420f3b8c613c5d1ab8b076a082f44b38939920c4befb7c85273e8c068d",
+      "bytes": 419
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncResetRequiredException.cs",
+      "sha256": "835ed0abc8439d7b3ca7bdd98ef6678e6f89d1a8075ae19693e56d863ee760de",
+      "bytes": 636
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncResult.cs",
+      "sha256": "de341802661f28c7bd80278f930e67cae960eef0055888d993bd260eceb740de",
+      "bytes": 3604
+    },
+    {
+      "path": "src/Bsync/Bsync/SyncTransportException.cs",
+      "sha256": "e90c4a0e19f921dd8da9b2f1292b5d75350b2845ca7a1c1773a9322e347393ee",
+      "bytes": 1319
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityCapabilities.cs",
+      "sha256": "435713137f90d1f4f374fcbc2638d498b392c4d833f761e8b836e8a7ea2dfd01",
+      "bytes": 1619
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityConformance.cs",
+      "sha256": "6e8380d4328c11c8e366727fd16811899da3b7fa59eaec856b43719da08dd2dd",
+      "bytes": 37792
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityConformanceCase.cs",
+      "sha256": "bef623b1973c0e2be89bb25954ae49c2105380c6ac6b9ebc7082fab415024c31",
+      "bytes": 606
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityConformanceOptions.cs",
+      "sha256": "043d2d193ce330190e8975e215ad74a724bea9e8c6f4ce7eea56a6fdf89e6792",
+      "bytes": 1609
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/AuthorityUnderTest.cs",
+      "sha256": "ebe765123030d69984531b485e96ad4a4f26fee6d14cc201c426add0af5dbdea",
+      "bytes": 2771
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/Check.cs",
+      "sha256": "9db7d83ffffd740ca955eb7bcc04926d4f0e2bff8f392c0b3074181c45cf6069",
+      "bytes": 2603
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceCase.cs",
+      "sha256": "619d643d9b5fb63bd575299d1196e22433a89afa7dc874a0991ee0c3b86ab0e6",
+      "bytes": 527
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceDocument.cs",
+      "sha256": "d1cc8b96c2e712bcac91e01d1ea8b8101546a0d27064a5885b5b6702752f6c6b",
+      "bytes": 536
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceFailure.cs",
+      "sha256": "b499403d15fa106b2e766dd8363ca56aea3f495396d373f0e4a56f217c70f1d3",
+      "bytes": 175
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceFault.cs",
+      "sha256": "a4d40f885e2190d5fe3db066eec0dded8e59645a977a7614c49d9acba14d3865",
+      "bytes": 198
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/ConformanceJsonContext.cs",
+      "sha256": "37c891929461d0a46d16d08da6fc9c0b0ea56f863fecd830a28ff83925912c3f",
+      "bytes": 598
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/FixedClock.cs",
+      "sha256": "7ff415c7e4388f8b762a031fc50ea60c878986d600dec4045375a28c0f599d1a",
+      "bytes": 278
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/HttpAuthorityDriver.cs",
+      "sha256": "74868a4501f77f043c087b20557e7f525d3ac7fee07998623e9a5161dccedcf0",
+      "bytes": 3304
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/HttpConformanceServer.cs",
+      "sha256": "9113f9c1af1db60b1a0163c264a95734ceb2fbb0948d32eb484e74955e8a0984",
+      "bytes": 849
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/IAuthorityConformanceDriver.cs",
+      "sha256": "66d0bb18ba623223b9007f0ab0f6c1a8f1859a0b6060761d6a7d9762bb0134be",
+      "bytes": 729
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/InMemoryAuthorityDriver.cs",
+      "sha256": "679451407deec68275c6eacdec28eeee9fa88d3cab707df755b35ac8f892cbd3",
+      "bytes": 6082
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/LocalStoreConformance.cs",
+      "sha256": "2fe8b95344a2a07bb5fd19537f405a9700c96c00f1413d8965f1e5fe1f8e4a8c",
+      "bytes": 21886
+    },
+    {
+      "path": "src/Bsync/Bsync/Testing/LocalStoreIndexConformance.cs",
+      "sha256": "bd5a007ee161d4534c2a4468eeb9968b6943c9a54d46246fdcc240e68da82d83",
+      "bytes": 8166
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpProblems.cs",
+      "sha256": "b34e7ce745528f8d72f7477852748979b85e6c625351e252a2d494ea32ad028a",
+      "bytes": 3768
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpPullBatch.cs",
+      "sha256": "169de0418fec3e7cbac585a648cee04f54a53a8b3e45955420615ae684bf8975",
+      "bytes": 7416
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpSyncHints.cs",
+      "sha256": "043d42fe799159a915229ef8cf81b245ff661a3e1605e48b39184256dcc71544",
+      "bytes": 4583
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpSyncTransport.cs",
+      "sha256": "0412027f4ea292121cc8917d9f848022d2149d53060d49fc5455bd0ba4d3cbf2",
+      "bytes": 9740
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/HttpSyncTransportOptions.cs",
+      "sha256": "de7e7aa6d0c9290883e868ecdba47315705f4dc766f85fabd9de2e08631b8f33",
+      "bytes": 1425
+    },
+    {
+      "path": "src/Bsync/Bsync/Transport/ISyncTransport.cs",
+      "sha256": "5850230215742e9e644ee51a9bed8de1279f4a0dc721c360a07de797bd7ef59f",
+      "bytes": 2058
+    }
+  ],
+  "packages": [
+    {
+      "path": "artifacts/packages/Bsync.0.4.0-gapclosure.20261018.3.nupkg",
+      "sha256": "f94bf4e5668cb2e6e1ef420224fd26320518810598164e9a1441d7155f6b595b",
+      "bytes": 628167,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Blazor.0.4.0-gapclosure.20261018.3.nupkg",
+      "sha256": "73c502e7a0a5839fc9ee1186e841fda338db34b92832fd1da24ef99b6ac90e6b",
+      "bytes": 126581,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.AspNetCore.0.4.0-gapclosure.20261018.3.nupkg",
+      "sha256": "e9fb5ff380addb9e2b881c948dd3dde8b32b1cbb0fb216356bac89a5af930b1a",
+      "bytes": 64782,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.PostgreSql.0.4.0-gapclosure.20261018.3.nupkg",
+      "sha256": "ad86e7b2ea0b13acbaf26f8664deec2782b579e4e6dbb00dbd96824e45c6c8dd",
+      "bytes": 67419,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.SqlServer.0.4.0-gapclosure.20261018.3.nupkg",
+      "sha256": "0c128d30e40f42b35f574384fb6224ae15e59f9eb60cc1036ea82ba12a6f45f0",
+      "bytes": 84864,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Storage.Sqlite.0.4.0-gapclosure.20261018.3.nupkg",
+      "sha256": "f213543235c30641f2ea2f9b96f5f13bb1b7e096f09341e8408d589aaf92bdcd",
+      "bytes": 87750,
+      "cacheMatches": true,
+      "readmeMatches": true
+    }
+  ],
+  "packagedBrowserAssets": [
+    {
+      "path": "artifacts/gap-closure/memory-qualification/browser/wwwroot/_content/Bsync.Blazor/bsync-blobs.js",
+      "sha256": "f0e7af6ca07ab974487545d738b3b1a64e2e9553e9c992fc543db4cff16e465f",
+      "bytes": 8790
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/browser/wwwroot/_content/Bsync.Blazor/bsync-cache-locks.js",
+      "sha256": "9a79a07e269f75c739025f89f48a553c185d8e6a760905707309aa44b099ee74",
+      "bytes": 1181
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/browser/wwwroot/_content/Bsync.Blazor/bsync-orchestration.js",
+      "sha256": "0aa5a483cabccfb8f739553c7b048e691341e159761e4e858fa323ed17ba467e",
+      "bytes": 4570
+    }
+  ],
+  "tests": [
+    {
+      "path": "artifacts/gap-closure/memory-qualification/core-optimized.trx",
+      "sha256": "21e796692ffb86dd846bb3e750b865a15c0874caa87aa00b00c552d776acb27e",
+      "bytes": 1259513,
+      "counters": {
+        "total": "918",
+        "executed": "918",
+        "passed": "918",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/package-final.trx",
+      "sha256": "e33d50ac0b21358b2cdf6da629920befeeb4d1bfeb2d783299e1a99fd18e2f1b",
+      "bytes": 308464,
+      "counters": {
+        "total": "207",
+        "executed": "207",
+        "passed": "207",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/browser-final.trx",
+      "sha256": "b47a2eb97836d7d0b8207a241a6337e4fc53d99ea4ff1639b6fb1222a68fd5eb",
+      "bytes": 10418,
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    }
+  ],
+  "allocationComparison": {
+    "before": {
+      "result": {
+        "path": "artifacts/gap-closure/memory-qualification/allocation-before.json",
+        "sha256": "b59a1e6c7de84bffabcea89b274e1ac1c90f1bccb7d34af5200b564e8ead04e1",
+        "bytes": 3110
+      },
+      "libraryAssemblySha256": "e6f8f05cd751f8018894d6fd8c823497052e74264ade5faf63962126c80d8fc2",
+      "medianBytes": 74706336
+    },
+    "after": {
+      "result": {
+        "path": "artifacts/gap-closure/memory-qualification/allocation-after.json",
+        "sha256": "8e0fdfec9c4c907fec1769703cec05bfb108cc3a57d73324a45051330d70a1a2",
+        "bytes": 3103
+      },
+      "libraryAssemblySha256": "8492a8ba3940b5a627760437c97ec6e3044b29bff6f56df411c511a6a8d718e3",
+      "medianBytes": 56856160
+    },
+    "reductionBytes": 17850176,
+    "reductionPercent": 23.893791284316233
+  },
+  "symbols": {
+    "SchemaVersion": 1,
+    "Commit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+    "RemoteSourceDownloaded": false,
+    "EmbeddedChecksumsVerified": 213,
+    "RemoteChecksumsVerified": 0,
+    "UniqueSourcesDownloaded": 0,
+    "Symbols": [
+      {
+        "Package": "Bsync.0.4.0-gapclosure.20261018.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.dll",
+        "Pdb": "lib/net10.0/Bsync.pdb",
+        "PdbId": "572d7b9f-ac67-4af2-aa9a-b1f8a8dfe075",
+        "Documents": 329,
+        "EmbeddedDocuments": 153,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "1ae2af93fc7fe44afc2cbced5f5b4cb9052352a9b40ec13b9fb81a2af2e1c777",
+          "3e79b22e0d067cb4347668c3a094d5723df50ddcf83c7951d23f45962a24ff91",
+          "97eba2649b47271c2cb02dfc7c8038797c0199de50ecac23d9c7488366095504",
+          "ba1f4b070b42e095e8c484ca62f8bf3176cafc61da204ec930db071b9c14cf47",
+          "5b977c0f766f4a14e800f63f5289077ec6bcdfd23dd0174cdd23b26dc0b7aab3",
+          "1842c82ac36c2eecb9f67e58c440415dae2eed1bdd4fdc641e73531fb48c673b",
+          "944fd4acd4ad9b0ced6a14c85f16e9b3271c12ee132747b12d73dcd103919232",
+          "14405324194cce7bd7590ae63c5b1c541527ed09fd3c71afcd0cf34364cdae3b",
+          "fd4d1a1dac0709b967e6c96dff37228747ac6754236f3546f2f47747211d9101",
+          "a9314658afc804e6f0bd40929956bab91b410dea94182e0838aad2b782dc753f",
+          "42bd155ca46188b7b19f19577b1a3e97328d3448a67616fd6366e183cd0f68cf",
+          "0590d65801786ce5e83d9ad22acf9dcd8d020e825a1a0c7865958b746bf9e3a6",
+          "9f2f651d454077f804bc9930876ee82d479a3fdd9754b5e54b4734733a2c9f5c",
+          "c2bbaf1dbc2f772906f29c2827bd820e7f17845100b03ffc7119ea2b5d47d111",
+          "afc6a6d00ce52b73e1e0dc4b07b9522e2f146449d903ca65ee243b91152ad545",
+          "e3b2497e0d08212c59b051316f38e0aa59e014b49bbd0e0341836289bd060cb6",
+          "bd091deae84b8a2023d075bf28fd82e8f58a77886f8d2fc2f8ee8eb18158e87a",
+          "1db199d553cf43b2814ee008dcc094dd9f8d728769256751d77f0e717528c597",
+          "fdbedacf78c2aea8b666256f6ae3b3c1117d9bf696ba4d1394b71c17234cb0aa",
+          "247e291d01f338e01bc6afa7bc4156160ab275bc581b4f2de1d9bc941c79eb1f",
+          "21e4245073b1a49751096ea32f2d665ed933c25719f3b079baf65bda20ded3f9",
+          "e5d0fc719cfd779cf39b43ecdc7a802b2a93ac804629f2a30e3aa15c0d5d6577",
+          "32cfbae5dcc9a67453f14f11790a5372d6bda29ee789b9de63161dafed0869cd",
+          "509b77457f15c86f13c3482f540188443319dab2861893f6f60d17a07ffee3ef",
+          "cb408bd72004c0ef0771a6702e4381159acd4a7addd114d47455a1064a8a91b7",
+          "91641b2a518e3392fb902188f6fc06476a33da8601e13830bded3fce1c2ab191",
+          "e0776d98e720c56c89f3c5d16459ca94f5bbd503211974fc1ee0608b0bfff046",
+          "0029d6b64f4dd23927b00934edeae5938201f499f1568dbfc37b4a638e0ba9e9",
+          "52cdad2accb81a55fdd99005f6f264c91d274a0cb9417a44d96ffb60ebe18c5c",
+          "f00dee4afaa7ab0b77614213e5028debaa9d0e1fdd04a3ddefd981de407977a1",
+          "029751d4b6ce5f4e55090af06baa39b7cf912edc616483bdfcd66cffbb1e116c",
+          "c3e6b8d7abbe39c5b62a02f7b2a033b6146693c577d2626ddbc5ebf8d5c107a3",
+          "d71f6883a5afca93e5690efa651a7c6a7353f4b1359580cf7819455fdf19676d",
+          "4bc49ee23c1f1ef807adddf93fac4330557bd0977dbc7b003a7e7516455f3e43",
+          "8451448884fe9b9c65d373c79380b8fc42f34f26186d45b3636271b8401fc9db",
+          "85c20a4d6370f35dd2c116a29f8a3eadc1360254c73900d0c2ac8a8a3c9a4005",
+          "f1cb41f180f7ff64caf9ad1025b8f542f23588227dbf2a1946435e9d74e6d3ef",
+          "084d1ad694f57e7af37e5b97851d53c8f91eccc57d5c0c02ababdba04ab60104",
+          "89193b50c588c321ccfacddd2db61585d9b8cb44cd48b845f25fba69402733e6",
+          "393a5229e2252b8dc552f212b646876a0a42c788d627a37e10080af890828de8",
+          "4e2b8dbd4ea67912c4fdc5f603e0059cb15ba1738b317d5027847d8da8c87143",
+          "9adc113215f1c73a8b9cad5aee89b822fea5e30e3ded5e3b59f8d5e3bd9f2c44",
+          "4a225c4e872502111b95082a4f9b8ea9d498965dccbbcb5f99c296cfffa27971",
+          "ce571eeec972c05374c698c75a9e40435523a77c8099bb4ea7e72631fb840c1d",
+          "ab7aa820d776035b58a0a341a3cccc1963025d749b8eaabb1347ca0c716c284d",
+          "67671e735ce57758ec8b6a93ccdf77340b1ca7f3f1fe415cd18a7250b9f292c1",
+          "efd9b3cb3f4b2f85bb880ca8576fc095cdaf568181166f70574d03f901bbe320",
+          "0dc8a9cc64e838b899f7335c2699a912f8175723995a7f13bc8e63fa08cdf2f9",
+          "d60bb6545c9d36dce4a6dac55225cdc1297cf393977b21ca26b64398cd25970b",
+          "63a9bf0cabc70eee15c6d611638d2958813e536a63c5cdfe459f1e9c36c81efc",
+          "2d26c78ab7239c7b2e829a2abcde3b41eac7e023bbcde2ae319f4cb7f424267f",
+          "d9fb126c034001f1586b95e4224122807b348c09fb433ee94e85087954d54b84",
+          "a191f77b00d604d172a7dcbd722445ee9315ed84f6dee3dc3cb908845512fd18",
+          "078ff55fb05189a0c61395caf4ed2140eeb1c89287e85dd7518ae02ad46e1f3f",
+          "d138c642a17df5c8b2b745a2622608f34aae96a8f9b4faab3daf4e4c2670f2a9",
+          "22e738a9270c17c901e466e4eb097395fa4d3e7ac8aabfc92d546c27b2e919db",
+          "14546b761591bbe3eb38cb60365a3b3ac68edc45fd997bd219e83a0a42e49e9c",
+          "a46f58d6d52dfd8dddfbc261e60e4e3793f1e741225bcce54e5c3a09755acd59",
+          "c21d352f72813ed0f33df9dfc47b17e60ab16f787310c06b59f94058a22940d7",
+          "0c0dd6d784f6438d49fa65d1557ec5fbe651ce1890d9a0c921ad7982cccc404b",
+          "348e5ebb9860eb874a7258a41f524695625ec83251066fd213c580a4b49d0308",
+          "99c0cba1e4616123752f14e3d5dbdf2754693dfc92f10674af180b9db6a45ee4",
+          "90a4a3701ace9320a45728eeddcc4e7cbf6a93b84a11995b9f76b65f4cf7035d",
+          "d88fe678385a481485b579e7a87158eca6fdde62ce158d90b7368b2c45b502f2",
+          "932ecde8512762b811f696a23849b8138af4f5874d664d4639cfcab057630250",
+          "1d7acc3906474fe6176ca6fe5cb39e07ee2dd72973d7105f262033fde1f0c689",
+          "2ea1ce34390733505fbb2a8dbccdba462cffd57190ffccd5c3cdbab61997b2aa",
+          "aefa9e221511ac6b70298410f98f89cd1d0933471a84d990845043b7c264fef1",
+          "e88eb6b897514b1a4135bc85fa05294bf437aaf083002f68c49a68e2bb76838b",
+          "7374d37861439d250a002e91633a47f9861c4f71a75e5e9b56b3d019a7a57017",
+          "7b9927e895aef322c344c12d5c561ac0522801e093b0de723d7646e0c90e3837",
+          "3ea1390d720d304664afdcd26dbfedc1f696082c7eb8a52b0f3b0de1115598dd",
+          "615db512205dc8b8b667a46d750f23685dce7dde8cc85f8a8275ef496ba1a59f",
+          "ee5acefdc5c9a9a27fffb90a0f0083123706504e6f42228ce954d6e7116f0f79",
+          "87aa30b972ee4d409d9b8b88ce78c89cb812650a05af4c432ec6b7a82adf2a9f",
+          "680e1b9a120465e14580d4f723f9837447d7df2f4c70506d21568b7eaa8ebb5c",
+          "ece582210d6e72bd9a446b5b842c51bd0bbfa628d3410d4c5129f7d419c4c2b4",
+          "54d269a93bdebf65f37c5cc9ddbf8d602217bb978d670d0f2a57e270eae933d7",
+          "01333dfd10d9843bf4cb65e176f679376d055e2a1c9a8a7b6764178a9ea6c3cb",
+          "d9102074ebc26e8b5b98ac6951571d67672693657f9cfde68de783ac1905a41c",
+          "63c19bd4041b3a2caac873ce6fc0ed49515574b901fd4793ece5cb3dbf7b878c",
+          "4a7bae02fbde526f122b121c9690d714aeeb9ba5a793c6a0ef34d96181a1df93",
+          "bdacbc3b927952125936d1c003d3d131bdac82d9196de644ffee090e22a3438a",
+          "43e4d5234e38958d23b31478c79d5a551df9937b08158ca33cbd044484d28a82",
+          "183a80c8558c9ac36fd289a4cee4a3782ff254b49adb750acaf7aedfc11c0930",
+          "a4306df2aac5a874cb241512da64c2475bb590a303084df9f7cb9831489a4908",
+          "8ddc44d7cc225926767d826217debce6a59ff48f5809166684d9dc7732be18e9",
+          "aefdf22ee945d8cff2ba74a05be878170417fae2d351301ae842288ff54783aa",
+          "73c4d6b18bed23212ab544d53fb2d3a397e8c04bae3197795809e45fbe5652a6",
+          "e3ef83f1119f134d8f11186d88290735d89bc3f2549f505141914426caf07edb",
+          "df00188850bb2b27aacb3c8ab4796399a2b801fabb5d7d3d2aebe4205e27d890",
+          "bab322c6b49a99cfa1b6f7ce5c8a1db648df674e7eaffefb3652c04677f224bc",
+          "0422f2d1b26523c76ffbf15b4ada1e91f30ab12b97bd031fbad94e73c341bb1a",
+          "5a917e0861417312bca7020da8c3df440f5d6f8c430591d165d1f9913d1dd224",
+          "a015ea3ef780fc7c34486457b052ba09f0e8bab4c3046fb691f38440d70e5006",
+          "63737f934e7cfa38d3cca88bf1f425f3f7ed35264bc699da372cea63bb9cf3fc",
+          "abbe44ea7216b7b860a0e5546a68f2572ded9f02dba69f1e3ef634dbba58d2ca",
+          "c220ab35c0ca3b87f80db2e31b86245a6c1106a7649319e8a02ddb40f8de72ed",
+          "eb64dc02ed209dd53d6b52d93da92880b91530b862704aabc35b2d24865e5c53",
+          "a9646a0079fc2eed411aa283e92271ae852fcbfff916b4167dff9d954481b2d7",
+          "f3852890fd6c1b2192a1441a9eb34bb0d6d4d9a4ab214776c3f266649b10f4d9",
+          "6c9324a6166f2a7286aaffcea11fc38950a8e1cb7a4686f421f613a397c90aaf",
+          "516f837b845a729b20a54a7b48f0af332d775a91a5bceba6746cb5accc2dcdf7",
+          "997be8244c9dfee3708a1839800e849fe3ab782404f9502c121cca9714a19af4",
+          "7abf6f3cc19c6ba3ee3c0aca8a336e5c659112f80c6cf68b2234a3fc89d82079",
+          "c8f3fe61ca9f363ba290e2ed30581bd208fe3962083c36aaf541e170a9b7d33e",
+          "bc8a13d17b932835ee7eb24d04e8499014928bfff1cffa080d066a8b94d43d3d",
+          "2ee70dbdbbd12ad62b573d74e2234ab60073f9dfae60b772cbd9d97102d7be4a",
+          "8c5a0a17c74c9e926edd21111b9d4aca11442e4e924f282e0f7872aa1e82fff2",
+          "ea719491e1ab810c7db76eb606d9598837c717af5bef592f60ea1817dce66fd3",
+          "875239bfec0e606e0a3859b27fe09befe75c1f0bf7a3139afa2bff133c80cf7d",
+          "9bbd80db90d390d6f242a46a8d65ecb83e62c335f74bc4310887db9a3cf86e7a",
+          "f9871e8c171108c1092581a05c99a9c0a0e62aceaf5eebd11b0df8b423e92741",
+          "c75f6c6356c8841eb47c4febc6b96db0ba381f406b5f9c1e33f194daa88958ac",
+          "1b969e1b7b7b2103329719ea4c3945f558fb8330b8c0922027fee72ef1b977d9",
+          "52b07a4fbdc95c4323fecf225ea34a33d60e7aba623b7ddd2115564868261ed8",
+          "0fd1605512a1653f67c9ec264420c1df367009635ced660cef910d56b505362b",
+          "a33d6aa322625464941e967666b9767b376e4f891d31d7416dbd4b36713cb6e0",
+          "56094f76336a1f8cb3072ec0938dea79176eb29c161e2de9985a4fa34f6bcc37",
+          "e8da815a68045e7aa15ab47f889eceec10b3e89d5c026b4f0fca53cd0a00687e",
+          "238a8d4eb8ef32dd561f5812c355805926f559a75df5aad6d034593bbc9e2fa7",
+          "a6dde0e7c8459c488a251df8cacafef15e75b9b0ed7dac526c09117e2c3bebbc",
+          "2f0f4272fcfdb55ccb536816b94f93761cff6bf237a12bee8d90ec9d176be6a0",
+          "418f6199a15f4bcc646477c4923312a4158bd02ed22f93515a872840059f7a2b",
+          "8625114a4951f606add19c3fd411a4e29afdda0eb94bfb4900c478e36360c573",
+          "6c4cf5db34a4c4ac2263b9fc455d0212c68d5816a0af78f0cda094251ac298d5",
+          "17105241628e70d941e3ceb3f84d6a290e00f92e4f2670051442e998e709a330",
+          "f2119f1601f1054b9735be882b064437d1d6be9341d8db9aaa563d81a00fa050",
+          "ad595e1b159322114aa7657229d83e36a49e808fe2265458c2593fea29265999",
+          "4121e38d23dd23aa4a097e1c2d33cd9734b94850d4228015fff256c33ddcc686",
+          "d2f58eba0a3649e40963c732575bfe160b325ff6113c8aafd154d2699767bff4",
+          "39768f0e5ab0cc7249d316ccd7500ff17e09a4727be61235dd0b8fcd8de60b85",
+          "e16b259608568e8fe08af138bad6b01111db85233a52558ae2d608da54975674",
+          "9b745efb321017cb602e510c794dc3728f2f3131d234e6167327da597c6d9066",
+          "57e921fcb8d7cb97d1cf515e8e4ea5427db07f8fed7685a064253299eec37982",
+          "e622e845afbeea53c2a9d7b7ec5b02e0ffa2b8f8e0cf104c3c3bd02c9d3fbd01",
+          "89a59527cecfa85c92e4274a6e903c4a6b77af8b61220f0323f562f4432ebeaf",
+          "50fb6a663963d4fc67f4db69d6174129f8b411add3c4867ffa0ea9aa660ab255",
+          "62ca8fe3bebcd4ee36ab7224c95e0e6a6eec00df9cb696fc8f32c39f40017da2",
+          "72d33185e3e53ea4f05b02ed265cb3123adeb13ed6436a008f77454a7f9bdc2c",
+          "ba63ff8963935b2e0a1936ce9f569d7ecdb4cef9012b64ac2a6cf05a80383abf",
+          "057fa7b2ca577edc468ea035a33975c6395862e9b9fb12e2d120fc40a8fa13db",
+          "c0de7f09054923bbcf1f0e9dbea31983cf5940f9fd9bcdc345bde25d86b13173",
+          "e17c85e176ca4056dd439c42d7d3ced2a970c337267e01c4edddf8f771595f29",
+          "dddabd64e4543e74b48422da975c4b5320f8c2387a08466607558027b8881cc8",
+          "e735712fd72efc8cf4a065b2ca92e271ab73a8bd528b37c1618c598de1c89623",
+          "f06a8791c258a4f5c65a89f72e11438420bc058309497c58dfa3f19f50d69089",
+          "a38b6f3173e8c37777a361c228ddf64ccd17a8a1e649e707aad853d12e70b90b",
+          "53f94235e4a411a5a64c0d4deed2ad4a2e88c53d32fb885b08c6e01c161c66fb",
+          "d70defec1e0c75f732568b919fd35f9a25055be3d507b945d1f7d54de2b6e68f",
+          "51cb1ea232624067b8bb096c459679176e9f71908ca8657a450b354741aa200f"
+        ]
+      },
+      {
+        "Package": "Bsync.Blazor.0.4.0-gapclosure.20261018.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Blazor.dll",
+        "Pdb": "lib/net10.0/Bsync.Blazor.pdb",
+        "PdbId": "00c1ae38-d663-4a20-aa27-4067e2362824",
+        "Documents": 56,
+        "EmbeddedDocuments": 35,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "37d8bb5686fe71aee93a92af21d4783e0045e0c3969bd5af7dda169da8615abc",
+          "4f2715c98a8bab68e4f4768af6d32d749b2d02ec5e7aa6c75ab852c0801b7c63",
+          "bee333eaa298a22f1d0b6d06aa17f6e3a588107824df9aad40a45b5f78fb1493",
+          "943d7c2a18346b3887455f70f559070eebf411096cdf421ebeacb39bfa33710c",
+          "528b690b54a29690fb0122d545c81f60583968ea11040f377d647d2bf5bd717b",
+          "c9a086415f4585aaad9b6b4fc5120f4cb194b8a92721f5e87455cd9db6e7e43a",
+          "8d55bd51c8ec0fa6e61a24af52e0a578057889aae4eb1091b3348208a6e12aa7",
+          "e61a0c011155669e395194e0a146ffffa76b3411ca21c82ce318ab689f6ba337",
+          "4fe63f0b7329879d5bfc45c7fb7310c1f18f3a0644133381ab3c2488cad57c36",
+          "52a577d47906637941f24df8dca7b335552b954bee85dd67a03be1b144ce4e56",
+          "2557b8117a7c8ab90d5e96ceea4e360f17de7740fb67c9547f9f61fb291d35e1",
+          "308a55c32b9a7b7495cbab696e34b3b0e07c8575fb49da875b02e7a60b4ad1d6",
+          "cfd69472039c057bf37c32a982ccc781186b9484d118bcf2a904904acaf36391",
+          "5a5240177744c891c2ca05a34fa3c0d92fb73290b777da643a9686864eae011e",
+          "caa854859f10f587182553d7f1220c15df7e04dd38814816bfdb3126e2998070",
+          "e752a68b1917e2c9beaac0c827b9cf2e332070b9a6b2974497d3fb93ca6f20e3",
+          "9d7cd16fdacf440b034ff9f6a3f0b7473ab9b089a65dd918dcbcbf33e63431cc",
+          "474176f427efb3867ee7e2164327720adde2bc2bdfb05d545b5ec39254b35d33",
+          "ba5903102bcd3311d72998f6ebc70eb3751e4885507d9014b7bc267c5748b8bf",
+          "642acbabb00ee2f8f3dc303654113203d89ace99721498f54fb44c841060964c",
+          "e3ea0cbd24e8a6bc9060c0a3a7767fdec867e08286c7030150ca9e7ae827785e",
+          "cb05c146d68f88d3de9fe43e1982a5a5277f512834baf0158302e40a3ec4c5a8",
+          "e63c81149dab6508a708db0560135f20a37f266a99a4f5e977b0b094f46d5ad7",
+          "210f7a2fc87630c6a959c677a3492ca2745b0a2fd8a99f76af6b865a03516da1",
+          "b7ff68acddafd2740e5662aefeac1db6652c983eb9b17dab099e6d31d61f1482",
+          "5e452aa26f0f872ca0a712aaba6b9a003d1b95a2725c20be5cf0f2e7a6ec2ee9",
+          "c60d4a29c9ef0d4c3bce8a1743d2f14001e74a302e7bedf4b177348f717818ef",
+          "21e2e80579f956061a6332e2336044e1a2282dad812fe3880da69a2d639edea6",
+          "06a3f74145ecb8e370302a7f9da622b812fe393ab005337d60221273f834bf5f",
+          "a8964fae859f896a48660b15a1ab82b672e70607e1786d7ff3aa5193300c2523",
+          "4e3dab9b16c5372a48fadbcf165c0d8f483c6d2dbb838a96db1a3e593aeb177d",
+          "38eb6f99809fcb0c30ad1b82b70e834bf0293a179bd1c2c1a38b37db94854920",
+          "d44a7341a71add3107b5bffa26f45cfaaf7c27ef2139ea57e1f44c6d54d11166"
+        ]
+      },
+      {
+        "Package": "Bsync.Server.AspNetCore.0.4.0-gapclosure.20261018.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Server.AspNetCore.dll",
+        "Pdb": "lib/net10.0/Bsync.Server.AspNetCore.pdb",
+        "PdbId": "288bbf8c-c5ce-45f9-8674-913c6462705e",
+        "Documents": 12,
+        "EmbeddedDocuments": 4,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "c67be93e005b8643b589f94c4bb9eaf9a021869c649cb9741a077766b386a6f6",
+          "5138111f03a7de870345216d602720243778ac7cf232905f4fcc60fdc1b63772"
+        ]
+      },
+      {
+        "Package": "Bsync.Server.PostgreSql.0.4.0-gapclosure.20261018.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Server.PostgreSql.dll",
+        "Pdb": "lib/net10.0/Bsync.Server.PostgreSql.pdb",
+        "PdbId": "ee5ad731-f42f-499e-a375-37f57b68db13",
+        "Documents": 7,
+        "EmbeddedDocuments": 3,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "3cdaee27d61bc9f4760446ed37d5be77286b5751597196b4271a4b71bd2d4472"
+        ]
+      },
+      {
+        "Package": "Bsync.Server.SqlServer.0.4.0-gapclosure.20261018.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Server.SqlServer.dll",
+        "Pdb": "lib/net10.0/Bsync.Server.SqlServer.pdb",
+        "PdbId": "1fdb60c5-245e-415b-9dbf-2292b2f109a6",
+        "Documents": 15,
+        "EmbeddedDocuments": 9,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "42c31f94ff784f807eb80cad98897c92c9191ad345c34454aaca36faf32627e7",
+          "7639d20d93d93eee9c3a8e819dedbda8dc5408cbeb47430a190a6289f0faeade",
+          "c74a964cca27d6b8935c1232bcdfafa513a4ada9ed6a4322e49c95b5096a5082",
+          "597616d91afaf21f7a92d0bde91c739b823bb6b50f08b0d97368cecabe3a7993",
+          "bca61cbe3f377cd522dac9262774baa260f535cd5b8553c91b9403675398077d",
+          "e4795b5b3cdd6ecec9640f6e77a86ef18351a0e5d11b016e2b572c7c5d61b8a9",
+          "66b80f9ebb3060cdabdd021179bd102f1184abf21c481a3d075c812c7182399d"
+        ]
+      },
+      {
+        "Package": "Bsync.Storage.Sqlite.0.4.0-gapclosure.20261018.3.nupkg",
+        "Assembly": "lib/net10.0/Bsync.Storage.Sqlite.dll",
+        "Pdb": "lib/net10.0/Bsync.Storage.Sqlite.pdb",
+        "PdbId": "db797e7b-c4c8-4db4-84e5-9a2b275e965c",
+        "Documents": 21,
+        "EmbeddedDocuments": 9,
+        "EmbeddedSourceHashes": [
+          "a3c6048bb4d922b1799a9977f84362a3787b68810cac67aa86ac3aa23295f227",
+          "93d67476196ebfc80d1d7d8844b91146cfd678d105f5ce635eb900ca40610c9b",
+          "5b4c1604fdeaccd451cee85d00c95869253c21c250f908506afc4367303a38da",
+          "aa1ec5e84debcb5e7b1ab778ab00520723bfb1b61f843cccb0985c22c750dff5",
+          "b744e0d7a76991b60ee6fb9c11e06284ed2d46ab694a57e4ba58a8d0d7fe37d3",
+          "2c0b1d4878555ebcaec38e819ecb4b9cc6312f0a6fece660a788ae8108f09592",
+          "8e0f496dbbb928ccc4bc34d52f0900b35db97e90ffbff1ff258165c48c55c981",
+          "9cfbf9285e49a0058e83e6e2364b997860194dad57b2aa128d82357358c724f8",
+          "e357773382e29be626cece1fb15b2a39bba5e53dd837639b8b31c3cfa30d2a7e"
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "path": "artifacts/packages/provenance.json",
+    "sha256": "f06c2f64c285d2536a1cbe6b0c5acb60633ff151c07f5e537d5e6e3363a49b4f",
+    "bytes": 10614
+  },
+  "previousValidation": {
+    "path": "docs/review/gap-closure-completion-validation-2026-10-18.json",
+    "sha256": "da243f8e79a7d28d40b1991d765f84b1f134caed09039e1719816800fe3d70db",
+    "bytes": 114920
+  },
+  "profiles": [
+    {
+      "name": "exact-package",
+      "passed": false,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/exact-package/manifest.json",
+        "sha256": "63e65ad8bb2c40b4ac37b628b3d53a5c214a36fcb23251c0439ec721ac817bbe",
+        "bytes": 10730
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1-1.json",
+            "sha256": "8e75819c311d524150b15e4e2775d6082db4029e35b74de721e3996513207cd1",
+            "bytes": 4433
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1-1.log",
+            "sha256": "d066a8d528b69f7fca7cf5e0b1216b4da5779b1d611b3271b4edd9a1a7fc4ed3",
+            "bytes": 554
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 15171328,
+          "observedGcCommitBytes": 19746816
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1-2.json",
+            "sha256": "136199ac933180aa117679a2e71378b2d9ea9f7b4830e3c1b059b1d0e0cc068a",
+            "bytes": 4434
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1-2.log",
+            "sha256": "b3164bff5f063423d753b59ade1617c2b3ba7cf266878a3150e1ab74b33f6503",
+            "bytes": 554
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 15250376,
+          "observedGcCommitBytes": 19750912
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1-3.json",
+            "sha256": "395b5f9b69a3a14df25ef32cc87e9a4e21f7d84698a2b122c44f02cf12d355b5",
+            "bytes": 4435
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1-3.log",
+            "sha256": "2b36858e56246bd62451b5fddffa4805fa5bbcb9ee936f9dd787b39120aabfa8",
+            "bytes": 554
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 18466448,
+          "observedGcCommitBytes": 19750912
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-16-1.json",
+            "sha256": "491564a04f333faa8f1d1604348932c108350e41a0e7ce448183cfe07257cf58",
+            "bytes": 4467
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-16-1.log",
+            "sha256": "6e20033a6accdec932114b4a1983ded2537bdba530b408f06e444c7bb629bc91",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 23732928,
+          "observedGcCommitBytes": 20934656
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-16-2.json",
+            "sha256": "562602f8f1dd3f39d533f462954cf309db0f643b5b7092d8c57647c681765afa",
+            "bytes": 4469
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-16-2.log",
+            "sha256": "575d03db35738538734e133b615669fb0763e4d824e22c9fe4689caa12e26b1d",
+            "bytes": 560
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 24839040,
+          "observedGcCommitBytes": 20041728
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-16-3.json",
+            "sha256": "0d9f00c0d39f1058698e113547953cfbf8c5a3bb4c793329a26f02aebe19e594",
+            "bytes": 4464
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-16-3.log",
+            "sha256": "289947af103de12ba64c21ab01e2a73df0a85543b8a908e9e910d241468a5127",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 24729432,
+          "observedGcCommitBytes": 19914752
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-17-1.json",
+            "sha256": "8c6a38ef0bab1ec5f7415b893af56b1e11310de9a247572f9ed9a28e14dbb50f",
+            "bytes": 4469
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-17-1.log",
+            "sha256": "d0fc53093be63de022a3ab560dc7fa3973b50f527c5f9fe054f6f970ecb74e6f",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 21181200,
+          "observedGcCommitBytes": 31563776
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-17-2.json",
+            "sha256": "5e0b63df2ff81b5376aa77e2a6cf3d3d7d997aae35a0eada7c27e3db180e215b",
+            "bytes": 4470
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-17-2.log",
+            "sha256": "257fe325147edfc06c55820555ddc723706a66d6244e42779475057a753bce53",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 29863496,
+          "observedGcCommitBytes": 31518720
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-17-3.json",
+            "sha256": "17acb4c73ef5db07995e152a458c063b6e173600f06bf5c94ceecd4812149026",
+            "bytes": 4469
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-17-3.log",
+            "sha256": "cd460b9a5af3afafaf233afc97e96073f1cd037ca1f70428b1af0aa5333de362",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 29847480,
+          "observedGcCommitBytes": 31531008
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-256-1.json",
+            "sha256": "dd99c34b5e097b570243b258811086765cc9ce885927a61c643315200c922704",
+            "bytes": 4493
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-256-1.log",
+            "sha256": "ec217010793caa74f321e47a24caa1deeb471cbbba69f66154e3d19ff349f214",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30250832,
+          "observedGcCommitBytes": 29405184
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-256-2.json",
+            "sha256": "f2d4ad3c84b4aea8532cd14a0d48bfb5f4a4bbe1da4454cb33487bfe4e329988",
+            "bytes": 4493
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-256-2.log",
+            "sha256": "c5f4ef418e82332b02dd648433beb37e3ac77ca18e56ee6470609325f224468b",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 29251592,
+          "observedGcCommitBytes": 30117888
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-256-3.json",
+            "sha256": "a463af38a17179bdb03353ddf3d6db8238df7841154a19f363f493727353d3cb",
+            "bytes": 4492
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-256-3.log",
+            "sha256": "4a4436c036583c7c33835d7b4f0b147d640a2260a3d8b209caab7dde6acff76a",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28757440,
+          "observedGcCommitBytes": 28364800
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1024-1.json",
+            "sha256": "6c6e95164770e4c2d3c1fa7e5890bfc64e4ed8af793b1e38450bdb74f151bf62",
+            "bytes": 4439
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/exact-package/memory-1024-1.log",
+            "sha256": "b527341bf2f52f238eefd42942662de74b14fdd132e1cd09ec6edeebc8a149c2",
+            "bytes": 102
+          },
+          "passed": false,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 0,
+          "peakSampledManagedBytes": 29316344,
+          "observedGcCommitBytes": 31563776
+        }
+      ],
+      "heapLimitBytes": 32505856,
+      "candidate": "0.4.0-gapclosure.20261018.2",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "1F00000",
+        "perHeapHardLimits": "removed"
+      }
+    },
+    {
+      "name": "diagnostic",
+      "passed": false,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/diagnostic/manifest.json",
+        "sha256": "b4976c68855def5a6a26d8c01b3ad4dea2d0bd4c9466d56446c20e3ff0060b35",
+        "bytes": 2603
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/diagnostic/memory-1024-1.json",
+            "sha256": "fd38bc5433f84e60446b8fb328d75fc5f6f3f185fa8b0da3e56eaf3102b292d2",
+            "bytes": 4839
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/diagnostic/memory-1024-1.log",
+            "sha256": "8bbecec9cb02c31c38953bf16df51440fcc683b51ea78e567b9b227fb4ed772c",
+            "bytes": 102
+          },
+          "passed": false,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 0,
+          "peakSampledManagedBytes": 28125872,
+          "observedGcCommitBytes": 31088640
+        }
+      ],
+      "heapLimitBytes": 32505856,
+      "candidate": "0.4.0-gapclosure.20261018.2",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "1F00000",
+        "perHeapHardLimits": "removed"
+      }
+    },
+    {
+      "name": "conserve-pilot",
+      "passed": false,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/conserve-pilot/manifest.json",
+        "sha256": "0591803af7968aff582495d89682e542b2ab61327bfa620747988ccd88da2448",
+        "bytes": 2643
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/conserve-pilot/memory-1024-1.json",
+            "sha256": "8d5f241690a3af14b39147d546139af71ed9b7112b62439f6650410d5809fe8f",
+            "bytes": 4839
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/conserve-pilot/memory-1024-1.log",
+            "sha256": "82485ff273c375e0d5728a1d938b6c3cb27917445df961c8bc2628258ecb5d50",
+            "bytes": 102
+          },
+          "passed": false,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 0,
+          "peakSampledManagedBytes": 27106184,
+          "observedGcCommitBytes": 31375360
+        }
+      ],
+      "heapLimitBytes": 32505856,
+      "candidate": "0.4.0-gapclosure.20261018.2",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "1F00000",
+        "perHeapHardLimits": "removed",
+        "DOTNET_GCConserveMemory": "5"
+      }
+    },
+    {
+      "name": "heap-diagnostic",
+      "passed": false,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/manifest.json",
+        "sha256": "bc3fbc8de02f84cbb7dbba825777fdc7e21c55d14a96227df1aad54c7138e7f2",
+        "bytes": 2645
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/memory-1024-1.json",
+            "sha256": "8f11d6a0c04e02cc00ac21e5875850384abad12e00873e25d125188bbbec087c",
+            "bytes": 4840
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/memory-1024-1.log",
+            "sha256": "b25d8c229e3e22f423f1a8f54c9e2196a787b4c6ea2f39a5074b5ccb10a1e9ce",
+            "bytes": 174
+          },
+          "passed": false,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 0,
+          "peakSampledManagedBytes": 30723248,
+          "observedGcCommitBytes": 30744576
+        }
+      ],
+      "heapLimitBytes": 32505856,
+      "candidate": "0.4.0-gapclosure.20261018.2",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "1F00000",
+        "perHeapHardLimits": "removed",
+        "DOTNET_GCConserveMemory": "0"
+      }
+    },
+    {
+      "name": "heap64",
+      "passed": true,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/heap64/manifest.json",
+        "sha256": "e274064d4f38d0c5eb8dfa77ffde5e992d191d06c9bd1063cf59445c2736ee91",
+        "bytes": 12189
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1-1.json",
+            "sha256": "d549efe3c6242835b2ecbf4ee7751c1ecf48556bee9fff612f03a3c5f7fbf29a",
+            "bytes": 4726
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1-1.log",
+            "sha256": "a51356f0ae1790ef2d8754c3aa143c84867ce40d4d284caf4778c11dd2a30293",
+            "bytes": 554
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 15282016,
+          "observedGcCommitBytes": 19750912
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1-2.json",
+            "sha256": "f04a23b702c725373d9a7bb7ca3dfe39123806bb6c7e753232fe7a6aa3b5c947",
+            "bytes": 4730
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1-2.log",
+            "sha256": "9fe7d62902f5096e75b2311f639a1bb86b06257ef6b6d4a52d9f332c74b5d0a1",
+            "bytes": 554
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 15243440,
+          "observedGcCommitBytes": 19750912
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1-3.json",
+            "sha256": "a0b49956abccdb29a9788eba06064891be577aef92e5b6cbdec4bbcad5bc2bc4",
+            "bytes": 4726
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1-3.log",
+            "sha256": "4a9bcf86542c43e9eeee8f554b6308bd82bd1e32b42d7ed4a4ea2d83c90b33db",
+            "bytes": 554
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 15248760,
+          "observedGcCommitBytes": 19759104
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-16-1.json",
+            "sha256": "2267d226d01de49954d14ffdf0658fd8409d1d225c380733c1fde379e4e7c935",
+            "bytes": 4761
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-16-1.log",
+            "sha256": "05c898814baceff1dfaa0adca6e9788a7b6ca0a5e2b9692a1102bdc86bec3a94",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 34172456,
+          "observedGcCommitBytes": 21995520
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-16-2.json",
+            "sha256": "8236fb111dc0e535f15199bfd8518fe3efd8aa31a43839cf9ed8c03c73e27210",
+            "bytes": 4762
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-16-2.log",
+            "sha256": "23fbc2b432d901009f494d06a4314374827f91e7f63379db69f135ca2ed7967d",
+            "bytes": 560
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 25728752,
+          "observedGcCommitBytes": 27422720
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-16-3.json",
+            "sha256": "6649245be9c7853f3c9b2221eab5d61a44e5e75b3f9b85a97d059ecda661b1c7",
+            "bytes": 4762
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-16-3.log",
+            "sha256": "efb9765b5cb87fb73e5fc3d5d6793448109e71663a0cc62c4b3c46212babd8c7",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 29741408,
+          "observedGcCommitBytes": 31551488
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-17-1.json",
+            "sha256": "3690f68ed90fde6f78f73c99b81fd0a528d04596d46d23cf7074dfeeb13d7c60",
+            "bytes": 4763
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-17-1.log",
+            "sha256": "f2835ddbd9e15ee0fb01a6e1bd04fc633e1ceaf272841915f6708d56b3182af8",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 23316912,
+          "observedGcCommitBytes": 20078592
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-17-2.json",
+            "sha256": "fac9b344d73a063f329a37e2aa296ffea44fec55b9dabfad7baea1fef9752b79",
+            "bytes": 4763
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-17-2.log",
+            "sha256": "dbbed42eaf36b01ae328a9dfb6c479c9c715521ec095ddc3942c6fc974fea125",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 29817696,
+          "observedGcCommitBytes": 31506432
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-17-3.json",
+            "sha256": "674a72291ecd54de0fcb3dd66efa522f6ce0f522513d48f20e7105083230f4d6",
+            "bytes": 4761
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-17-3.log",
+            "sha256": "238c428fef22772f64a08a343c828914cb38d7f42baddeec5982018eabdf15f6",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 25570864,
+          "observedGcCommitBytes": 31719424
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-256-1.json",
+            "sha256": "e810703bf6f8186793c077282a49e55d3fbac1f676718578c6b9af86f81b42d8",
+            "bytes": 4787
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-256-1.log",
+            "sha256": "b5e47518825a13b1afda569329e59f728aa98c4efbaad7961026d62c76d91db8",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 60850520,
+          "observedGcCommitBytes": 59506688
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-256-2.json",
+            "sha256": "4d2c80d92e93e4b05ccc84f566f4a4e4de33f3560d9e54c4286b930ef6975e0f",
+            "bytes": 4789
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-256-2.log",
+            "sha256": "a042c560dcdc43b629568064690db9a4c7f39ef6b457687b8bb2889162b3b1d1",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 58620272,
+          "observedGcCommitBytes": 62967808
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-256-3.json",
+            "sha256": "f049aaed045b894ed8fa33f220f07f7f159d72805fb40248a5065f147fc22e30",
+            "bytes": 4789
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-256-3.log",
+            "sha256": "f82e93d7be3cc3c686196b24d50d0bfaff47510a31e6283bb16535894cf4ef1e",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 58535752,
+          "observedGcCommitBytes": 62820352
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1024-1.json",
+            "sha256": "3f00be1408a8d78cc0e52230ec09ed85366e5af749d5896f9fb47b4e46600f17",
+            "bytes": 4806
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1024-1.log",
+            "sha256": "5554b782019917713d58935be7225e1b3a8732420fc46a44b9d3eab39ebf63b1",
+            "bytes": 566
+          },
+          "passed": true,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 64462592,
+          "observedGcCommitBytes": 63782912
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1024-2.json",
+            "sha256": "5384234e01af1573cdc633747559e5d002049cc1e2a425ccfaeacbf2618a9414",
+            "bytes": 4807
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1024-2.log",
+            "sha256": "7be5b197db1ee47f5dde4042f6a01f1e08912aaf5a58b73f6a3fa9619416b244",
+            "bytes": 566
+          },
+          "passed": true,
+          "sizeMiB": 1024,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 64785184,
+          "observedGcCommitBytes": 65953792
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1024-3.json",
+            "sha256": "ede68bf9d0fdcd4747b372339ba8cbd63c0ae98b03928d9074a171c1e8708353",
+            "bytes": 4805
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/heap64/memory-1024-3.log",
+            "sha256": "dadc987f4bcf7a36afb9d6b503f3003791beeb094a0e960b20d7798765c35f11",
+            "bytes": 566
+          },
+          "passed": true,
+          "sizeMiB": 1024,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 64251592,
+          "observedGcCommitBytes": 62885888
+        }
+      ],
+      "heapLimitBytes": 67108864,
+      "candidate": "0.4.0-gapclosure.20261018.2",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "4000000",
+        "perHeapHardLimits": "removed",
+        "DOTNET_GCConserveMemory": "0"
+      }
+    },
+    {
+      "name": "optimized-heap64",
+      "passed": true,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/manifest.json",
+        "sha256": "1ebd3a0a6d28a88e982188740daa31d02a31faa9625161364d54cd6b02f063df",
+        "bytes": 12340
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1-1.json",
+            "sha256": "5041bc3c84e6a5163f3f72023043584557225e9d95d806b608117c870bdaaab1",
+            "bytes": 4724
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1-1.log",
+            "sha256": "ad2062c230a778dc8a510ac2ad5306c48185c4c8dac97a2fb38a4981aaf8cb5a",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 18976784,
+          "observedGcCommitBytes": 8216576
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1-2.json",
+            "sha256": "73a6a4abd081381e8267ff4057c78718abcb2169be2a8483642bc4382fd0c11b",
+            "bytes": 4728
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1-2.log",
+            "sha256": "c3b77b9e2d527a98c7f8de52d6b35059d5d70cec06a2fc54c89a338ad2a47aa1",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 19006800,
+          "observedGcCommitBytes": 8216576
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1-3.json",
+            "sha256": "6e5a71d2a8297c3d49a227f319230de22c2a9fb5483a588f2692fec6387847cd",
+            "bytes": 4726
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1-3.log",
+            "sha256": "12edad3938fc74002febd11abe972dab4ec7d1520e732e884047934a705ed346",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 18983648,
+          "observedGcCommitBytes": 8216576
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-16-1.json",
+            "sha256": "b2b5c89eea332000882e85fcba56e1919de389e315ed751c967838b99004fc88",
+            "bytes": 4762
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-16-1.log",
+            "sha256": "4dfa53b46253a29bf63b325c4c6a21020740be05ac517c780178ec5c3b825b11",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28602816,
+          "observedGcCommitBytes": 31985664
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-16-2.json",
+            "sha256": "bbe7f16f825f2804f16d5cf883b70c5aad9ec7614cbef9e5abe2c8ef2a28d952",
+            "bytes": 4761
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-16-2.log",
+            "sha256": "f7cfb56a4780be18414ca19d857e58e25f5066e7ee61bdc4892bd5680b8f851f",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30356768,
+          "observedGcCommitBytes": 31473664
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-16-3.json",
+            "sha256": "e538ba3d7d52b6163f8b51b04059001a5b36f90d1ebe210049529120339cc622",
+            "bytes": 4762
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-16-3.log",
+            "sha256": "f8d3af7fe1f685375c174aaf42edc56a3fa4c6862b1527d85a20f2b05b9a1cb4",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30261912,
+          "observedGcCommitBytes": 31956992
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-17-1.json",
+            "sha256": "7f06ba755da9de8bb0d8cc79e74e8919303fbff8a087acadfdb01cf26c5a7fc3",
+            "bytes": 4757
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-17-1.log",
+            "sha256": "dbd8d8ab8951644f04ad12eb67d3221c344d6aa616b4d5f110d1b2feef992748",
+            "bytes": 559
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30205952,
+          "observedGcCommitBytes": 32088064
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-17-2.json",
+            "sha256": "b474c9e1f805cd66f8974627af5e1a280d46f5bf4262e638f6a1ec64d545a9f4",
+            "bytes": 4758
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-17-2.log",
+            "sha256": "3192bf7a0c186528bd2fcee522d91b57075fa4ed297acb09e1b9c07bced7e455",
+            "bytes": 557
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30276344,
+          "observedGcCommitBytes": 32055296
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-17-3.json",
+            "sha256": "9af639c11865df0e3fc5f61dfd4bd3309647133e138df08c1bb0708a41d6eede",
+            "bytes": 4759
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-17-3.log",
+            "sha256": "4aea7c3661891c8e73bb9c104765fb602850834a3fcbca07a7cb53ad7c9f5cd5",
+            "bytes": 557
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 26804912,
+          "observedGcCommitBytes": 32108544
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-256-1.json",
+            "sha256": "839074533a682582150207daf4e5707ed64111c47998448f36c4c41f5879e2e4",
+            "bytes": 4782
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-256-1.log",
+            "sha256": "ba6c8e4cb1f453cef173737df9332e36f4f67b93e875c1dfa254aa5c539f148a",
+            "bytes": 561
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 27278488,
+          "observedGcCommitBytes": 33181696
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-256-2.json",
+            "sha256": "b27349ca7fbd4766fe3a7a101dcead4674fa6b8ffe0a824a9944b9c24fe18650",
+            "bytes": 4785
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-256-2.log",
+            "sha256": "e5184cbb5f2c709049176f1a2240555c5473c5d212c9f0b8ec8919a774f8223a",
+            "bytes": 561
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 27293736,
+          "observedGcCommitBytes": 33579008
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-256-3.json",
+            "sha256": "24f18589fbfd08df8dfaee16fa19f0a9de063862c33b22c091f34efa76ffa76a",
+            "bytes": 4786
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-256-3.log",
+            "sha256": "13df1520412453e49c056e6cc932358f90609d369b7fe02c7c70aee2d1607143",
+            "bytes": 562
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28796608,
+          "observedGcCommitBytes": 33767424
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1024-1.json",
+            "sha256": "9d1cddea275d32d61bcffe4203a0b952b60703a7001d0038a6b741720323e3b2",
+            "bytes": 4805
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1024-1.log",
+            "sha256": "c6351f31239b45135175faef19f7707652c62f9686387d3cab24bd0ce3cc121a",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 61003592,
+          "observedGcCommitBytes": 64897024
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1024-2.json",
+            "sha256": "ea778a97645acf956e2a0e6c76865fc7d9677e714518499fabc6b3c35e427555",
+            "bytes": 4807
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1024-2.log",
+            "sha256": "459093c2192f3449e2436fe49d1dafa6d0bab299b736f7d629f837d2ae516bc6",
+            "bytes": 566
+          },
+          "passed": true,
+          "sizeMiB": 1024,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 62669824,
+          "observedGcCommitBytes": 60018688
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1024-3.json",
+            "sha256": "7ef55771c4e2fad7c54568b301d23a931365129090d25c05efd4900cb4b16bd7",
+            "bytes": 4805
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap64/memory-1024-3.log",
+            "sha256": "57355818b0c9e3bb4e9af94d90b4907a45de9dad84443141b311e91d68f5c15e",
+            "bytes": 566
+          },
+          "passed": true,
+          "sizeMiB": 1024,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 62547448,
+          "observedGcCommitBytes": 65613824
+        }
+      ],
+      "heapLimitBytes": 67108864,
+      "candidate": "0.4.0-gapclosure.20261018.3",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "4000000",
+        "perHeapHardLimits": "removed",
+        "DOTNET_GCConserveMemory": "0"
+      }
+    },
+    {
+      "name": "optimized-heap31",
+      "passed": false,
+      "manifest": {
+        "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/manifest.json",
+        "sha256": "2d84955ccff78ca7e99835a4c0f10a448936602663f284dc3500127d159c28cf",
+        "bytes": 10996
+      },
+      "cases": [
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1-1.json",
+            "sha256": "74ad67b0aa30ceb8cf95d13d142e1b5a4dc64a532d7acc169cfd7c982595b4b1",
+            "bytes": 4728
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1-1.log",
+            "sha256": "96bdec0699ce276fc6a20d066c2e01c1f3b916920e36707b2c1bcb13203acbc4",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 19006016,
+          "observedGcCommitBytes": 8216576
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1-2.json",
+            "sha256": "44b22e2668d9fdad9f2022de13e69180dc808868b741b2b0c7590dbc5ba58092",
+            "bytes": 4727
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1-2.log",
+            "sha256": "90de0654a204c811cddb3c6ef620c3464c08e168f4df7cfbdc280f13fbb0ec29",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 18988888,
+          "observedGcCommitBytes": 8216576
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1-3.json",
+            "sha256": "681d34e4635e0d40e1231f7444743d7e959b57bd51153134471c67f98a031bbb",
+            "bytes": 4727
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1-3.log",
+            "sha256": "d4b40c68a75bc3d0754c27f94c59c45aa5237724d7a28aba670a5a3a986f83e1",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 1,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 19008552,
+          "observedGcCommitBytes": 8216576
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-16-1.json",
+            "sha256": "a01c7adf89ded77b230c55b5e38b0a4b58591a442d6404f5ec0c40f5c8db4876",
+            "bytes": 4758
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-16-1.log",
+            "sha256": "37b644e4f7d85a65d39a11e581e36335d11e862f3e4f4b3430aa62c47e866b8d",
+            "bytes": 557
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 24369016,
+          "observedGcCommitBytes": 20242432
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-16-2.json",
+            "sha256": "c289436b182384ad77ae2877b1f063d5558aa152277588836f265f7323e38808",
+            "bytes": 4757
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-16-2.log",
+            "sha256": "41a8c0c0cced9004525aaf1e4b2c7985959d89fdebe4d6519b7b900db2810cea",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 18138496,
+          "observedGcCommitBytes": 19931136
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-16-3.json",
+            "sha256": "29ecfa54a60cb9e39fcb2eae3c1b099d537424e1e2ab30f358187e1450fd1416",
+            "bytes": 4756
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-16-3.log",
+            "sha256": "3eefe19ce81178c060c3b83b616cb54c54d0c09196f21960b6e90adcdace4f76",
+            "bytes": 557
+          },
+          "passed": true,
+          "sizeMiB": 16,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28619784,
+          "observedGcCommitBytes": 20881408
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-17-1.json",
+            "sha256": "e63308ad62e3d53c135b1e6d2f636673e45a31921a253e4d6092da60e31178aa",
+            "bytes": 4762
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-17-1.log",
+            "sha256": "2bef93e19a145fd1dbc39910dbbfcf61290d9b28bde426b81eb792f0135adce1",
+            "bytes": 558
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30133096,
+          "observedGcCommitBytes": 28995584
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-17-2.json",
+            "sha256": "9d68103b9b9d6931bd457971d584827cadb82c1deb2bda75e6a0278e444b4362",
+            "bytes": 4762
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-17-2.log",
+            "sha256": "7c7f1dd96c0e8842e44eaa67a6da58ce789dffa9e7937cf5d052fbf46a36217e",
+            "bytes": 557
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30172064,
+          "observedGcCommitBytes": 29138944
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-17-3.json",
+            "sha256": "d0832cc4012bcef6d9ba0bcb8af46d97334000a5ba7ed2a0735a68cb2d25f8df",
+            "bytes": 4761
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-17-3.log",
+            "sha256": "8b863377623f30a1313465520b97ee2b4db516f274918e792c2c0323eabb6f6f",
+            "bytes": 557
+          },
+          "passed": true,
+          "sizeMiB": 17,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 30146896,
+          "observedGcCommitBytes": 29081600
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-256-1.json",
+            "sha256": "f8b15c15db5afe6f477f6505a586f8373d860a61b61f9e32b469c64b16710ebf",
+            "bytes": 4786
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-256-1.log",
+            "sha256": "2b94aa3e893808dab7c3056ece08be23c3920c945d488eb5063a0b297cb81c65",
+            "bytes": 564
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 1,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28681912,
+          "observedGcCommitBytes": 29261824
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-256-2.json",
+            "sha256": "0faf8513c63175d3e3c9110c27e7d13fc1d2d27fd7eae300a086d67ae12b7cfb",
+            "bytes": 4786
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-256-2.log",
+            "sha256": "cffdab6124f1cbe2acce21728445af8cdc13043163142930a419c1782b2dcbeb",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 2,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28535568,
+          "observedGcCommitBytes": 29450240
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-256-3.json",
+            "sha256": "e99e8746bb5080303a3ccf76498053c3535a17f77bd5e9e34f09b4e8c863c105",
+            "bytes": 4791
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-256-3.log",
+            "sha256": "88bb4acf898c3bff8ae99afed0746e9658583ee84ded6abad0246a9639707719",
+            "bytes": 565
+          },
+          "passed": true,
+          "sizeMiB": 256,
+          "sample": 3,
+          "completedStages": 10,
+          "peakSampledManagedBytes": 28972528,
+          "observedGcCommitBytes": 29147136
+        },
+        {
+          "result": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1024-1.json",
+            "sha256": "88f4ba8a39c2c47956c07f2b3e4011c2d282c61292393ebcb77db759c2a2a67f",
+            "bytes": 6294
+          },
+          "log": {
+            "path": "artifacts/gap-closure/memory-qualification/optimized-heap31/memory-1024-1.log",
+            "sha256": "45b0aada85636b796b16a1119d68300f604ce9e718d5359e9b253f4f5da3432f",
+            "bytes": 343
+          },
+          "passed": false,
+          "sizeMiB": 1024,
+          "sample": 1,
+          "completedStages": 5,
+          "peakSampledManagedBytes": 29912400,
+          "observedGcCommitBytes": 31584256
+        }
+      ],
+      "heapLimitBytes": 32505856,
+      "candidate": "0.4.0-gapclosure.20261018.3",
+      "environment": {
+        "DOTNET_GCHeapHardLimit": "1F00000",
+        "perHeapHardLimits": "removed",
+        "DOTNET_GCConserveMemory": "0"
+      }
+    }
+  ],
+  "guardChecks": [
+    {
+      "name": "missing-cap",
+      "exitCode": 3762504530,
+      "passed": true,
+      "log": "missing-cap-final.log"
+    },
+    {
+      "name": "bad-arguments",
+      "exitCode": 2,
+      "passed": true,
+      "log": "bad-arguments-final.log"
+    },
+    {
+      "name": "mismatched-cap",
+      "exitCode": 3762504530,
+      "passed": true,
+      "log": "mismatched-cap-final.log"
+    },
+    {
+      "name": "existing-evidence",
+      "exitCode": 3762504530,
+      "passed": true,
+      "log": "existing-evidence-final.log"
+    }
+  ],
+  "files": [
+    {
+      "path": "artifacts/gap-closure/memory-qualification/allocation-after.json",
+      "sha256": "8e0fdfec9c4c907fec1769703cec05bfb108cc3a57d73324a45051330d70a1a2",
+      "bytes": 3103
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/allocation-after.log",
+      "sha256": "bd889acd6068787c491abb0f0d5b0f2b394857469a28cb079ce0021aa204d9a9",
+      "bytes": 350
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/allocation-before.json",
+      "sha256": "b59a1e6c7de84bffabcea89b274e1ac1c90f1bccb7d34af5200b564e8ead04e1",
+      "bytes": 3110
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/allocation-before.log",
+      "sha256": "73e5db700cd313ca216507ebf12e5feec213aab86b3f4a2dda5f1d81ad6ea857",
+      "bytes": 350
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/android-probes.json",
+      "sha256": "f428055b066fe1623d4db7c8cde75b72faa05d4ad31691774cc5a58d58f0419b",
+      "bytes": 519
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/bad-arguments-final.log",
+      "sha256": "eaedacb01186dd47be02257557c6da4c94742030996279e9a71967760d1fe99e",
+      "bytes": 118
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/bad-arguments.log",
+      "sha256": "8f43984533cb5aa76fb8087fbac3ab256bc2b529d4c97239745568ff44e26ccd",
+      "bytes": 96
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/browser-final.trx",
+      "sha256": "b47a2eb97836d7d0b8207a241a6337e4fc53d99ea4ff1639b6fb1222a68fd5eb",
+      "bytes": 10418
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/build.log",
+      "sha256": "739cd301c0252cd097da5971f081d554c65730db445492900041af2c533fb7d4",
+      "bytes": 720
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/collect_evidence.py",
+      "sha256": "89fa693ef27836a818ff5367eae29035f15d586b56e0981de0fd6ce0b73cdf0e",
+      "bytes": 9289
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/conserve-pilot.log",
+      "sha256": "a11d3ef6522dcd5546da767ec4481ed48cb3673a9444c4b923e8eb10cec2f1e4",
+      "bytes": 776
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/consumers.log",
+      "sha256": "76ec340a98b6f5b6562191a9685255a9f2c70ce7dda11f6dd36e072559045cf9",
+      "bytes": 6242
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/core-optimized.log",
+      "sha256": "34a8e43c665bbb9572fbd9783ad3e6683e1c5989dcc021a097ec3d90bf7585fb",
+      "bytes": 3218
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/core-optimized.trx",
+      "sha256": "21e796692ffb86dd846bb3e750b865a15c0874caa87aa00b00c552d776acb27e",
+      "bytes": 1259513
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/default-mode-smoke.json",
+      "sha256": "003e959b817c558c745300cb519f5dfd44d55cdf071a6b636bcbc2d0e7754ed4",
+      "bytes": 1861
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/default-mode-smoke.log",
+      "sha256": "85881ab03577b50d34b5258b821a6cd980d930d706686699b4f0286aa384de41",
+      "bytes": 114
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/diagnostic-tool-install.log",
+      "sha256": "808fae805144920a8e176d52059de184bfeb5caa0f1f5823a2f1933d94fc5ebb",
+      "bytes": 278
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/diagnostic.log",
+      "sha256": "a11d3ef6522dcd5546da767ec4481ed48cb3673a9444c4b923e8eb10cec2f1e4",
+      "bytes": 776
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/existing-evidence-final.log",
+      "sha256": "965bc7045637349bba46dd8d1b205e8312acfef8eaca34459916204101a5df5b",
+      "bytes": 394
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/existing-evidence.log",
+      "sha256": "0254732a8877f4db4912e7b7c0ddd8d5fa74662f9b7da7f253a6f6b3049bcf36",
+      "bytes": 394
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/guard-checks-final.json",
+      "sha256": "ec806c050d18f2456d624cad3f6ee8996576bd02ed1fb241e92d830f48e5d34d",
+      "bytes": 516
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/guard-checks.json",
+      "sha256": "98923b4a8e9c92253778b3c8c0757297f053a6bdb5f45f4ae5d6f6ea7b740d57",
+      "bytes": 266
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic.log",
+      "sha256": "65a60081aa3ed3f8c5ce558a4cc9bbbbe79a5de7e1d9518eb74784f75d5d933e",
+      "bytes": 776
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap64.log",
+      "sha256": "2e7a47a92f825a795df6b29f0992e9da59916a8b15db8d9b5ccfca60a853e42b",
+      "bytes": 870
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/matrix.log",
+      "sha256": "a15bc9a6af1bbe8567cfbef7be655f4f18b1c5ffed5aac93a3e285cd7eac92e4",
+      "bytes": 1454
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/mismatched-cap-final.log",
+      "sha256": "a2dd962057c05bb36f19425012ce8fe01a38c237c6c439e34437b355ddda99fd",
+      "bytes": 455
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/missing-cap-final.log",
+      "sha256": "a2dd962057c05bb36f19425012ce8fe01a38c237c6c439e34437b355ddda99fd",
+      "bytes": 455
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/missing-cap.log",
+      "sha256": "ca73ae73e524a0f7bc78fa263fa950d9cb32e9ad15f4db70a374629f801e1a46",
+      "bytes": 455
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/optimized-heap31.log",
+      "sha256": "adea5d5eda831518b1054165328b43b230e614cfbeddbd77f24ba912b64361c3",
+      "bytes": 1454
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/optimized-heap64.log",
+      "sha256": "d33f7c222bb304abb7b8ba62b40b8a1d667d871bf4e49c0924598c8e324b919e",
+      "bytes": 872
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/optimized-package-31.json",
+      "sha256": "6ac8c60a2a9560668ec04fbc3e2c9c222ffef4c092614cfb0f36e0cd4ede3a2d",
+      "bytes": 4804
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/optimized-package-31.log",
+      "sha256": "5c394406cb6bd699ee801e3dd3d89ef7c60723c8c74ce53207df13bbd46ed79d",
+      "bytes": 1132
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/optimized-source-31.json",
+      "sha256": "2ea3339b74c0bd34ec63378aea996e40f716a2051b90c2ef89df4d73f9cb7bf7",
+      "bytes": 6645
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/optimized-source-31.log",
+      "sha256": "a3f0636b3e3df36de260cd84654fc57bade33e8a2987335cc14f979e13a44c3b",
+      "bytes": 688
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/pack-preview3.ps1",
+      "sha256": "586078722378ba55d1226990bbc290c93c1e59209265e15abed72ffd29e4234f",
+      "bytes": 1379
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/pack.log",
+      "sha256": "55ead5261d6006f40b6d722c70eb6306e3bacd82707aeb0109eaae2d0133ef12",
+      "bytes": 8034
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/package-final.trx",
+      "sha256": "e33d50ac0b21358b2cdf6da629920befeeb4d1bfeb2d783299e1a99fd18e2f1b",
+      "bytes": 308464
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/pilot-1.json",
+      "sha256": "8605efe40291728d0afb0f5b933ca01024f888a8211cc8dddb693629729ccd61",
+      "bytes": 4431
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/pilot-1.log",
+      "sha256": "e4f9b23ebf2440016ab39cf760b5e65cbae156ec93ca67f3eefb3173feecd059",
+      "bytes": 1108
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/source-build.log",
+      "sha256": "0218f19c0793e7f391b1a1d6dea923906082f562dc3113e2a6802d85cf80d04b",
+      "bytes": 1766
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/validate-preview3.ps1",
+      "sha256": "83c43d557af4ad3e9ccdd2e51551bbcf438732b38ad3758785404243c8e1bc72",
+      "bytes": 1501
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/build.log",
+      "sha256": "4f7264c50738c1de775a6ae8b41faad90c9f07858b4ad6aaa9ab5656293ac93d",
+      "bytes": 293
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/heap-stat.log",
+      "sha256": "f6bec37a1cd819e133e89a102722baeea9a0c530cabb91f3d8f2f7a4a1ade4e8",
+      "bytes": 103776
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/large-chars.log",
+      "sha256": "6472907930ac0f8d4f435ad98dd89a164f72f940cfcf49dacbffa827500652b8",
+      "bytes": 2810
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/memory-1024-1.log",
+      "sha256": "b25d8c229e3e22f423f1a8f54c9e2196a787b4c6ea2f39a5074b5ccb10a1e9ce",
+      "bytes": 174
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/roots.log",
+      "sha256": "245bc2003eae27658881cd84c803ba5153bebcbe4df0e6baca0133c960230aa7",
+      "bytes": 468
+    },
+    {
+      "path": "artifacts/gap-closure/memory-qualification/heap-diagnostic/memory.dmp",
+      "sha256": "eeaeff2700bfd2af2d37636616776d31857213ad84c83d29321adbb03ece16b4",
+      "bytes": 45569433
+    }
+  ],
+  "source": [
+    {
+      "path": "src/Bsync/Bsync/Blobs/ChunkedEncryptedBlobCache.cs",
+      "sha256": "54f28419962ef1cec5f154a11d3dd3971e27a4f14f6faae86f2f18a0f21ffa17",
+      "bytes": 42335
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/ChunkedEncryptedBlobCacheTests.cs",
+      "sha256": "c329d36257c91219a76d0f82e59a271ce1f6c591bdc179eec21a366641501ea3",
+      "bytes": 15749
+    },
+    {
+      "path": "src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests/Bsync.PackageConsumer.Tests.csproj",
+      "sha256": "ac03c73d0db66e4e4705615d435db524a97e916f2e855bbb96e272929006b5b4",
+      "bytes": 2636
+    },
+    {
+      "path": "src/Tools/Bsync.ChunkBenchmark/Program.cs",
+      "sha256": "6068d4de780a5b18aed2270aa4306178a94a302f67059effe5826811dd46b026",
+      "bytes": 9071
+    },
+    {
+      "path": "src/Tools/Bsync.ChunkBenchmark/MemoryQualification.cs",
+      "sha256": "cedcd922e28c44c2cf340a8819a7c8a2209e3ee263e63e2db5b948596d734065",
+      "bytes": 14402
+    },
+    {
+      "path": "src/Tools/Bsync.ChunkBenchmark/run-memory.py",
+      "sha256": "00e7135b613a4a501f36e46fa9b90e4272a2ec0754e0b41d15a669623a2ebfbd",
+      "bytes": 6429
+    },
+    {
+      "path": "src/Tools/Bsync.ChunkBenchmark/README.md",
+      "sha256": "a70cc0a78152034e211972b7c82a9a325cea2f4c8aef22aa4a1a9445bae3c7a8",
+      "bytes": 4647
+    },
+    {
+      "path": ".github/workflows/chunk-memory.yml",
+      "sha256": "b6de1e051fdba1f547fe20aa63a29675c8c80959d5b90b296c8523d5e8dc1450",
+      "bytes": 2005
+    }
+  ],
+  "limits": [
+    "Original .2 and exploratory-source 31 MiB failures are retained separately from the exact .3 profiles; the broad cache-only target remains open.",
+    "64 MiB results are a separate workload profile; samples are not peak/cache-attribution proofs.",
+    "No native allocation, browser duplication, physical device, real object-store, or release qualification added.",
+    "The workflow was parsed locally, not executed on GitHub."
+  ]
+}

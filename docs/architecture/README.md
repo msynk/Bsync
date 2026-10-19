@@ -30,6 +30,16 @@
 | [023](adr-023-local-read-model-generations.md) | Full-reconciliation local read-model generations | Implemented primitive; host snapshot required |
 | [024](adr-024-sql-server-capture-gate.md) | Controlled publication after a bounded capture spike | Automatic capture deferred |
 | [025](adr-025-encrypted-blob-envelopes.md) | Bounded authenticated blob envelopes, migration and rotation | Implemented; native/browser and process recovery tests |
+| [026](adr-026-verified-content-repair.md) | Verified content repair and interruption recovery | Implemented, unreleased |
+| [027](adr-027-account-ownership-and-protected-metadata.md) | Account ownership and protected metadata | Implemented, unreleased |
+| [028](adr-028-experimental-chunked-encryption.md) | Chunked encryption and generation recovery | Experimental; review and performance gates open |
+| [029](adr-029-account-maintenance.md) | Exclusive maintenance and durable owner reconciliation | Implemented opt-in proposal |
+| [030](adr-030-execution-budgets-and-verification.md) | Execution stop diagnostics and bounded verification | Implemented scope; broader B4 work remains |
+| [031](adr-031-goal-wait-budgets.md) | Goal-wait deadlines and observation ownership | Implemented; cooperative callback limits |
+| [032](adr-032-session-listener-lifetimes.md) | Lease admission and joined hint-listener lifetimes | Implemented; cooperative callback limits |
+| [033](adr-033-idle-lease-observation.md) | Admitted lease loss between session runs | Implemented; pause and server backoff preserved |
+| [034](adr-034-nested-stop-causes.md) | Nested execution stop causes | Implemented for deadlines, session lifetimes and transport aliases |
+| [035](adr-035-generation-integrity-maintenance.md) | Durable chunk scrubbing and key-retention observations | Implemented; crypto/device qualification remains open |
 | [014](adr-014-sql-server-authority.md) | SQL Server authority on the application's database: feed lock, transaction enlistment, write handler, publisher | Accepted; implemented (0.2.0, unreleased) |
 
 Operations: [disaster recovery and stuck replicas](../operations/disaster-recovery.md).

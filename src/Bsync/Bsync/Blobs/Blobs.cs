@@ -113,3 +113,10 @@ public interface IBlobCacheInventory
     /// <summary>Total stored payload bytes including complete objects, partials and abandoned import staging. Excludes filesystem/database overhead.</summary>
     Task<long> GetStoredBytesAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>Optional bounded inventory of complete logical objects. Pages are ordinal, not a stable snapshot.</summary>
+public interface IBlobCachePagedInventory
+{
+    /// <summary>Returns at most limit identities after the last returned hash, or an empty list at end. Limit is 1..1000.</summary>
+    Task<IReadOnlyList<string>> ListCompletedPageAsync(string? afterHash = null, int limit = 100, CancellationToken cancellationToken = default);
+}

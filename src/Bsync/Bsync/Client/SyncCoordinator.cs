@@ -139,21 +139,37 @@ public sealed partial class SyncCoordinator : IAsyncDisposable
     {
         if (_account is not null) await CloseAccountAsync().ConfigureAwait(false);
         await _stopping.CancelAsync().ConfigureAwait(false);
+        await StopHintsAsync().ConfigureAwait(false);
+    }
+
+    private async Task StopHintsAsync()
+    {
         Task? hints;
+        CancellationTokenSource? stopping;
         lock (_gate)
         {
             hints = _hints;
-            _hintsStopping?.Cancel();
+            stopping = _hintsStopping;
+            stopping?.Cancel();
         }
 
-        if (hints is not null)
+        try
         {
-            try
+            if (hints is not null) await hints.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            lock (_gate)
             {
-                await hints.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
+                if (ReferenceEquals(_hints, hints))
+                {
+                    _hints = null;
+                    _hintsStopping = null;
+                    _hintAccount = null;
+                    stopping?.Dispose();
+                }
+                // A replacement owns this source and disposes it after joining its predecessor.
             }
         }
     }
@@ -204,16 +220,42 @@ public sealed partial class SyncCoordinator : IAsyncDisposable
 
         lock (_gate)
         {
-            if (_hintsFallback || (_hints is not null && _hintAccount == account))
+            if (_stopping.IsCancellationRequested || _hintsFallback || (_hints is not null && _hintAccount == account))
             {
                 return;
             }
 
-            _hintsStopping?.Cancel();
+            var previous = _hints;
+            var previousStopping = _hintsStopping;
+            previousStopping?.Cancel();
             _hintsStopping = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token);
             _hintAccount = account;
             var stopping = _hintsStopping.Token;
-            _hints = Task.Run(() => ListenAsync(hints, account, stopping), CancellationToken.None);
+            // Keep ownership of retired listeners. A replacement cannot overlap a provider that ignores cancellation,
+            // and awaiting the current task on shutdown also joins every predecessor.
+            _hints = Task.Run(async () =>
+            {
+                using var cause = CooperativeDeadline.TrackLinkedToken(stopping, _stopping.Token);
+                try
+                {
+                    try { if (previous is not null) await previous.ConfigureAwait(false); }
+                    finally
+                    {
+                        previous = null;
+                        previousStopping?.Dispose();
+                        previousStopping = null;
+                    }
+                    _stopping.Token.ThrowIfCancellationRequested();
+                    stopping.ThrowIfCancellationRequested();
+                    await ListenAsync(hints, account, stopping).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (stopping.IsCancellationRequested || _stopping.IsCancellationRequested) { }
+                finally
+                {
+                    // Root CancelAsync can be observed before its linked-token callback has run.
+                    CooperativeDeadline.RecordStop("coordinator_hints", _stopping.IsCancellationRequested ? _stopping.Token : stopping, false, false);
+                }
+            }, CancellationToken.None);
         }
     }
 
@@ -354,10 +396,12 @@ public sealed partial class SyncCoordinator : IAsyncDisposable
             {
                 await foreach (var collection in hints(account, [.. Collections], stopping).ConfigureAwait(false))
                 {
+                    stopping.ThrowIfCancellationRequested();
                     failures = 0;
                     Hint(collection);
                 }
 
+                stopping.ThrowIfCancellationRequested();
                 failures++;
             }
             catch (NotSupportedException)
@@ -365,11 +409,14 @@ public sealed partial class SyncCoordinator : IAsyncDisposable
                 // An older server has no multiplexed stream: every session listens on its own, as before.
                 lock (_gate)
                 {
+                    // A superseded stream cannot change the new account's capabilities or start fallback listeners.
+                    if (stopping.IsCancellationRequested) return;
                     _hintsFallback = true;
                 }
 
                 foreach (var member in Snapshot())
                 {
+                    if (stopping.IsCancellationRequested) return;
                     member.Session.ListenOnOwn();
                 }
 

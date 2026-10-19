@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Bsync.Client;
 using Bsync.Storage;
 
 namespace Bsync.Blobs;
@@ -69,7 +70,7 @@ public sealed record PackagePreparationStatus(string PackageId, string Revision,
 /// evaluated before staging/opening/activation; an offline policy may permit previously granted local access. No network
 /// is required to inspect or open prepared content. Retired revision pins are released only by explicit removal.
 /// </summary>
-public sealed class OfflinePackageManager
+public sealed partial class OfflinePackageManager
 {
     private readonly IOrchestrationStore _store;
     private readonly ManagedBlobCache _cache;
@@ -159,18 +160,43 @@ public sealed class OfflinePackageManager
         {
             await _cache.PinAsync(item.Sha256, Owner(manifest), ct).ConfigureAwait(false);
             var job = await _transfers.EnqueueAsync(item.Sha256, item.Size, BlobTransferDirection.Download, item.Required ? 1 : 0, ct).ConfigureAwait(false);
-            if (job.State == BlobTransferState.Complete && await _cache.SizeAsync(item.Sha256, ct).ConfigureAwait(false) != item.Size)
-                await _transfers.SetStateAsync(item.Sha256, BlobTransferDirection.Download, BlobTransferState.Queued, ct).ConfigureAwait(false);
+            if (job.State == BlobTransferState.Complete)
+                await _transfers.RevalidateDownloadAsync(item.Sha256, item.Size, ct).ConfigureAwait(false);
         }
     }
-    /// <summary>Resumes the latest staged candidate, drains transfers within budget, and activates only verified required content.</summary>
+    /// <summary>
+    /// Repairs active and candidate content, then activates only a verified latest candidate. One cooperative budget covers
+    /// authorization, queueing, ownership, transfers, verification and activation. Budget expiry throws cancellation;
+    /// durable work remains resumable. Started atomic provider commits are joined and may finish after expiry.
+    /// </summary>
     public async Task<OfflinePackageStatus> PrepareAsync(string packageId, TimeSpan budget, CancellationToken cancellationToken = default)
     {
-        var latest = await _store.ReadAsync(Prefix(packageId) + "latest", cancellationToken).ConfigureAwait(false) ?? throw new KeyNotFoundException("No staged package.");
-        var manifest = Decode(await _store.ReadAsync(RevisionKey(packageId, latest.Payload), cancellationToken).ConfigureAwait(false) ?? throw new InvalidDataException("Missing staged manifest."));
-        await Authorize(manifest, cancellationToken).ConfigureAwait(false);
-        await Queue(manifest, cancellationToken).ConfigureAwait(false);
-        await _transfers.DrainAsync(budget, cancellationToken).ConfigureAwait(false);
+        using var deadline = new CooperativeDeadline(budget, _time, cancellationToken, "package_prepare");
+        cancellationToken = deadline.Token;
+        OfflinePackageManifest manifest;
+        await using (var held = await _locks.AcquireAsync(Hash("package/" + packageId), cancellationToken).ConfigureAwait(false))
+        {
+            var latest = await _store.ReadAsync(Prefix(packageId) + "latest", cancellationToken).ConfigureAwait(false) ?? throw new KeyNotFoundException("No staged package.");
+            manifest = Decode(await _store.ReadAsync(RevisionKey(packageId, latest.Payload), cancellationToken).ConfigureAwait(false) ?? throw new InvalidDataException("Missing staged manifest."));
+            await Authorize(manifest, cancellationToken).ConfigureAwait(false);
+            // Preparation may discover damage or replace a generation and then be interrupted. Do not leave a cached
+            // readiness result whose timestamp predates that work; a successful final status observation replaces it.
+            var verification = await _store.ReadAsync(Prefix(packageId) + "verification", cancellationToken).ConfigureAwait(false);
+            if (verification is not null && !await _store.TryWriteAsync([new(verification.Key, verification.Revision, null)], cancellationToken: cancellationToken).ConfigureAwait(false))
+                throw new InvalidOperationException("Package verification changed outside its ownership boundary.");
+            var active = await _store.ReadAsync(Prefix(packageId) + "active", cancellationToken).ConfigureAwait(false);
+            if (active is not null && active.Payload != manifest.Revision)
+            {
+                var previous = Decode(await _store.ReadAsync(RevisionKey(packageId, active.Payload), cancellationToken).ConfigureAwait(false) ?? throw new InvalidDataException("Missing active manifest."));
+                await Authorize(previous, cancellationToken).ConfigureAwait(false);
+                _ = deadline.Remaining;
+                await Queue(previous, cancellationToken).ConfigureAwait(false);
+            }
+            _ = deadline.Remaining;
+            await Queue(manifest, cancellationToken).ConfigureAwait(false);
+        }
+        await _transfers.DrainAsync(deadline.Remaining, cancellationToken).ConfigureAwait(false);
+        _ = deadline.Remaining;
         await TryActivateAsync(packageId, manifest.Revision, cancellationToken).ConfigureAwait(false);
         return await GetStatusAsync(packageId, cancellationToken).ConfigureAwait(false);
     }
@@ -195,10 +221,7 @@ public sealed class OfflinePackageManager
         var counted = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in manifest.Items)
         {
-            await using var stream = await _cache.OpenReadAsync(item.Sha256, ct).ConfigureAwait(false);
-            var valid = stream is not null && stream.Length == item.Size
-                && Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false)) == item.Sha256;
-            if (valid) continue;
+            if (await BlobVerification.VerifyAsync(_cache, item.Sha256, item.Size, ct).ConfigureAwait(false) == BlobVerificationResult.Verified) continue;
             if (required.Contains(item.Id)) { missing.Add(item.Id); if (counted.Add(item.Sha256)) bytes = checked(bytes + item.Size); }
             else optional.Add(item.Id);
         }
@@ -343,7 +366,7 @@ public sealed class PackageSnapshot : IAsyncDisposable
         if (stream is null) return null;
         try
         {
-            if (stream.Length != item.Size || Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false)) != item.Sha256)
+            if (stream.Length != item.Size || Convert.ToHexStringLower(await StreamingSha256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false)) != item.Sha256)
                 throw new BlobCorruptedException("Prepared content is no longer verified.");
             stream.Position = 0; return stream;
         }

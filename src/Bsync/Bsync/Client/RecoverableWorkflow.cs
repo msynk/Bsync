@@ -62,7 +62,9 @@ public sealed class RecoverableWorkflow
         await _store.ReadAsync("workflow/" + Identity(workflowId), cancellationToken).ConfigureAwait(false) is { } record ? Decode(record) : null;
 
     /// <summary>
-    /// Creates/resumes one workflow within a cooperative deadline. Returns null if another executor owns it. Exceptions
+    /// Creates/resumes one workflow within a cooperative deadline, including lease acquisition. Returns null if another
+    /// executor owns it or the budget expires before progress is observed. Expiry/lease loss returns last observed durable
+    /// progress without starting a fresh storage read; re-read GetAsync for current state. Exceptions
     /// leave the current step recoverable. A failed step remains failed until RetryFailedAsync. Changing definitions fails.
     /// </summary>
     public async Task<WorkflowProgress?> RunAsync(string workflowId, string definitionVersion, IReadOnlyList<WorkflowStep> steps,
@@ -74,32 +76,39 @@ public sealed class RecoverableWorkflow
             || steps.Select(s => s.Name).Distinct(StringComparer.Ordinal).Count() != steps.Count) throw new ArgumentException("Invalid workflow definition.", nameof(steps));
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
         var registered = steps.ToArray(); var names = registered.Select(s => s.Name).ToArray(); var id = Identity(workflowId); var key = "workflow/" + id;
-        await using var lease = await ExecutionLease.TryAcquireAsync(_store, "workflow-owner/" + id, TimeSpan.FromSeconds(30), _time, cancellationToken).ConfigureAwait(false);
-        if (lease is null) return null;
-        using var deadline = new CancellationTokenSource(budget, _time);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token, lease.Lost);
-        var record = await _store.ReadAsync(key, linked.Token).ConfigureAwait(false);
-        if (record is null)
-        {
-            var created = new WorkflowProgress(1, definitionVersion, names, 0, "pending");
-            if (!await _store.TryWriteAsync([new(key, null, Encode(created))], lease.Fence, linked.Token).ConfigureAwait(false)) return null;
-            record = (await _store.ReadAsync(key, linked.Token).ConfigureAwait(false))!;
-        }
-        var progress = Decode(record);
-        if (progress.DefinitionVersion != definitionVersion || !progress.Steps.SequenceEqual(names))
-            throw new InvalidOperationException("Workflow definition changed; retain the registered version until existing work completes.");
-        if (progress.State is "complete" or "failed") return progress;
+        using var deadline = new CooperativeDeadline(budget, _time, cancellationToken, "workflow");
+        OrchestrationRecord? record = null;
         try
         {
+            await using var lease = await ExecutionLease.TryAcquireAsync(_store, "workflow-owner/" + id, TimeSpan.FromSeconds(30), _time, deadline.Token).ConfigureAwait(false);
+            if (lease is null) return null;
+            using var observation = deadline.ObserveLease(lease.Lost);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token, lease.Lost);
+            using var cause = deadline.TrackToken(linked.Token, lease.Lost);
+            _ = deadline.Remaining;
+            record = await _store.ReadAsync(key, linked.Token).ConfigureAwait(false);
+            if (record is null)
+            {
+                var created = new WorkflowProgress(1, definitionVersion, names, 0, "pending");
+                if (!await _store.TryWriteAsync([new(key, null, Encode(created))], lease.Fence, linked.Token).ConfigureAwait(false)) return null;
+                record = (await _store.ReadAsync(key, linked.Token).ConfigureAwait(false))!;
+            }
+            var progress = Decode(record);
+            if (progress.DefinitionVersion != definitionVersion || !progress.Steps.SequenceEqual(names))
+                throw new InvalidOperationException("Workflow definition changed; retain the registered version until existing work completes.");
+            if (progress.State is "complete" or "failed") return progress;
             while (progress.NextStep < registered.Length)
             {
+                _ = deadline.Remaining;
                 linked.Token.ThrowIfCancellationRequested();
                 progress = progress with { State = "running" };
-                if (!await _store.TryWriteAsync([new(key, record.Revision, Encode(progress))], lease.Fence, linked.Token).ConfigureAwait(false)) return await GetAsync(workflowId, cancellationToken).ConfigureAwait(false);
+                if (!await _store.TryWriteAsync([new(key, record.Revision, Encode(progress))], lease.Fence, linked.Token).ConfigureAwait(false)) return await GetAsync(workflowId, linked.Token).ConfigureAwait(false);
                 record = (await _store.ReadAsync(key, linked.Token).ConfigureAwait(false))!;
                 // This identity never changes on retry, lease takeover or process restart.
                 var operation = _account.StorageKey + "/" + id + "/" + progress.NextStep.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 var outcome = await registered[progress.NextStep].ExecuteAsync(operation, linked.Token).ConfigureAwait(false);
+                _ = deadline.Remaining;
+                linked.Token.ThrowIfCancellationRequested();
                 if (!Enum.IsDefined(outcome)) throw new InvalidOperationException("Unknown workflow step outcome.");
                 progress = outcome switch
                 {
@@ -107,14 +116,14 @@ public sealed class RecoverableWorkflow
                     WorkflowStepOutcome.RetryLater => progress with { State = "pending" },
                     _ => progress with { State = "failed" },
                 };
-                if (!await _store.TryWriteAsync([new(key, record.Revision, Encode(progress))], lease.Fence, linked.Token).ConfigureAwait(false)) return await GetAsync(workflowId, cancellationToken).ConfigureAwait(false);
+                if (!await _store.TryWriteAsync([new(key, record.Revision, Encode(progress))], lease.Fence, linked.Token).ConfigureAwait(false)) return await GetAsync(workflowId, linked.Token).ConfigureAwait(false);
                 if (outcome != WorkflowStepOutcome.Complete) return progress;
                 record = (await _store.ReadAsync(key, linked.Token).ConfigureAwait(false))!;
             }
             return progress;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        { return await GetAsync(workflowId, cancellationToken).ConfigureAwait(false); }
+        { return record is null ? null : Decode(record); }
     }
     /// <summary>Re-enables a failed step after explicit host repair/decision. Does not undo completed effects.</summary>
     public async Task<bool> RetryFailedAsync(string workflowId, CancellationToken cancellationToken = default)

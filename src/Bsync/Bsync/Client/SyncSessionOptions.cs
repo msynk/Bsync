@@ -20,7 +20,8 @@ public sealed record SyncSessionOptions<TDocument>
 
     /// <summary>
     /// Takes the replication lease for an account, or returns <see langword="null"/> if another instance (tab)
-    /// holds it. When not set, this session always replicates.
+    /// holds it. When not set, this session always replicates. Shutdown joins a callback that ignores cancellation,
+    /// disposes any late lease, and does not begin a new run. An already-lost execution lease cannot authorize a run.
     /// </summary>
     public Func<string, CancellationToken, Task<IAsyncDisposable?>>? AcquireLease { get; init; }
 

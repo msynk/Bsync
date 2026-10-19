@@ -12,8 +12,10 @@ namespace Bsync.Blazor.Blobs;
 /// a reload. Quota and availability failures surface as <see cref="Storage.LocalStoreUnavailableException"/> (reasons
 /// <c>quota</c>, <c>unavailable</c>), never as silent success. Use one store per account and delete it on sign-out.
 /// </summary>
-public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
+public sealed class BrowserBlobStore : IBlobCacheReplacement, IBlobCacheInventory, IBlobCachePagedInventory
 {
+    /// <inheritdoc />
+    public bool SupportsVerifiedReplacement => true;
     private const string ModulePath = "./_content/Bsync.Blazor/bsync-blobs.js";
     private const int ReadChunk = 1024 * 1024;
 
@@ -80,15 +82,28 @@ public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
         AppendPartialAsync(sha256, bytes.ToArray(), cancellationToken);
 
     /// <inheritdoc />
-    public async Task<Stream?> OpenReadAsync(string sha256, CancellationToken cancellationToken = default) =>
-        await SizeAsync(sha256, cancellationToken).ConfigureAwait(false) is { } size ? OpenRead(sha256, size) : null;
+    public async Task<Stream?> OpenReadAsync(string sha256, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var snapshot = await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<string[]?>("openSnapshot", CancellationToken.None, Name, sha256)).ConfigureAwait(false);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            if (snapshot is not null) await _module.InvokeVoidAsync("releaseSnapshot", snapshot[0]).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        return snapshot is null ? null : new RangeStream(this, sha256, long.Parse(snapshot[1], System.Globalization.CultureInfo.InvariantCulture), snapshot[0]);
+    }
 
     /// <summary>
     /// Verifies the unfinished transfer against <paramref name="sha256"/> and makes it the content. Returns
     /// <see langword="false"/> (and discards it) on a mismatch.
     /// </summary>
-    public Task<bool> CompletePartialAsync(string sha256, CancellationToken cancellationToken = default) =>
-        IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<bool>("completePartial", cancellationToken, Name, sha256));
+    public Task<bool> CompletePartialAsync(string sha256, CancellationToken cancellationToken = default)
+    {
+        // Cancellation of an interop await does not stop JavaScript. Join hash/transaction before releasing ownership.
+        cancellationToken.ThrowIfCancellationRequested();
+        return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<bool>("completePartial", CancellationToken.None, Name, sha256));
+    }
 
     /// <summary>Discards the unfinished transfer of <paramref name="sha256"/>.</summary>
     public Task DiscardPartialAsync(string sha256, CancellationToken cancellationToken = default) =>
@@ -128,7 +143,7 @@ public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
         return (sha256, size);
     }
 
-    /// <summary>Reads verified content in ranges (it is not loaded at once). Throws if it is not on this device.</summary>
+    /// <summary>Legacy live range view. Use OpenReadAsync and asynchronous disposal for a reader stable across replacement.</summary>
     public Stream OpenRead(string sha256, long size) => new RangeStream(this, sha256, size);
 
     /// <summary>Removes verified content (eviction; never content that a pending document still has to upload).</summary>
@@ -139,12 +154,20 @@ public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
     public async Task<IReadOnlyList<string>> ListAsync(CancellationToken cancellationToken = default) =>
         await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<string[]>("list", cancellationToken, Name)).ConfigureAwait(false);
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListCompletedPageAsync(string? afterHash = null, int limit = 100, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1); ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 1000);
+        return await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<string[]>("listPage", cancellationToken, Name, afterHash, limit)).ConfigureAwait(false);
+    }
+
     private Task<byte[]> ReadRangeAsync(string sha256, long offset, int count, CancellationToken cancellationToken) =>
         IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<byte[]>("readRange", cancellationToken, Name, sha256, offset, count));
 
-    private sealed class RangeStream(BrowserBlobStore store, string sha256, long size) : Stream
+    private sealed class RangeStream(BrowserBlobStore store, string sha256, long size, string? snapshot = null) : Stream
     {
         private long _position;
+        private bool _disposed;
 
         public override bool CanRead => true;
 
@@ -162,13 +185,15 @@ public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
 
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var count = (int)Math.Min(Math.Min(buffer.Length, ReadChunk), size - _position);
             if (count <= 0)
             {
                 return 0;
             }
 
-            var bytes = await store.ReadRangeAsync(sha256, _position, count, cancellationToken).ConfigureAwait(false);
+            var bytes = snapshot is null ? await store.ReadRangeAsync(sha256, _position, count, cancellationToken).ConfigureAwait(false)
+                : await IndexedDbLocalStore<NoDocument>.Call(() => store._module.InvokeAsync<byte[]>("readSnapshot", cancellationToken, snapshot, _position, count)).ConfigureAwait(false);
             bytes.CopyTo(buffer);
             _position += bytes.Length;
             return bytes.Length;
@@ -194,6 +219,14 @@ public sealed class BrowserBlobStore : IBlobCache, IBlobCacheInventory
         public override void SetLength(long value) => throw new NotSupportedException();
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            if (snapshot is not null) await store._module.InvokeVoidAsync("releaseSnapshot", snapshot).ConfigureAwait(false);
+            _disposed = true;
+            GC.SuppressFinalize(this);
+        }
     }
 
     /// <summary>A type argument for the shared interop helpers of the IndexedDB store.</summary>

@@ -13,6 +13,28 @@ public sealed class OfflineMetricsCollection;
 public sealed class OfflineMetricsTests
 {
     [Fact]
+    public async Task QuarantineSnapshotMarksTruncationAndInvalidInventoryWithoutExposingPayloads()
+    {
+        await using var store = new InMemoryOrchestrationStore();
+        var generation = new string('0', 32);
+        var prefix = "encrypted-chunk/v2/" + generation + "/";
+        await store.TryWriteAsync([
+            new(prefix + new string('a', 64), null, "42"),
+            new(prefix + new string('b', 64), null, "private-malformed-size"),
+            new("encrypted-protected/v2/" + generation, null, "private-content-hash"),
+            new("repair/v1/private-job", null, """{"SchemaVersion":1,"State":999,"ErrorCode":"private-error"}""")]);
+        using var metrics = new OfflineMetrics(store);
+        var partial = await metrics.RefreshAsync(1);
+        Assert.True(partial.Truncated); Assert.Equal(42, partial.Counts["blob.quarantined_reserved_bytes"]);
+        var full = await metrics.RefreshAsync(10);
+        Assert.False(full.Truncated); Assert.Equal(2, full.UnsupportedRecords);
+        Assert.Equal(42, full.Counts["blob.chunk_reserved_bytes"]);
+        var exported = await OfflineDiagnosticExport.ExportJsonAsync(store);
+        Assert.DoesNotContain("private", exported, StringComparison.Ordinal);
+        Assert.DoesNotContain(generation, exported, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task BoundedSnapshotsExposeAgeAndUnknownsWithoutIdentifiersAndUnregisterOnClose()
     {
         await using var store = new InMemoryOrchestrationStore();

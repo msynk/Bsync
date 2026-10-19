@@ -88,6 +88,13 @@ Its bounded complete repair locks both feeds through the snapshot/replacement bo
 and hard deletions. There is no catch-up gap because participating writers cannot commit within that boundary.
 Rollback, competing ACL writers and repair are tested. Online large-feed rebuild remains a separate design problem.
 
+The 2026-10-17 continuation adds the opt-in sample `TaskAudienceProjection` helper to API creation, task sync and intent
+handlers. It factors the shared dependent lock/publication steps while leaving connection ownership, transaction commit,
+EF retry boundaries and domain validation visible in those callers. The order extends to intent, task, audience, then
+ledger/domain/ACL rows. The default host does not enable the extra feed. See the [sample registration and writer
+inventory](../../src/Samples/Bsync.Samples.Tasks.Server/README.md#opt-in-to-the-reader-specific-projection) for backfill,
+authorization and after-commit hint requirements. No wire/schema or packaged public API changes are involved.
+
 Direct Get/List reads now enforce persisted reader membership in the in-memory, SQL Server and PostgreSQL authorities,
 as pull already did. Membership filtering precedes page limits, and additional CanRead policy still applies. Anonymous,
 invalid, differently cased or trailing-space principals cannot borrow another principal's membership.

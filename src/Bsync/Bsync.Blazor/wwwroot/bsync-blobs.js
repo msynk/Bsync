@@ -7,6 +7,27 @@
 // Quota failures surface as errors ("Bsync:quota:..."), never as silent success.
 
 const databases = new Map();
+// Immutable reader references live only in this realm; tab/process termination releases them automatically.
+// The existing v1 provider materializes whole IndexedDB objects. This is not the proposed bounded-memory v2 format.
+const snapshots = new Map();
+
+export function openSnapshot(name, sha) {
+  return run(name, async (db) => {
+    const content = await request(db.transaction("blobs", "readonly").objectStore("blobs").get(["object", sha]));
+    if (!content) return null;
+    const id = crypto.randomUUID();
+    snapshots.set(id, content);
+    return [id, String(sizeOf(content))];
+  });
+}
+
+export async function readSnapshot(id, offset, count) {
+  const content = snapshots.get(id);
+  if (!content) throw fail("missing", "The reader has been released.");
+  return new Uint8Array(content instanceof Blob ? await content.slice(offset, offset + count).arrayBuffer() : content.slice(offset, offset + count));
+}
+
+export function releaseSnapshot(id) { snapshots.delete(id); }
 
 function fail(code, message) {
   const error = new Error(`Bsync:${code}:${message}`);
@@ -146,6 +167,15 @@ export function list(name) {
   return run(name, async (db) => {
     const keys = await request(db.transaction("blobs", "readonly").objectStore("blobs").getAllKeys(IDBKeyRange.bound(["object"], ["object", []])));
     return keys.map((key) => key[1]);
+  });
+}
+
+export function listPage(name, after, limit) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new RangeError('Invalid page limit.');
+  return run(name, async db => {
+    const range = IDBKeyRange.bound(after === null ? ['object'] : ['object', after], ['object', []], after !== null, true);
+    const keys = await request(db.transaction('blobs', 'readonly').objectStore('blobs').getAllKeys(range, limit));
+    return keys.map(key => key[1]);
   });
 }
 

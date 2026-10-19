@@ -92,7 +92,11 @@ Uploads have two modes:
   least 5 MB; a verified upload is written to the bucket once and the partial file removed.
 - **Presigned (`PresignUploads = true`).** The start response carries an `uploadUrl`, and `HttpBlobTransfer` sends the
   whole content there in one `PUT` (`HttpBlobTransferOptions.DirectUploads`, on by default). Finishing reads the
-  object back once to verify its hash, copies it to its place and deletes the upload. An interrupted presigned upload
+  object into a private server-disk snapshot, verifies its hash, uploads those exact verified bytes to their final key
+  and deletes the upload. It never copies a mutable staging key after verification. The snapshot is plaintext,
+  exclusively opened and deleted on close, including publication errors; `MaximumStagedBytes` defaults to 512 MiB.
+  Hosts must provision protected temporary disk and limit concurrent completions. This adds server disk and an outbound
+  upload during verification; the client's original PUT still goes directly to the bucket. An interrupted presigned upload
   starts again from the beginning; content larger than `MaxSize` is refused at finish and removed by the collector.
   Use a `DirectClient` without the sync credentials (the sample's console client does; the browser default has none).
 
@@ -100,6 +104,11 @@ Browsers need a CORS rule on the bucket for the app's origin: `GET` for download
 Tested against a local S3-compatible server (moto): `TasksSampleTests.AttachmentsInObjectStorage`, run with
 `BSYNC_S3=http://127.0.0.1:59000` (an upload cut halfway is sent again whole to the bucket, never through the
 application server; downloads redirected and resumed).
+
+Use the [object-store qualification runner](../../src/Tools/Bsync.ObjectStoreQualification/README.md) for an existing
+test bucket with real credentials. It tests actual expiry enforcement/refresh, ranges, lost completion acknowledgements,
+credential isolation, orphan cleanup and PUT/GET/range CORS in three browser engines. Emulator runs remain separate;
+an emulator accepting expired signatures fails qualification. The runner never changes bucket configuration.
 
 ## Garbage collection
 

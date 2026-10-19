@@ -1,6 +1,106 @@
 # Compatibility policy and migration notes
 
-## 0.4.0 (unreleased) - Offline orchestration additions
+## 0.5.0 (unreleased) - Gap closure
+
+`ChunkedEncryptedBlobCache.ScrubAsync` and `GetKeyRetentionPageAsync` are additive. Their independently versioned
+`encrypted-scrub/v1/` and `encrypted-generation-key/v1/` journals do not change the v2 chunk or document wire formats.
+Register both namespaces if using an explicit orchestration payload policy. A legacy generation without a key journal
+reports an unknown obligation; retain potentially used keys. Scrubbing authenticates chunks over successive calls,
+not a fresh simultaneous full SHA-256. Checkpoint encryption also consumes key invocation allowance. See
+[ADR-035](architecture/adr-035-generation-integrity-maintenance.md).
+
+Nested bounded invocations now preserve observed parent budget/lease reasons for deadline tokens and registered
+library-owned aliases. Diagnostic consumers may see `budget_expired` or `lease_lost` where a child formerly reported
+`caller_canceled`. Public results, exceptions, signatures and persistence formats are unchanged. Opaque host-created
+linked tokens remain caller-relative. Session/coordinator and session-transport aliases now preserve known causes. See
+[ADR-034](architecture/adr-034-nested-stop-causes.md) for scope lifetime and precedence.
+
+An admitted execution lease's loss now wakes the session through its normal trigger path instead of waiting for the
+idle interval. Pause remains paused, and server `Retry-After` still suppresses early execution. The additive
+`session_ownership` stop operation observes one loss notification per admitted lease, including between runs; it can
+overlap an acquisition/run stop and must not be summed as unique failures. Normal lease disposal detaches the observer
+first and emits no ownership stop. No public API, document wire or persistence change is required. See
+[ADR-033](architecture/adr-033-idle-lease-observation.md).
+
+Coordinator hint replacement now waits for the previous iterator to finish and dispose; shutdown joins the entire
+replacement chain. A provider that ignores cancellation can delay replacement/shutdown. Late hints and unsupported
+responses from a canceled listener no longer trigger requests or change the new account's hint capability. Session
+lease acquisition checks cancellation and execution ownership after its callback; a late lease remains owned until
+shutdown disposes it. These are lifecycle corrections with no public signature, document wire or persistence changes.
+See [ADR-032](architecture/adr-032-session-listener-lifetimes.md) for diagnostics and host callback constraints.
+
+Session goal waits now include account resolution and opening in the original session `TimeProvider` budget. Zero
+budget performs no I/O; expiry returns the last completed observation with `Reached=false`, without fresh reads.
+The additive `SyncGoalResult.HasObservation` defaults to true for manually constructed results and is false when no
+observation completed. In that case `Pending=0` is unknown, and `Combine` preserves the unknown flag. Consumers must
+check it before interpreting queue counts. The property affects record equality/application serialization; document
+wire formats and persisted schemas are unchanged. Progress exceptions now fault their wait rather than the shared
+loop, and shutdown joins active goal reads/callbacks before closing storage. See
+[ADR-031](architecture/adr-031-goal-wait-budgets.md) for callback lifetime and reentrancy limits.
+
+`SyncOptions<TDocument>.TimeProvider` is additive and defaults to the system clock; it controls only `SyncForAsync`
+budgets, not HLC/server time. Zero-budget calls now do no I/O and conservatively report remaining work. Late successful
+callbacks cannot report timely completion. Unrelated provider cancellation now propagates; only actual budget expiry
+returns remaining work. Session pause stops polling storage, and stopped/lease-lost runs cannot publish late success.
+These are behavioral corrections with no wire/persistence changes; see ADR-030 for cooperative limits.
+
+The budgeted `BlobVerification.VerifyAsync` overload and `ContentLimitExceeded` result are additive; only the new
+overload returns that value. It means deferral before storage opens, never corruption or repair authorization. Both
+overloads now bound plaintext reads by the declared size plus one EOF probe. There is no new persistent/wire format.
+Workflow budget expiry/lease loss returns last observed durable progress (possibly null/stale) instead of issuing a new
+read after stopping. Use `GetAsync` explicitly when current state is required. See
+[ADR-030](architecture/adr-030-execution-budgets-and-verification.md) for deadline and diagnostics boundaries.
+
+`AccountMaintenance`, exclusive composition scopes and built-in pin reconciliation are additive. Checkpoints use a new
+schema-1 `maintenance/v1/` namespace and bind the ordered step names/versions. Older binaries ignore them. All account
+participants must share the physical lock namespace before enabling maintenance; use a new plan identity when changing
+cursor semantics. See [ADR-029](architecture/adr-029-account-maintenance.md).
+
+`IBlobCache` and the HTTP protocol are unchanged. `IBlobCacheReplacement` is optional; providers without it
+retain conservative existing-content behavior. New `BlobVerification` results distinguish unreadable keys and
+I/O from repairable plaintext damage. New repair and terminal-cleanup journals have independent schema 1;
+existing package, transfer, cache and encrypted v1 records remain readable. See [ADR-026](architecture/adr-026-verified-content-repair.md).
+
+`FileBlobCache.CollectRetiredPageAsync` and `ChunkedEncryptedBlobCache.ObserveStoragePageAsync` are additive paging
+APIs with opaque continuation values. Existing retired-file cleanup now advances its cursor within an instance;
+persist the explicit page continuation when reopening between passes. Diagnostic format 1 adds fixed repair/chunk
+aggregate keys; consumers must tolerate additional aggregate names. No content or storage format changes for these
+observations. Quarantine totals are conservative journal reservations and remain subject to snapshot age/truncation.
+
+`PrepareAsync` and `EnsureUploadsAsync` now apply the supplied budget to the complete operation, including
+queueing, locks and verification. Budget expiry can throw `OperationCanceledException` before activation;
+durable jobs remain resumable. `DrainAsync` still returns remaining work on its own budget expiry and propagates
+caller cancellation. Browser v1 hashing/commit interop is joined once started and can overrun a cooperative deadline.
+Browser `OpenReadAsync` holds a stable snapshot until async disposal; the synchronous `OpenRead` remains a live view.
+
+On downgrade, 0.4.0 ignores the additional journal prefixes and cannot finish their repair/cleanup work. Preserve
+these records and managed bytes for re-upgrade; do not run old and new managers concurrently on one cache. New
+encrypted writers require explicit construction. Unsupported encrypted schemas report `LocalStoreUnavailableException("outdated")`
+instead of a general `InvalidDataException`; ciphertext is retained.
+
+| Local format | Writer/reader and upgrade policy | Downgrade boundary |
+|---|---|---|
+| Repair and terminal cleanup journals, schema 1 | New managed transfer manager; no document protocol change | Old managers ignore journals; preserve for re-upgrade |
+| Encrypted blob v1 | Existing 16 MiB writer/reader unchanged | Original source retained by explicit v2 migration |
+| Chunked blob v2 | Explicit experimental `ChunkedEncryptedBlobCache`; dedicated chunk storage | Requires provider feature 2; no silent v1 reinterpretation |
+| Protected payload envelope 1 | Explicit `ProtectedOrchestrationStore`, bounded CAS migration/rotation | Requires provider feature 2; selected plaintext must be explicitly migrated |
+| Owned read-model schema/namespace 2 | New constructor with account and physical generation locks | Legacy namespace retained; old snapshots are never collected by the new namespace |
+| Provider feature header 2 | Optional `IOrchestrationFeatureStore`, implemented by SQLite/IndexedDB | Actual published 0.4.0 readers reject on reopen; no automatic downgrade |
+| Grouped preparation | Not introduced; conditional plan item | Individual package semantics unchanged |
+
+Before enabling protected payload or v2 blob writes, quiesce **all** older processes/tabs. The feature barrier prevents
+later opens, not already-open legacy SQLite handles. Use `AccountComposition.UpgradeFeatureStoreAsync` under exclusive
+ownership, and quiesce all accounts if they share one database. SQLite's orchestration schema header is independent of
+the document schema; IndexedDB's orchestration database upgrades to version 2. Third-party providers retain the base
+interface, and must implement the optional feature capability before hosting new encrypted formats.
+
+`IBlobCachePagedInventory` is optional. `ReadModelSnapshot` adds async disposal; the legacy constructor preserves its
+retention guarantee. The new constructor requires disposing snapshots before bounded cleanup can reclaim their rows.
+Chunk readers require async reads/disposal. See [ADR-027](architecture/adr-027-account-ownership-and-protected-metadata.md)
+and [ADR-028](architecture/adr-028-experimental-chunked-encryption.md) for limits, leaked metadata, key dependencies,
+rollback limitations and experimental status. The six-package inventory is unchanged; mobile hosts are source samples.
+
+## 0.4.0 (published) - Offline orchestration additions
 
 New account lifecycle, orchestration stores, transfer/cache/package managers, workflow/background/read-model contracts and the
 SQL Server publication-lock method are additive. Existing session opens still construct transports normally;

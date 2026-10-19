@@ -1,0 +1,48 @@
+name: Local real object-store qualification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  seaweed:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Download and verify the pinned server
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory artifacts -Force | Out-Null
+          curl.exe --fail --location --output artifacts/seaweed.zip https://github.com/seaweedfs/seaweedfs/releases/download/4.48/windows_amd64.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash artifacts/seaweed.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'fe90c04c0620ad1a1c756f86cd5e1443773f56a446688077a4bb5ec04c3cc874') { throw 'Server archive digest mismatch' }
+          Expand-Archive -LiteralPath artifacts/seaweed.zip -DestinationPath artifacts/seaweed
+          python -m pip install boto3==1.43.114
+      - name: Build exact package consumer
+        shell: pwsh
+        run: |
+          $suffix = 'localstore.${{ github.run_id }}.${{ github.run_attempt }}'
+          dotnet pack src/Bsync/Bsync -c Release -o artifacts/packages -p:VersionSuffix=$suffix
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet pack src/Bsync/Bsync.Server.AspNetCore -c Release -o artifacts/packages -p:VersionSuffix=$suffix
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/Tools/Bsync.ObjectStoreQualification -c Release -p:BsyncPackageVersion=0.5.0-$suffix
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pwsh src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/playwright.ps1 install chromium firefox webkit
+      - name: Qualify real loopback service
+        run: python src/Tools/Bsync.ObjectStoreQualification/run-local-seaweed.py artifacts/seaweed/weed.exe artifacts/local-object-store
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-object-store-evidence
+          path: |
+            artifacts/local-object-store/*.json
+            artifacts/local-object-store/*.log
+            artifacts/local-object-store/qualification/**
+            artifacts/packages/**

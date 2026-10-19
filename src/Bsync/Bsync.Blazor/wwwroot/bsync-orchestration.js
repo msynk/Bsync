@@ -2,11 +2,15 @@
 function open(name) {
   return new Promise((resolve, reject) => {
     let abandoned = false;
-    const request = indexedDB.open(name, 1);
+    const request = indexedDB.open(name);
     request.onupgradeneeded = () => request.result.createObjectStore('records', { keyPath: 'key' });
     request.onerror = () => reject(request.error);
     request.onblocked = () => { abandoned = true; reject(new Error('Orchestration upgrade blocked by another tab.')); };
-    request.onsuccess = () => { if (abandoned) request.result.close(); else resolve(request.result); };
+    request.onsuccess = () => {
+      if (abandoned) request.result.close();
+      else if (request.result.version > 2) { request.result.close(); reject(new DOMException('Unsupported orchestration version.', 'VersionError')); }
+      else resolve(request.result);
+    };
   });
 }
 
@@ -39,6 +43,20 @@ async function transaction(name, mode, action) {
 }
 
 export async function initialize(name) { const db = await open(name); db.close(); return 'true'; }
+export async function requireFeatureVersion(name) {
+  const existing = await open(name);
+  const version = existing.version;
+  existing.close();
+  if (version >= 2) return 'true';
+  return new Promise((resolve, reject) => {
+    let abandoned = false;
+    const upgrade = indexedDB.open(name, 2);
+    upgrade.onblocked = () => { abandoned = true; reject(new Error('Close older tabs before enabling protected formats.')); };
+    upgrade.onupgradeneeded = () => { if (abandoned) upgrade.transaction.abort(); };
+    upgrade.onerror = () => reject(upgrade.error);
+    upgrade.onsuccess = () => { upgrade.result.close(); if (!abandoned) resolve('true'); };
+  });
+}
 export function read(name, key) { return transaction(name, 'readonly', async store => (await request(store.get(key))) || null); }
 export function clear(name) { return transaction(name, 'readwrite', async store => { await request(store.clear()); return true; }); }
 

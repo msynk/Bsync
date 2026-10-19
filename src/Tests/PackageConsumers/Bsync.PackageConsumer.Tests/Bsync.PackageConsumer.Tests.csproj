@@ -14,6 +14,27 @@
 
   <ItemGroup>
     <AssemblyMetadata Include="BsyncPackageVersion" Value="$(BsyncPackageVersion)" />
+    <Compile Include="../../Bsync.Tests/BlobRepairRegressionTests.cs" Link="BlobRepairRegressionTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BsyncPackageVersion)' != '0.4.0'">
+    <EmbeddedResource Include="../../Bsync.Tests/Fixtures/chunked-v2-vector.json" LogicalName="chunked-v2-vector.json" />
+    <Compile Include="../../Shared/ChunkedFormatVector.cs" Link="ChunkedFormatVector.cs" />
+    <Compile Include="../../Bsync.Tests/ChunkedEncryptedBlobCacheTests.cs" Link="ChunkedEncryptedBlobCacheTests.cs" />
+    <Compile Include="../../Bsync.Tests/ChunkIntegrityTests.cs" Link="ChunkIntegrityTests.cs" />
+    <Compile Include="../../Bsync.Tests/OwnedReadModelTests.cs" Link="OwnedReadModelTests.cs" />
+    <Compile Include="../../Bsync.Tests/BlobRepairTests.cs" Link="BlobRepairTests.cs" />
+    <Compile Include="../../Bsync.Tests/BlobMetricsTests.cs" Link="BlobMetricsTests.cs" />
+    <Compile Include="../../Bsync.Tests/AccountMaintenanceTests.cs" Link="AccountMaintenanceTests.cs" />
+    <Compile Include="../../Bsync.Tests/BuiltInOwnerMaintenanceTests.cs" Link="BuiltInOwnerMaintenanceTests.cs" />
+    <Compile Include="../../Bsync.Tests/ExecutionBudgetTests.cs" Link="ExecutionBudgetTests.cs" />
+    <Compile Include="../../Bsync.Tests/BlobVerificationBudgetTests.cs" Link="BlobVerificationBudgetTests.cs" />
+    <Compile Include="../../Bsync.Tests/SessionExecutionTests.cs" Link="SessionExecutionTests.cs" />
+    <Compile Include="../../Bsync.Tests/SyncGoalBudgetTests.cs" Link="SyncGoalBudgetTests.cs" />
+    <Compile Include="../../Bsync.Tests/SessionLifetimeTests.cs" Link="SessionLifetimeTests.cs" />
+    <Compile Include="../../Bsync.Tests/SessionOwnershipTests.cs" Link="SessionOwnershipTests.cs" />
+    <Compile Include="../../Bsync.Tests/NestedStopCauseTests.cs" Link="NestedStopCauseTests.cs" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
   </ItemGroup>
 
 </Project>

@@ -21,6 +21,9 @@
   <ItemGroup>
     <None Include="..\..\..\docs\protocol\fixtures\**\*.json" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures\*.db" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\published040.zip" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Fixtures\chunked-v2-vector.json" LogicalName="chunked-v2-vector.json" />
+    <Compile Include="..\Shared\ChunkedFormatVector.cs" Link="ChunkedFormatVector.cs" />
   </ItemGroup>
 
   <ItemGroup>

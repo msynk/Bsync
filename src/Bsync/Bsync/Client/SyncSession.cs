@@ -100,6 +100,7 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
             var stopping = new CancellationTokenSource();
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var transport = new SessionTransport<TDocument>(() => _options.CreateTransport(account), stopping.Token, _replicationEnabled);
                 var engine = new SyncEngine<TDocument>(
                     replica.Store,
@@ -117,6 +118,7 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
                 if (_options.AttachLifecycle is { } attach)
                 {
                     started.Lifecycle = await attach(this, account, cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
 
                 return engine;
@@ -162,10 +164,11 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
         if (_replicationEnabled && _active is { } active
             && (_options.AcquireLease is null || active.Lease is not null))
         {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
-                active.NetworkStopping?.Token ?? active.Stopping.Token,
-                (active.Lease as ISyncExecutionLease)?.Lost ?? CancellationToken.None);
-            await active.Engine.SyncAsync(linked.Token).ConfigureAwait(false);
+            using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
+                active.NetworkStopping?.Token ?? active.Stopping.Token);
+            using var cause = CooperativeDeadline.TrackLinkedToken(stopping.Token, cancellationToken,
+                additionalCaller: active.NetworkStopping?.Token ?? active.Stopping.Token);
+            await ExecuteSyncAsync(active, stopping.Token, active.Engine.SyncAsync).ConfigureAwait(false);
             await PublishAsync(active, _status.State, _status.Detail).ConfigureAwait(false);
         }
     }
@@ -184,36 +187,83 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
     /// (task C4). The session's own loop does the work, so replication stays single-flight and compatible waits share runs.
     /// Budget expiry returns a result with <see cref="SyncGoalResult.Reached"/> false; cancelling the wait never undoes a
     /// local write. A wait for revision N is never completed by the acceptance of an older revision.
+    /// The cooperative budget includes replica opening and goal observations. Expiry returns the last completed
+    /// observation without new storage reads; HasObservation is false if none completed. Zero budget does no I/O.
+    /// Started callbacks are joined. Progress exceptions affect this wait, not the shared replication loop.
     /// </summary>
-    public async Task<SyncGoalResult> SyncAsync(string account, SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default)
+    public Task<SyncGoalResult> SyncAsync(string account, SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(account);
+        return SyncGoalAsync(_ => Task.FromResult(account), goal, budget, progress, cancellationToken);
+    }
+
+    internal async Task<SyncGoalResult> SyncGoalAsync(Func<CancellationToken, Task<string>> resolveAccount, SyncGoal goal,
+        TimeSpan budget, IProgress<SyncProgress>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(goal);
         ArgumentOutOfRangeException.ThrowIfLessThan(budget, TimeSpan.Zero);
-        await GetEngineAsync(account, cancellationToken).ConfigureAwait(false);
-        var active = _active ?? throw new InvalidOperationException("The session stopped.");
-        var waiter = new Waiter(goal, active, Volatile.Read(ref _runsStarted), progress);
-        lock (_waiters)
+        goal = goal with { Documents = goal.Documents?.ToArray() };
+        var observed = new SyncGoalResult(false, false, 0, goal.Documents ?? [], default) { HasObservation = false };
+        if (budget == TimeSpan.Zero)
         {
-            _waiters.Add(waiter);
+            CooperativeDeadline.RecordStop("sync_goal", cancellationToken, false, true);
+            cancellationToken.ThrowIfCancellationRequested();
+            return observed;
         }
-
+        using var deadline = new CooperativeDeadline(budget, _options.TimeProvider, cancellationToken, "sync_goal");
+        Waiter? waiter = null;
         try
         {
+            _ = deadline.Remaining;
+            var account = await resolveAccount(deadline.Token).ConfigureAwait(false);
+            _ = deadline.Remaining;
+            var engine = await GetEngineAsync(account, deadline.Token).ConfigureAwait(false);
+            _ = deadline.Remaining;
+            Active active;
+            lock (_waiters)
+            {
+                if (_active is not { } current || current.Account != account || !ReferenceEquals(current.Engine, engine)) return observed;
+                active = current;
+                waiter = new Waiter(goal, active, Volatile.Read(ref _runsStarted));
+                _waiters.Add(waiter);
+            }
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token, active.Stopping.Token);
+            using var cause = deadline.TrackToken(linked.Token);
             RequestSync();
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var expiry = Task.Delay(budget, _options.TimeProvider, timeout.Token);
-            var finished = await Task.WhenAny(waiter.Done.Task, expiry).ConfigureAwait(false);
-            await timeout.CancelAsync().ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            return finished == waiter.Done.Task
-                ? await waiter.Done.Task.ConfigureAwait(false)
-                : await EvaluateAsync(waiter).ConfigureAwait(false);
+            var reportedRuns = 0;
+            while (true)
+            {
+                _ = deadline.Remaining;
+                linked.Token.ThrowIfCancellationRequested();
+                int runs; bool caughtUp; SyncResult work;
+                lock (_waiters) { runs = waiter.Runs; caughtUp = waiter.CaughtUp; work = waiter.Work; }
+                var state = await EvaluateAsync(waiter, caughtUp, work, linked.Token).ConfigureAwait(false);
+                _ = deadline.Remaining;
+                linked.Token.ThrowIfCancellationRequested();
+                observed = state;
+                if (runs > reportedRuns)
+                {
+                    progress?.Report(new SyncProgress(runs, work.Pulled, work.Pushed, state.Pending));
+                    reportedRuns = runs;
+                    _ = deadline.Remaining;
+                    linked.Token.ThrowIfCancellationRequested();
+                }
+                if (state.Reached) return state;
+                await waiter.Wake.WaitAsync(linked.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested &&
+            (deadline.Expired || waiter?.Active.Stopping.IsCancellationRequested == true))
+        {
+            return observed with { Reached = false };
         }
         finally
         {
-            lock (_waiters)
+            if (waiter is not null)
             {
-                _waiters.Remove(waiter);
+                lock (_waiters) _waiters.Remove(waiter);
+                waiter.Wake.Dispose();
+                waiter.Finished.TrySetResult();
             }
         }
     }
@@ -301,10 +351,18 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
         }
         active.Loop = null;
         active.Hints = null;
-        if (active.Lease is { } lease) await lease.DisposeAsync().ConfigureAwait(false);
-        active.Lease = null;
+        await ReleaseLeaseAsync(active).ConfigureAwait(false);
         active.NetworkStopping?.Dispose();
         active.NetworkStopping = null;
+    }
+
+    private static async Task ReleaseLeaseAsync(Active active)
+    {
+        // Ordinary lease disposal also cancels Lost. Detach and join the observer before initiating that disposal.
+        await active.LeaseObservation.DisposeAsync().ConfigureAwait(false);
+        active.LeaseObservation = default;
+        if (active.Lease is { } lease) await lease.DisposeAsync().ConfigureAwait(false);
+        active.Lease = null;
     }
 
     async Task ICoordinatedSession.OpenAsync(string account, CancellationToken token) => _ = await GetEngineAsync(account, token).ConfigureAwait(false);
@@ -415,14 +473,10 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
             abandoned = [.. _waiters.Where(w => w.Active == active)];
         }
 
-        foreach (var waiter in abandoned)
-        {
-            // The replica is closing (sign-out, account switch): the wait ends unreached; nothing local is undone.
-            waiter.Done.TrySetResult(new SyncGoalResult(false, waiter.CaughtUp, 0, waiter.Goal.Documents ?? [], waiter.Work));
-        }
-
         await active.Stopping.CancelAsync().ConfigureAwait(false);
         await StopReplicationAsync(active).ConfigureAwait(false);
+        // Goal observations may be inside a provider callback that ignores cancellation. Join them before closing storage.
+        await Task.WhenAll(abandoned.Select(w => w.Finished.Task)).ConfigureAwait(false);
 
         if (active.Lifecycle is { } lifecycle)
         {
@@ -430,11 +484,6 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
         }
 
         active.Subscription.Dispose();
-        if (active.Lease is { } lease)
-        {
-            await lease.DisposeAsync().ConfigureAwait(false);
-        }
-
         if (active.Replica.Store is IAsyncDisposable disposable)
         {
             await disposable.DisposeAsync().ConfigureAwait(false);
@@ -446,57 +495,50 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
 
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
 
-    private async Task SettleWaitersAsync(Active active, int run, SyncResult result)
+    private void SettleWaiters(Active active, int run, SyncResult result)
     {
-        Waiter[] waiters;
         lock (_waiters)
         {
-            waiters = [.. _waiters.Where(w => w.Active == active)];
-        }
-
-        foreach (var waiter in waiters)
-        {
-            waiter.Runs++;
-            waiter.Work += result;
-
-            // Only a run that started after the wait began proves the replica caught up with the server.
-            if (run >= waiter.FirstRun && !result.HasRemainingWork)
+            foreach (var waiter in _waiters.Where(w => w.Active == active))
             {
-                waiter.CaughtUp = true;
-            }
-
-            var state = await EvaluateAsync(waiter).ConfigureAwait(false);
-            waiter.Progress?.Report(new SyncProgress(waiter.Runs, waiter.Work.Pulled, waiter.Work.Pushed, state.Pending));
-            if (state.Reached)
-            {
-                waiter.Done.TrySetResult(state);
+                waiter.Runs++;
+                waiter.Work += result;
+                // Only a run that started after the wait began proves the replica caught up with the server.
+                if (run >= waiter.FirstRun && !result.HasRemainingWork) waiter.CaughtUp = true;
+                // Coalesce notifications, not work counts. Evaluation and callbacks belong to the individual wait.
+                if (waiter.Wake.CurrentCount == 0) waiter.Wake.Release();
             }
         }
     }
 
-    private static async Task<SyncGoalResult> EvaluateAsync(Waiter waiter)
+    private static async Task<SyncGoalResult> EvaluateAsync(Waiter waiter, bool caughtUp, SyncResult work, CancellationToken token)
     {
         var engine = waiter.Active.Engine;
-        var dirty = await engine.CountDirtyAsync().ConfigureAwait(false);
-        var issues = await engine.CountIssuesAsync().ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        var dirty = await engine.CountDirtyAsync(token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        var issues = await engine.CountIssuesAsync(token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
         var pending = Math.Max(0, dirty - issues.Rejected);
         var unaccepted = new List<SyncDocumentRevision>();
         foreach (var wanted in waiter.Goal.Documents ?? [])
         {
             // Accepted at N or later: the record is clean (no local change waits) and its revision reached N.
-            if (await engine.GetAsync(wanted.Id).ConfigureAwait(false) is not { IsDirty: false, Conflict: null } record || record.LocalRevision < wanted.Revision)
+            token.ThrowIfCancellationRequested();
+            if (await engine.GetAsync(wanted.Id, token).ConfigureAwait(false) is not { IsDirty: false, Conflict: null } record || record.LocalRevision < wanted.Revision)
             {
                 unaccepted.Add(wanted);
             }
         }
 
-        var reached = (!waiter.Goal.CaughtUp || waiter.CaughtUp)
+        token.ThrowIfCancellationRequested();
+        var reached = (!waiter.Goal.CaughtUp || caughtUp)
             && (!waiter.Goal.AllPendingAccepted || pending == 0)
             && unaccepted.Count == 0;
-        return new SyncGoalResult(reached, waiter.CaughtUp, pending, unaccepted, waiter.Work);
+        return new SyncGoalResult(reached, caughtUp, pending, unaccepted, work);
     }
 
-    private sealed class Waiter(SyncGoal goal, Active active, int firstRun, IProgress<SyncProgress>? progress)
+    private sealed class Waiter(SyncGoal goal, Active active, int firstRun)
     {
         public SyncGoal Goal { get; } = goal;
 
@@ -504,9 +546,8 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
 
         public int FirstRun { get; } = firstRun;
 
-        public IProgress<SyncProgress>? Progress { get; } = progress;
-
-        public TaskCompletionSource<SyncGoalResult> Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public SemaphoreSlim Wake { get; } = new(0, 1);
+        public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public int Runs { get; set; }
 
@@ -541,14 +582,35 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
             var honourTriggers = true;
             try
             {
-                if (active.Lease is ISyncExecutionLease { Lost.IsCancellationRequested: true } expired)
+                if (active.Lease is ISyncExecutionLease { Lost.IsCancellationRequested: true })
                 {
-                    await expired.DisposeAsync().ConfigureAwait(false);
-                    active.Lease = null;
+                    await ReleaseLeaseAsync(active).ConfigureAwait(false);
                 }
                 if (_options.AcquireLease is { } acquire && active.Lease is null)
                 {
-                    active.Lease = await acquire(active.Account, stopping).ConfigureAwait(false);
+                    try
+                    {
+                        stopping.ThrowIfCancellationRequested();
+                        // Retain even a late lease so shutdown joins and disposes it before closing the replica.
+                        active.Lease = await acquire(active.Account, stopping).ConfigureAwait(false);
+                        stopping.ThrowIfCancellationRequested();
+                        if (active.Lease is ISyncExecutionLease execution)
+                        {
+                            execution.Lost.ThrowIfCancellationRequested();
+                            active.LeaseObservation = execution.Lost.UnsafeRegister(_ =>
+                            {
+                                // One notification per admitted lease, even between runs or while paused. The existing
+                                // trigger path preserves pause and Retry-After semantics and coalesces concurrent hints.
+                                RequestSync();
+                                CooperativeDeadline.RecordStop("session_ownership", stopping, true, false);
+                            }, null);
+                        }
+                    }
+                    finally
+                    {
+                        CooperativeDeadline.RecordStop("session_lease", stopping,
+                            active.Lease is ISyncExecutionLease { Lost.IsCancellationRequested: true }, false);
+                    }
                 }
 
                 if (_options.AcquireLease is not null && active.Lease is null)
@@ -566,15 +628,13 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
                     }
 
                     var run = Interlocked.Increment(ref _runsStarted) - 1;
-                    using var execution = CancellationTokenSource.CreateLinkedTokenSource(stopping,
-                        (active.Lease as ISyncExecutionLease)?.Lost ?? CancellationToken.None);
-                    var result = _options.Coordination is { } coordination
-                        ? await coordination.Coordinator.RunAsync(coordination.Name, active.Engine.SyncAsync, execution.Token).ConfigureAwait(false)
-                        : await active.Engine.SyncAsync(execution.Token).ConfigureAwait(false);
+                    var result = await ExecuteSyncAsync(active, stopping, token => _options.Coordination is { } coordination
+                        ? coordination.Coordinator.RunAsync(coordination.Name, active.Engine.SyncAsync, token)
+                        : active.Engine.SyncAsync(token)).ConfigureAwait(false);
                     var now = _options.TimeProvider.GetUtcNow();
                     _status = _status with { LastPulled = now, LastPushed = now };
                     var issues = await IssuesAsync(active).ConfigureAwait(false);
-                    await SettleWaitersAsync(active, run, result).ConfigureAwait(false);
+                    SettleWaiters(active, run, result);
                     failures = 0;
                     renewed = false;
                     if (result.Rejected > 0 || issues.Total > 0)
@@ -686,8 +746,34 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
         }
     }
 
+    private static async Task<SyncResult> ExecuteSyncAsync(Active active, CancellationToken stopping,
+        Func<CancellationToken, Task<SyncResult>> execute)
+    {
+        var lost = (active.Lease as ISyncExecutionLease)?.Lost ?? CancellationToken.None;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(stopping, lost);
+        using var cause = CooperativeDeadline.TrackLinkedToken(linked.Token, stopping, lost);
+        try
+        {
+            linked.Token.ThrowIfCancellationRequested();
+            var result = await execute(linked.Token).ConfigureAwait(false);
+            linked.Token.ThrowIfCancellationRequested();
+            return result;
+        }
+        finally
+        {
+            // A normal lease disposal happens after the loop joins, outside this observation boundary.
+            CooperativeDeadline.RecordStop("session_run", stopping, lost.IsCancellationRequested, false);
+        }
+    }
+
     /// <summary>Turns server hints into sync requests; reconnects with backoff; stops if the transport has no hints.</summary>
     private async Task ListenAsync(Active active, CancellationToken stopping)
+    {
+        try { await ListenCoreAsync(active, stopping).ConfigureAwait(false); }
+        finally { CooperativeDeadline.RecordStop("session_hints", stopping, false, false); }
+    }
+
+    private async Task ListenCoreAsync(Active active, CancellationToken stopping)
     {
         var failures = 0;
         while (!stopping.IsCancellationRequested)
@@ -696,10 +782,12 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
             {
                 await foreach (var _ in active.Transport.StreamAsync(Checkpoint.Start, stopping).ConfigureAwait(false))
                 {
+                    stopping.ThrowIfCancellationRequested();
                     failures = 0;
                     RequestSync();
                 }
 
+                stopping.ThrowIfCancellationRequested();
                 failures++;
             }
             catch (NotSupportedException)
@@ -729,7 +817,7 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
 
     private async Task WaitAsync(TimeSpan wait, bool honourTriggers, CancellationToken stopping)
     {
-        if (wait <= TimeSpan.Zero)
+        if (wait <= TimeSpan.Zero && wait != Timeout.InfiniteTimeSpan)
         {
             return;
         }
@@ -839,6 +927,7 @@ public sealed class SyncSession<TDocument> : IAsyncDisposable, ICoordinatedSessi
         public Task? Loop { get; set; }
 
         public IAsyncDisposable? Lease { get; set; }
+        public CancellationTokenRegistration LeaseObservation { get; set; }
         public CancellationTokenSource? NetworkStopping { get; set; }
     }
 }

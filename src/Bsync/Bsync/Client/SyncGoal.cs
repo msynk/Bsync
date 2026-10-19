@@ -47,11 +47,14 @@ public sealed record SyncProgress(int Runs, int Pulled, int Pushed, int Pending)
 /// <summary>How a <see cref="ISyncCollection{TDocument}.SyncAsync"/> wait ended.</summary>
 /// <param name="Reached">Every part of the goal was reached.</param>
 /// <param name="CaughtUp">A pull that started after the wait began read everything.</param>
-/// <param name="Pending">Local changes still waiting to be uploaded.</param>
+/// <param name="Pending">Local changes waiting at the last completed observation. Unknown observations contribute zero to aggregates; check HasObservation before treating the count as complete.</param>
 /// <param name="Unaccepted">Requested revisions not accepted (still pending, rejected or in conflict).</param>
 /// <param name="Work">What the sync runs during the wait did.</param>
 public sealed record SyncGoalResult(bool Reached, bool CaughtUp, int Pending, IReadOnlyList<SyncDocumentRevision> Unaccepted, SyncResult Work)
 {
+    /// <summary>Whether this wait completed a local goal observation. False means Pending is unknown (reported as zero) and all requested revisions remain unconfirmed. An observation can be stale and is not a transactional snapshot.</summary>
+    public bool HasObservation { get; init; } = true;
+
     /// <summary>Combines the results of several collections: reached only if each was.</summary>
     public static SyncGoalResult Combine(IEnumerable<SyncGoalResult> results)
     {
@@ -62,6 +65,6 @@ public sealed record SyncGoalResult(bool Reached, bool CaughtUp, int Pending, IR
             all.All(r => r.CaughtUp),
             all.Sum(r => r.Pending),
             [.. all.SelectMany(r => r.Unaccepted)],
-            all.Aggregate(default(SyncResult), (sum, r) => sum + r.Work));
+            all.Aggregate(default(SyncResult), (sum, r) => sum + r.Work)) { HasObservation = all.All(r => r.HasObservation) };
     }
 }

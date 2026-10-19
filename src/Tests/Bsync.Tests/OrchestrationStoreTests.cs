@@ -95,13 +95,13 @@ public sealed class OrchestrationStoreTests : IAsyncLifetime
         await using var connection = new SqliteConnection($"Data Source={_path};Pooling=False");
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE bs_orchestration_schema SET version=2";
+        command.CommandText = "UPDATE bs_orchestration_schema SET version=3";
         await command.ExecuteNonQueryAsync();
         Assert.Equal("outdated", (await Assert.ThrowsAsync<LocalStoreUnavailableException>(() => Open(true))).Reason);
         command.CommandText = "SELECT payload FROM bs_orchestration_records";
         Assert.Equal("keep", await command.ExecuteScalarAsync());
         command.CommandText = "SELECT version FROM bs_orchestration_schema";
-        Assert.Equal(2L, await command.ExecuteScalarAsync());
+        Assert.Equal(3L, await command.ExecuteScalarAsync());
     }
 
     [Fact]

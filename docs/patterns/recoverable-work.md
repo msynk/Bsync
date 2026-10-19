@@ -41,3 +41,9 @@ The adapter reports headless, network and charging capabilities honestly. Schedu
 foreground reconciliation remains necessary. No Android WorkManager or iOS BGTaskScheduler adapter is yet qualified
 by this implementation. Closed-tab browser execution remains unsupported. The portable dispatcher tests establish
 durable request/ownership semantics, not OS task delivery, locked-device key access or physical-device behavior.
+
+Workflow budgets include execution-lease acquisition. After budget expiry or lease loss, `RunAsync` returns the last
+observed durable progress, or null when none was observed, without beginning a new storage read. This result can lag
+the current record; explicitly call `GetAsync` when the host has a new read budget. A step that returns late is replayed
+with the same operation identity instead of being newly acknowledged after its deadline. The fixed-tag
+`bsync.execution.stops` metric separates observed stop reasons; see [observability](../operations/observability.md).

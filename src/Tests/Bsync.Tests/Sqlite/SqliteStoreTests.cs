@@ -72,7 +72,7 @@ public sealed class SqliteStoreTests : IDisposable
     {
         var store = await _database.OpenAsync();
         await store.UpdateAsync([new("x", _ => new SyncRecord<Note>(new Note { Id = "x" }, null, true))]);
-        await using (var connection = new SqliteConnection($"Data Source={_database.Path}"))
+        await using (var connection = new SqliteConnection($"Data Source={_database.Path};Pooling=False"))
         {
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
@@ -114,7 +114,7 @@ public sealed class SqliteStoreTests : IDisposable
             await command.ExecuteNonQueryAsync();
         }
 
-        SqliteConnection.ClearAllPools();
+        SqliteStorePool.Release(_database.Path);
         var reopened = new TestReplica(server, "a", store: await _database.OpenAsync());
         var record = await reopened.RecordAsync("clean");
         await reopened.Engine.SyncAsync();

@@ -132,3 +132,29 @@ dispatcher. Use an explicit production migration and register a host worker plus
 Tests cover enqueue rollback, immutable identity, a lost receiver reply, a failure before result commit, competing and
 expired claims, distinct case-sensitive identities and poison isolation. They use a simulated idempotent receiver;
 qualification of a particular external service remains the consuming application's responsibility.
+
+### Receivers with different retry guarantees
+
+The new `DrainAsync(IExternalEffectReceiver, ...)` overload uses
+[`ExternalEffectDelivery`](../../src/Samples/Bsync.Samples.Tasks.Server/ExternalEffectReceiver.cs). Declare deduplication
+and status-lookup capabilities explicitly. The existing delegate overload retains its caller-supplied deduplication
+contract. The capability-aware overload persists the attempt before sending and applies this policy on replay:
+
+| Receiver observation | Next action |
+|---|---|
+| Confirmed success/rejection | Publish that canonical result and acknowledge under the claim fence |
+| Pending | Preserve and retry lookup later |
+| Definitive terminal non-execution | A new send is permissible after current authorization |
+| Unknown, with deduplication | Retry under the same immutable receiver key |
+| Unknown, without deduplication | `ReconciliationRequired`; no automatic duplicate send |
+| Credentials unavailable | Preserve queued work without consuming the poison-attempt budget |
+
+`AuthorizeAsync` acquires current credentials and revalidates dependencies at dispatch time. It must distinguish a
+temporary inability to authorize from a final domain rejection supplied through the adapter's result policy. A send
+exception or cancellation after acceptance does not prove non-execution. Fenced database acknowledgement does not
+provide receiver deduplication. Canceling a client wait cannot recall an accepted external operation.
+
+`ExternalReceiverConformanceTests` supplies deduplicating, lookup-only and neither-capability receivers and verifies
+lost-reply behavior. Existing SQL Server intent/publication tests continue to cover atomic domain/ledger/result work,
+rollback, retained replay identity, audience removal and dropped hints. Use the [file-service bridge](external-file-bridge.md)
+for content integration; permissions and external receiver implementations remain application-owned.

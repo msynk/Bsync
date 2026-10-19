@@ -11,6 +11,49 @@ using Bsync.Storage.Sqlite;
 // The test process kills this process at an arbitrary point and inspects the database afterwards.
 
 var mode = args[0];
+if (mode is "maintenance-checkpoint" or "network-owner")
+{
+    await MaintenanceCrashHost.RunAsync(args[1], mode);
+    return;
+}
+if (mode == "read-model-reader")
+{
+    var account = new Bsync.Client.AccountScope("crash", "test", "account");
+    await using var metadata = await SqliteOrchestrationStore.OpenAsync(args[1], account);
+    var model = new Bsync.Client.LocalReadModel(metadata, "tasks", account, new Bsync.Client.FileAccountResourceLock(args[1] + ".lifetimes"));
+    static async IAsyncEnumerable<Bsync.Client.ReadModelRow> Rows(int count)
+    {
+        for (var i = 0; i < count; i++) yield return new(i.ToString(CultureInfo.InvariantCulture), "payload");
+        await Task.CompletedTask;
+    }
+    await model.RebuildAsync("1", "old", Rows(130), TimeSpan.FromSeconds(10));
+    await using var reader = await model.OpenActiveAsync() ?? throw new InvalidOperationException("Missing snapshot.");
+    await model.RebuildAsync("1", "new", Rows(1), TimeSpan.FromSeconds(10));
+    Console.WriteLine("reader-held");
+    await Task.Delay(Timeout.Infinite);
+    return;
+}
+if (mode == "feature-upgrade")
+{
+    await using var featureStore = await SqliteOrchestrationStore.OpenAsync(args[1], new Bsync.Client.AccountScope("fixtures", "published040", "alice"));
+    await featureStore.RequireFeatureVersionAsync(2);
+    return;
+}
+if (mode == "chunked-publication")
+{
+    await ChunkCrashHost.RunAsync(args[1], args[2] == "after");
+    return;
+}
+if (mode == "chunked-scrub")
+{
+    await ChunkCrashHost.ScrubAsync(args[1], args[2] == "after");
+    return;
+}
+if (mode == "blob-repair")
+{
+    await RepairCrashHost.RunAsync(args[1], args[2] == "after");
+    return;
+}
 if (mode == "encrypted-rotation")
 {
     await EncryptionCrashHost.RunAsync(args[1], args[2] == "after");

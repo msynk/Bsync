@@ -3,18 +3,19 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.2.0` is published on NuGet, with an unresolved source-provenance mismatch. This branch uses
-> the `0.4.0` version prefix; development artifacts use preview suffixes. Pre-1.0: minor versions may
+> **Status:** `0.4.0` is published on NuGet. This branch targets
+> `0.5.0` (not yet published); development artifacts require unique preview suffixes. Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
 
 This section is the single source of truth for release and verification status; other documents link here.
 
-- **Packages.** Six packages are at `0.2.0` on NuGet.org: `Bsync`, `Bsync.Blazor`,
+- **Packages.** Six packages were downloaded at `0.4.0` from NuGet.org on 2026-10-17: `Bsync`, `Bsync.Blazor`,
   `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Server.SqlServer`.
-  Checked 2026-10-16: all identify commit `5404785`, which predates release additions and declares 0.1.0.
-  Exact equivalence to a clean source commit is unproven; see the [inventory](docs/review/release-baseline-2026-10-16.md)
+  All declare commit `e4286fe2141d0d1e836cfc88dbfa5dfd82154d37`; [archive hashes and repair evidence](docs/review/gap-closure-2026-10-17.md)
+  distinguish the published baseline from subsequent local changes. This does not establish clean tagged provenance.
+  The older 0.2.0 source-provenance mismatch remains unresolved; see its [historical inventory](docs/review/release-baseline-2026-10-16.md)
   and [release validation](docs/operations/releases.md). `Bsync.Testing` is now in `Bsync`
   (namespace unchanged). `Bsync.Storage.Sqlite` covers plain and encrypted (SQLCipher)
   replicas and leaves the native SQLite library to the application. S3 blob storage and the MAUI helpers are recipes
@@ -26,9 +27,11 @@ This section is the single source of truth for release and verification status; 
   (`Bsync.Server.SqlServer`; source verified on SQL Server 2025 LocalDB). The in-memory authority is for tests
   and samples.
 - **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
-- **Offline orchestration (unreleased).** Account lifecycle, durable transfer jobs, pinned cache budgets,
-  immutable packages, bounded encrypted blob envelopes, workflow recovery, derived read-model generations and optional native scheduler recipes are implemented in development. See
-  [managed content](docs/patterns/managed-content.md), [recoverable work](docs/patterns/recoverable-work.md),
+- **Offline orchestration.** Account lifecycle, durable transfer jobs, pinned cache budgets,
+  immutable packages, bounded encrypted blob envelopes, workflow recovery, derived read-model generations and optional native scheduler recipes are present in 0.4.0. Subsequent unreleased work adds automatic plaintext repair, account composition,
+  protected metadata, owned read-model cleanup, experimental chunked encryption and integration hosts.
+  [Gap-closure implementation and remaining qualification](docs/review/gap-closure-local-qualification-2026-10-19.md) distinguish tested behavior from external gates. See
+  [managed content](docs/patterns/managed-content.md), [account maintenance](docs/patterns/account-maintenance.md), [recoverable work](docs/patterns/recoverable-work.md),
   [local unlock](docs/patterns/local-unlock.md), [native background recipes](docs/patterns/native-background.md), and the [improvement plan](docs/Improvement-Plan.md). This is not a claim that all roadmap work or native
   background qualification is complete.
 - **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
@@ -666,8 +669,8 @@ Consume the packages exactly as a NuGet user would (no project references; `src/
 ```bash
 for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite; do
   dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
-dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.4.0-local
-dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.4.0-local -o artifacts/consumer-web
+dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.5.0-local
+dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.5.0-local -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
 ```
 

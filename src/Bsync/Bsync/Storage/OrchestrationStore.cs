@@ -36,6 +36,17 @@ public interface IOrchestrationStore : IAsyncDisposable
     Task DeleteAllAsync(CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Optional provider barrier for feature formats older binaries cannot safely use. Before the first upgrade the host
+/// must close older processes/tabs under exclusive account ownership. Upgrading prevents subsequent old opens; it
+/// cannot revoke already-open legacy providers. The barrier is permanent unless an explicit offline downgrade exists.
+/// </summary>
+public interface IOrchestrationFeatureStore : IOrchestrationStore
+{
+    /// <summary>Durably requires feature version 2 for protected payloads/chunked encryption, or refuses without mutation.</summary>
+    Task RequireFeatureVersionAsync(int version, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Shared bounds and portable ASCII key rules for orchestration providers.</summary>
 public static class OrchestrationValidation
 {

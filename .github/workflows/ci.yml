@@ -17,7 +17,7 @@ env:
 
 jobs:
   release-tooling:
-    name: Release provenance failure tests
+    name: Release provenance and browser lock failure tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m unittest discover -s scripts -p "test_*.py" -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node scripts/test_browser_lock_release.mjs
 
   test:
     name: Unit, conformance, process-kill and HTTP tests (${{ matrix.os }})

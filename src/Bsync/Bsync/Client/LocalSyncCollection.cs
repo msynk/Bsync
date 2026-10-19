@@ -194,8 +194,7 @@ public sealed class LocalSyncCollection<TDocument> : ISyncCollection<TDocument>
     /// <inheritdoc />
     public async Task<SyncGoalResult> SyncAsync(SyncGoal goal, TimeSpan budget, IProgress<SyncProgress>? progress = null, CancellationToken cancellationToken = default)
     {
-        var account = await _resolveAccount(cancellationToken).ConfigureAwait(false);
-        return await _session.SyncAsync(account, goal, budget, progress, cancellationToken).ConfigureAwait(false);
+        return await _session.SyncGoalAsync(_resolveAccount, goal, budget, progress, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

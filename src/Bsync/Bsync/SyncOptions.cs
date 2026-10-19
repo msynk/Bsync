@@ -5,6 +5,9 @@ namespace Bsync;
 public sealed class SyncOptions<TDocument>
     where TDocument : class, ISyncEntity
 {
+    /// <summary>Monotonic clock and timer source for SyncEngine.SyncForAsync budgets. Does not change document HLC timestamps or server time. Default TimeProvider.System.</summary>
+    public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
     /// <summary>Maximum documents requested per pull page. Default 100.</summary>
     public int PullBatchSize { get; init; } = 100;
 

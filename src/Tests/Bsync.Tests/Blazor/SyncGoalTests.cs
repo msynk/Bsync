@@ -214,12 +214,16 @@ public sealed class SyncGoalTests
         await source.Engine.SyncAsync();
         var slow = new TestReplica(server, "slow", options: new SyncOptions<Note> { PullBatchSize = 5, MaxPullPages = 1 }, transport: inner => new DelayedPulls(inner));
 
+        // Establish committed progress independently of thread scheduling during the short budget.
+        await slow.Engine.SyncAsync();
+        var committed = (await slow.Engine.QueryAsync()).Count;
+        Assert.Equal(5, committed);
         var first = await slow.Engine.SyncForAsync(TimeSpan.FromMilliseconds(150));
         var pulledSoFar = (await slow.Engine.QueryAsync()).Count;
         var rest = await slow.Engine.SyncForAsync(TimeSpan.FromSeconds(30));
 
         Assert.True(first.HasRemainingWork);
-        Assert.InRange(pulledSoFar, 1, 49); // committed pages are kept
+        Assert.InRange(pulledSoFar, committed, 49); // even zero new pages must retain committed progress
         Assert.False(rest.HasRemainingWork);
         Assert.Equal(50, (await slow.Engine.QueryAsync()).Count);
     }

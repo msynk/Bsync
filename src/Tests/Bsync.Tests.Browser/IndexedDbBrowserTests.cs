@@ -27,6 +27,63 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
 
     [Theory]
     [MemberData(nameof(Browsers))]
+    public async Task ChunkedEncryptionResumesLargeObjectsAndProtectsAtomicPayloads(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var _ = context;
+        var account = Unique("chunked-v2");
+        var storageKey = await page.CallAsync("ChunkedChecks", account, false);
+        Assert.Equal("pending", await page.CallAsync("ChunkScrubReloadChecks", account, false));
+        var publishedProvider = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "orchestration-0.4.0.js"));
+        Assert.Equal("VersionError", await page.Page.EvaluateAsync<string>("""
+            async ([source, name]) => {
+                const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
+                try {
+                    const old = await import(url);
+                    try { await old.initialize('bsync-orchestration-' + name); return 'unexpected-open'; }
+                    catch (error) { return error.name; }
+                } finally { URL.revokeObjectURL(url); }
+            }
+            """, new[] { publishedProvider, storageKey }));
+        await page.Page.CloseAsync();
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("ChunkScrubReloadChecks", account, true));
+        Assert.Equal("ok", await reopened.CallAsync("ChunkedChecks", account, true));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task PackageAutomaticallyRepairsDamageAfterReloadWithStableReaders(string browser)
+    {
+        foreach (var length in new[] { -1, 1, 4 })
+        {
+            var (context, page) = await NewDeviceAsync(browser);
+            await using var _ = context;
+            var name = Unique("automatic-repair");
+            var identity = (await page.CallAsync("AutomaticRepairChecks", name, false))!.Split('/');
+            await page.Page.EvaluateAsync("""
+                ([name, hash, length]) => new Promise((resolve, reject) => {
+                    const open = indexedDB.open('bsync-blobs-' + name);
+                    open.onerror = () => reject(open.error);
+                    open.onsuccess = () => {
+                        const db = open.result;
+                        const tx = db.transaction('blobs', 'readwrite');
+                        const store = tx.objectStore('blobs');
+                        if (length < 0) store.delete(['object', hash]);
+                        else store.put(new Uint8Array(length).fill(9).buffer, ['object', hash]);
+                        tx.oncomplete = () => { db.close(); resolve(); };
+                        tx.onerror = () => reject(tx.error);
+                    };
+                })
+                """, new object[] { identity[0], identity[1], length });
+            await page.Page.CloseAsync();
+            var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+            Assert.Equal("ok", await reopened.CallAsync("AutomaticRepairChecks", name, true));
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
     public async Task Published020StorePreservesPreparedWorkAndUnknownFields(string browser)
     {
         var (context, page) = await NewDeviceAsync(browser);
@@ -623,10 +680,20 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
             return new HarnessPage(page);
         }
 
-        public Task<string> CallAsync(string method, params object[] args) =>
-            Page.EvaluateAsync<string>(
-                "([method, args]) => DotNet.invokeMethodAsync('Bsync.Tests.BrowserHost', method, ...args)",
-                new object[] { method, args });
+        public async Task<string> CallAsync(string method, params object[] args)
+        {
+            try
+            {
+                return await Page.EvaluateAsync<string>(
+                    "([method, args]) => DotNet.invokeMethodAsync('Bsync.Tests.BrowserHost', method, ...args)",
+                    new object[] { method, args }).WaitAsync(TimeSpan.FromSeconds(60));
+            }
+            catch (TimeoutException error)
+            {
+                var locks = await Page.EvaluateAsync<string>("async () => JSON.stringify(await navigator.locks.query())").WaitAsync(TimeSpan.FromSeconds(5));
+                throw new TimeoutException($"Harness call {method} did not finish. Web Locks: {locks}", error);
+            }
+        }
 
         public async Task<SyncSummary> SyncAsync()
         {

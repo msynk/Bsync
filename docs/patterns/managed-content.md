@@ -4,6 +4,28 @@ These APIs are new source capabilities under qualification. Use one `AccountScop
 and lock namespace per application/environment/account/organization. Never derive server authorization from this
 local identity. Keep the account catalog used for recoverable deletion outside resources being deleted.
 
+For high-level resource registration and fresh foreground/headless scopes, use `AccountComposition` with the same
+durable catalog and physical locks. Register data resources before key resources. Its work scope holds shared account
+ownership through joined disposal, and coordinated deletion requires exclusive ownership. See
+[ADR-027](../architecture/adr-027-account-ownership-and-protected-metadata.md) for the lock and upgrade contracts.
+
+The experimental `ChunkedEncryptedBlobCache` explicitly selects a separate v2 layout with bounded chunks, authenticated
+ranges, resumable rotation and retained-source v1 migration. It does not raise the existing v1 writer's 16 MiB cap.
+Read [ADR-028](../architecture/adr-028-experimental-chunked-encryption.md) before enabling it, particularly old-writer
+quiescence, key invocation budgets, async disposal, quarantine recovery and pending crypto/performance qualification.
+
+For bounded maintenance, native/browser raw providers expose `IBlobCachePagedInventory`; `ReconcilePageAsync` walks
+managed metadata then complete provider objects using a cooperative budget and opaque cursor. Continue until null,
+then periodically repeat to revisit live owners. Native enumeration retains only a bounded candidate page but still
+scans directory entries. Unknown partials remain physically accounted and protected. The legacy `ReconcileAsync` and
+`ListAsync` APIs remain full-list compatibility operations; avoid them for unbounded datasets.
+
+`MaintainOwnersAsync` resolves only explicitly named `app/` pins, outside global metadata locks. A resolver returns
+Live, Released, Unknown or Unavailable; only permanent Released permits removal, and owner IDs must never be reused.
+Dry-run reports observations without removing pins. Built-in/legacy pins remain conservative. Terminal transfer cleanup
+uses `ReconcileReleasedAsync`; read-model and encrypted-generation collection have separate ownership-aware APIs.
+Run maintenance under the enclosing account scope, give urgent pending work priority, and persist returned cursors.
+
 Native composition:
 
 ```csharp
@@ -14,6 +36,7 @@ var cache = new ManagedBlobCache(new FileBlobCache(accountBlobDirectory), metada
     softBudgetBytes: 256L * 1024 * 1024, hardBudgetBytes: 512L * 1024 * 1024);
 await cache.ReconcileAsync();
 var jobs = new BlobTransferManager(metadata, cache, new HttpBlobTransfer(accountHttpClient));
+var released = await jobs.ReconcileReleasedAsync(limit: 100); // Schedule another bounded pass if released == 100.
 var packages = new OfflinePackageManager(metadata, cache, jobs, locks, AuthorizeLocalPackageAsync);
 ```
 
@@ -57,6 +80,8 @@ readers remain protected. Repeat after OS cleanup if needed. Use `await using`: 
 conservative pin/lock until asynchronous disposal or process/tab termination. Custom/legacy owners require explicit
 durable-work reconciliation; never expire pins by age. Reserve `reader-v2/` and `snapshot-v2/` for library use.
 Native/browser inventory includes abandoned partial/staging payloads; unrecognized content consumes protected capacity.
+For exclusive account maintenance windows, use the [account maintenance runner](account-maintenance.md) to restore
+package/transfer pins and reconcile built-in owners from durable state with page checkpoints and dry-run support.
 Browser quota estimates/persistence requests are hints, separate from payload accounting. See
 [ADR-021](../architecture/adr-021-managed-content.md) for the exact boundaries.
 
@@ -72,8 +97,41 @@ then promotes them atomically (native file replacement or the browser transactio
 Capacity must accommodate both old and staged bytes. A refusal, cancellation or failed verification leaves the old
 object available for diagnosis and keeps pending references; retry with enough capacity and a trustworthy source.
 Already-open native handles keep the prior bytes. A snapshot cannot turn previously read corrupt bytes into good data;
-open/verify again after repair. Automatic network repair and a corrupted-source recovery policy remain host concerns.
-## Encrypted cache and candidate status additions (unreleased)
+open/verify again after repair.
+
+After 0.4.0, package preparation automatically verifies completed jobs and schedules repair for both the active
+revision and the latest candidate. File caches and browser caches opt into `IBlobCacheReplacement`; third-party
+providers must implement that capability before automatic replacement is enabled. Use `jobs.GetRepairAsync(hash)`
+for the durable repair outcome and `BlobVerification.VerifyAsync(cache, hash, length)` for a fresh structured check.
+The journal preserves progress across process death before/after promotion. HTTP download authorization remains
+server-owned. Bad source data fails the job without an automatic retry loop; after correcting the cause, explicitly
+resume through `SetStateAsync(..., BlobTransferState.Queued)`. Capacity/key deferrals also require host action.
+Unreadable encrypted data is preserved. Experimental `ChunkedEncryptedBlobCache.RecoverAsync` accepts explicit
+host-authorized recovery, retaining original generation pointers and ciphertext in permanent quarantine; v1 encrypted
+objects have no automatic replacement. See [ADR-028](../architecture/adr-028-experimental-chunked-encryption.md).
+
+`PrepareAsync` uses one cooperative budget for authorization, queueing, ownership, transfers, verification and
+activation. Catch cancellation and retry when more time is available. It invalidates the cached verification
+observation before work; a canceled run can leave that observation absent. Started provider commits are joined.
+Browser v1 hashing/transaction work cannot be forcibly stopped and can overrun a deadline. Browser async readers
+keep a stable snapshot across repair; their JS memory use is proportional to the v1 object, not a bounded chunk.
+
+Terminal job release now journals the gap between removing a job and releasing its cache pin. Run bounded
+`ReconcileReleasedAsync` calls under the account lifetime on startup or during maintenance; a return equal to
+the limit means another pass may be needed. Repeating release or enqueueing the same job also finishes its old
+cleanup. Other owners' pins are preserved. This does not reclaim arbitrary application pins or read-model data.
+
+Native retired-file cleanup advances past live readers and unknown files. `CollectRetiredAsync` retains its scan
+position for the cache instance; `CollectRetiredPageAsync` returns a filename continuation that hosts can persist
+across restarts. Restart from null after reaching the end to revisit released readers and newly added files. Each call
+probes at most its item limit and retains at most that many filenames, but enumerating the native directory is linear
+and checks cancellation per entry. Unknown filenames are preserved and still consume physical capacity.
+
+V1 managed rotation reserves both generations and holds a durable lifetime pin while encryption runs outside the
+cache metadata lock. The v1 encryption provider still serializes its own operations. Metadata inspection and unrelated
+pin updates remain available during crypto; failed rotation keeps a conservative reservation until reconciliation.
+
+## Encrypted cache and candidate status additions (0.4.0)
 
 `EncryptedBlobCache` can wrap dedicated native `FileBlobCache` or browser `BrowserBlobStore` storage. Pass the existing
 account's `ILocalKeyProvider`, a versioned `LocalKeyReference` and `PlatformBlobEncryption` (native) or
@@ -89,3 +147,38 @@ Both return observation times. Missing-byte totals count distinct required hashe
 The Notes browser app and WPF app share `ContentLibraryPanel` and `ContentLibrarySession`: prepare revision 1, interrupt
 revision 2, restart, read revision 1, finish revision 2, then read the new complete snapshot. Content is bundled with the
 sample as publisher-authored immutable bytes; these buttons demonstrate local package boundaries, not a remote catalog.
+
+For explicit full-object integrity work, declare both time and content-byte allowances:
+
+```csharp
+var verification = await BlobVerification.VerifyAsync(cache, hash, declaredSize,
+    budget: TimeSpan.FromSeconds(5), maximumContentBytes: 16L * 1024 * 1024,
+    timeProvider: timeProvider, cancellationToken: stopping);
+```
+
+`ContentLimitExceeded` defers without opening storage; it does not authorize repair. Only `Verified` establishes the
+full hash/length match. Reads are bounded to the declared length plus a one-byte EOF probe, but provider-internal
+allocations/I/O are separate. Deadline expiry and caller cancellation throw after joining started work/disposal.
+Interrupted full hashes restart, so schedule sufficient time for one complete object. See
+[ADR-030](../architecture/adr-030-execution-budgets-and-verification.md) for limits and stop diagnostics.
+
+For a sealed experimental v2 generation, bounded authentication can instead resume across runs:
+
+```csharp
+var progress = await chunkedCache.ScrubAsync(hash, TimeSpan.FromSeconds(5),
+    maximumBytes: 8L * 1024 * 1024, maximumChunks: 8,
+    timeProvider: timeProvider, cancellationToken: stopping);
+// Deferred retains encrypted progress. A later call resumes; restart: true begins a fresh scan.
+```
+
+`Complete` means every chunk authenticated against its sealed manifest over this scan. It is not a newly recomputed
+full SHA-256 or an instantaneous health snapshot. A changed generation starts at zero; late/canceled reads never
+advance the checkpoint. Allow at least one full chunk, plus time for manifest, key and checkpoint work. Each checkpoint
+seal consumes the key's encryption-invocation allowance. Failures preserve data and do not authorize repair.
+
+Before retiring an old key, acquire exclusive account maintenance ownership and scan `GetKeyRetentionPageAsync` from
+null through its final page. Retain every referenced key; a null key reference is an unknown legacy obligation and
+blocks retirement of potentially used keys. Current, partial, retired, reader-held and quarantined generations remain
+listed until collection safely removes them. Also account for v1 sources, protected orchestration, backups and other
+stores: this cache page alone never authorizes key deletion. See
+[ADR-035](../architecture/adr-035-generation-integrity-maintenance.md).

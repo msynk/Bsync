@@ -1,0 +1,403 @@
+{
+  "schema": 1,
+  "date": "2026-10-19",
+  "scope": "Physical-device deferral, verified-snapshot S3 completion and external-service qualification tooling",
+  "baseCommit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+  "workingTreeDirty": true,
+  "coreCandidateUnchanged": "0.4.0-gapclosure.20261019.1",
+  "unchangedLibraryFiles": 238,
+  "packages": [
+    {
+      "path": "artifacts/packages/Bsync.0.4.0-gapclosure.20261019.1.nupkg",
+      "sha256": "8fea280a39627773bcbdb24c5fbe4a4df7858e425a6d0ae5ab1344eff91dd37c",
+      "bytes": 628279,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Blazor.0.4.0-gapclosure.20261019.1.nupkg",
+      "sha256": "003c2d508fe667454c74abef9f3189daa12a2c433561bdca78c76135c4a8beb4",
+      "bytes": 126581,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.AspNetCore.0.4.0-gapclosure.20261019.1.nupkg",
+      "sha256": "a8208b3198c9865a96114394f03a8b80ba646632b88cd8f6b6bd298bdb110693",
+      "bytes": 64785,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.PostgreSql.0.4.0-gapclosure.20261019.1.nupkg",
+      "sha256": "e81cf384445cc257e42d03e991a9081f155135dbef768f0e532774dfe06484ad",
+      "bytes": 67422,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Server.SqlServer.0.4.0-gapclosure.20261019.1.nupkg",
+      "sha256": "92ef5340595edffbb8df51c85f1b9d69ad1512964aeaea00be9c876b4b3ae6d3",
+      "bytes": 84864,
+      "cacheMatches": true,
+      "readmeMatches": true
+    },
+    {
+      "path": "artifacts/packages/Bsync.Storage.Sqlite.0.4.0-gapclosure.20261019.1.nupkg",
+      "sha256": "daf2461fac5ccd69caef7c76bb07e0ec5ec60878ff01dcd635427495aa6507bf",
+      "bytes": 87747,
+      "cacheMatches": true,
+      "readmeMatches": true
+    }
+  ],
+  "previousValidation": {
+    "path": "docs/review/gap-closure-envelope-memory-validation-2026-10-19.json",
+    "sha256": "d1443169beda74bc939d7a5c53ede50955d025b2d31d825602429938d48d7c1d",
+    "bytes": 90229
+  },
+  "tests": [
+    {
+      "path": "artifacts/gap-closure/nondevice/s3-completion.trx",
+      "sha256": "3bcfdd35a499e56827dea5601ee47ae2efc56365eb8257ccd9e9859c42ea405c",
+      "bytes": 8955,
+      "counters": {
+        "total": "5",
+        "executed": "5",
+        "passed": "5",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-final.trx",
+      "sha256": "ce2c0d565963d4076a0f73a156bddf5b2c65576077bb5fa9e17cdd2b9e389a21",
+      "bytes": 10350,
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-current.trx",
+      "sha256": "30f3e1a4f7c823afe9bf3a7baf1cf72d5b869e487fae4bb3276d94b392faea65",
+      "bytes": 10350,
+      "counters": {
+        "total": "6",
+        "executed": "6",
+        "passed": "6",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      }
+    }
+  ],
+  "emulator": {
+    "result": {
+      "path": "artifacts/gap-closure/nondevice/verified/emulator/result.json",
+      "sha256": "6bb98a68578c9e0894cdad83367947f6e82bf60a6ef8dfe15486fcf28ce1b5b2",
+      "bytes": 2799
+    },
+    "passed": false,
+    "externalServiceQualified": false,
+    "passingChecks": 10,
+    "failedChecks": 2,
+    "version": "moto 5.2.4",
+    "exactPackageAssembliesVerified": true
+  },
+  "guards": [
+    {
+      "name": "arguments",
+      "passed": true,
+      "exitCode": 2,
+      "output": "Usage: <new-evidence-directory> [--emulator]; see README for environment configuration.\n"
+    },
+    {
+      "name": "https-required",
+      "passed": true,
+      "exitCode": 2,
+      "output": "Configuration rejected: invalid-service-endpoint\n"
+    },
+    {
+      "name": "loopback-emulator",
+      "passed": true,
+      "exitCode": 2,
+      "output": "Configuration rejected: emulator-must-be-loopback\n"
+    },
+    {
+      "name": "credentials-required",
+      "passed": true,
+      "exitCode": 2,
+      "output": "Configuration rejected: missing-AWS_ACCESS_KEY_ID\n"
+    },
+    {
+      "name": "existing-output",
+      "passed": true,
+      "exitCode": 2,
+      "output": "Evidence path already exists.\n"
+    }
+  ],
+  "androidSdkProbe": {
+    "url": "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip",
+    "status": 404
+  },
+  "files": [
+    {
+      "path": "artifacts/gap-closure/nondevice/android-sdk-probe.json",
+      "sha256": "5e738d9ab1f395d4b423661bdcb7a89a82f89f93a9aab82847c21df1310adb15",
+      "bytes": 118
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/check_guards.py",
+      "sha256": "12176a363d2e363bd9c7f29bab354d4f31e40250e08fc8055a90b9babdb02614",
+      "bytes": 1738
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/collect_evidence.py",
+      "sha256": "5a69f0fcb707a519ae0aca0de131b4983fb731a0ea67d8bac9762a3f1ae1c345",
+      "bytes": 5348
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator/result.json",
+      "sha256": "767515547e06896ece634242f2c3e30c5a487decb8ee34995bcb94cedef5068d",
+      "bytes": 2592
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator-driver.log",
+      "sha256": "11a6841b57bebacb540d721f0aa515c76027ff736ebc175e83f13567f6469007",
+      "bytes": 918
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator-final-driver.log",
+      "sha256": "c44dba3a09989d732f22288affa3a14dcc5c08169f31a324f94df47e71daafb0",
+      "bytes": 1054
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator-requirements.txt",
+      "sha256": "0633221854da091cf8b05a87db10cda84c39e060a0118659016a076537ae423c",
+      "bytes": 2432
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator-run.log",
+      "sha256": "fe1a85d4449a80b89dfd4dc80736413f98897f5299eb56280813aa043ae42e91",
+      "bytes": 460
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator-server.log",
+      "sha256": "233b21ffd2bc777418210427bcee850249f81bb418baed2808fe38f24464003d",
+      "bytes": 15117
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/emulator-verified-driver.log",
+      "sha256": "c44dba3a09989d732f22288affa3a14dcc5c08169f31a324f94df47e71daafb0",
+      "bytes": 1054
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/final/emulator/result.json",
+      "sha256": "cb1c1522f1b86d3fa1f84946a13f202f1f3f22976e46e260355d7f2ce933d159",
+      "bytes": 2797
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/final/emulator-run.log",
+      "sha256": "b10042773c12ed8571e86e86abf285e7d44d5dc8d7239d1e27480d62964e8bdc",
+      "bytes": 517
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/final/emulator-server.log",
+      "sha256": "5cbdb40f741d537c46574039698f11891f8d2f82a6f842d1b3b253c443f61e38",
+      "bytes": 15056
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/guard-results.json",
+      "sha256": "ff90789c2f6b313b35be53a9995f6a351b9cbbcfa47cfc3ddcce90db982265ef",
+      "bytes": 787
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/probe_android.py",
+      "sha256": "5d330f43733b531f6dad79ce426b805ba8a8cc531bbefee7ebaef69c1f065699",
+      "bytes": 680
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/run_emulator.py",
+      "sha256": "ca00da2a943b38d30aff9a7e43e3ef2c3f2249dd2f7d24ae44e45c939310ca74",
+      "bytes": 2409
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/run_sql_s3.py",
+      "sha256": "0216d9b9bce8e0fb00029705e417a9bbf432db882ae6a851718af1f1c021f286",
+      "bytes": 1750
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/runner-build-current.log",
+      "sha256": "ce2e709fe559225daf41c8dc52eab33f88925c94c3fc25cd1a87d69017fc22e0",
+      "bytes": 484
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/runner-build-final.log",
+      "sha256": "29930105e469b322f9e3993d73c6d4bb6f307d9edc8f055d8bab06a4e11b11ae",
+      "bytes": 484
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/runner-build-final2.log",
+      "sha256": "c21e5510558d42c9cff0eb2220ead23489ac5074932cc9d4b0ff641bdeb1e0e6",
+      "bytes": 484
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/runner-build.log",
+      "sha256": "efcbab71171715213d975473665d8177de42baacc239a3ee45e30f16e1123756",
+      "bytes": 484
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/s3-completion.trx",
+      "sha256": "3bcfdd35a499e56827dea5601ee47ae2efc56365eb8257ccd9e9859c42ea405c",
+      "bytes": 8955
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-build-current.log",
+      "sha256": "a1b1348f59e65977f27e33da7898b932231067dc8807502140285847d4476b37",
+      "bytes": 4324
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-current-driver.log",
+      "sha256": "10032b68c21df788aa5a313bd29459a537456b697c0d1777e4b396d67beeb8e0",
+      "bytes": 60
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-current-emulator.log",
+      "sha256": "f39591bd4dcdc5d0658c0e258a708d0016b93dd55f799260c7b1193a445e534f",
+      "bytes": 5535
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-current-tests.log",
+      "sha256": "84ef65152817f5cddd9dc3a27505084dea8177d1611a5844bfd90913d60936e6",
+      "bytes": 420
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-current.trx",
+      "sha256": "30f3e1a4f7c823afe9bf3a7baf1cf72d5b869e487fae4bb3276d94b392faea65",
+      "bytes": 10350
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-driver.log",
+      "sha256": "10032b68c21df788aa5a313bd29459a537456b697c0d1777e4b396d67beeb8e0",
+      "bytes": 60
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-emulator.log",
+      "sha256": "ffa000dd8c996480fa5e8b048964866904b14d8719b98c41ca3e92d3ad9ae149",
+      "bytes": 5535
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-final.trx",
+      "sha256": "ce2c0d565963d4076a0f73a156bddf5b2c65576077bb5fa9e17cdd2b9e389a21",
+      "bytes": 10350
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/sql-s3-tests.log",
+      "sha256": "54e555dc863343f6a21671601ff2a328b5cc41c1d2f25ca9f2b5c2de5e884c67",
+      "bytes": 419
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/verified/emulator/result.json",
+      "sha256": "6bb98a68578c9e0894cdad83367947f6e82bf60a6ef8dfe15486fcf28ce1b5b2",
+      "bytes": 2799
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/verified/emulator-run.log",
+      "sha256": "b10042773c12ed8571e86e86abf285e7d44d5dc8d7239d1e27480d62964e8bdc",
+      "bytes": 517
+    },
+    {
+      "path": "artifacts/gap-closure/nondevice/verified/emulator-server.log",
+      "sha256": "2ba6e322869052b71cae72c3a3dffd9863172bceb0b87f30f76fb855efdb2832",
+      "bytes": 15056
+    }
+  ],
+  "source": [
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/S3BlobStore.cs",
+      "sha256": "ab916786476fbb5298464efac79c32b0379209640ddf6e3eb87284aa7828d156",
+      "bytes": 13087
+    },
+    {
+      "path": "src/Tests/Bsync.Tests.SqlServer/S3CompletionTests.cs",
+      "sha256": "c4bf6d20e79718fc822fca4bbc34bf8e6fca205558413da4e0e1ceabb71f4790",
+      "bytes": 4696
+    },
+    {
+      "path": "src/Tools/Bsync.ObjectStoreQualification/Program.cs",
+      "sha256": "0aad86dace7edf154dcd25b5a715498f06dfe3a4fc850cea11db1a6a692416b8",
+      "bytes": 19675
+    },
+    {
+      "path": "src/Tools/Bsync.ObjectStoreQualification/Bsync.ObjectStoreQualification.csproj",
+      "sha256": "9174ca64bffcb46876a491bfd270ec112a6a50ca7099251ebe40b60bac1a460a",
+      "bytes": 968
+    },
+    {
+      "path": "src/Tools/Bsync.ObjectStoreQualification/README.md",
+      "sha256": "69c65b74556e857998e279a590ec0478b00342507fa6540a0240a2e097ef1943",
+      "bytes": 4850
+    },
+    {
+      "path": ".github/workflows/object-store.yml",
+      "sha256": "388bf97c5283f102b175029132cd5913e2be7b3e0c8aac5cd8fcf5c405309a80",
+      "bytes": 2243
+    },
+    {
+      "path": "docs/patterns/attachments.md",
+      "sha256": "ef2b5670487bc89c012f6d3ac77844ba79da123fe0c2627cd7519adcf5811398",
+      "bytes": 12327
+    },
+    {
+      "path": "docs/operations/releases.md",
+      "sha256": "905196afb4cd128b30d0a1e757884715f900e603dd7f91c4084f6f968a337ce6",
+      "bytes": 7910
+    }
+  ],
+  "deferredByUser": [
+    "Physical-device tests and device-only performance"
+  ],
+  "unexecuted": [
+    "External S3 service expiry/refresh/CORS",
+    "Android full host build (SDK unavailable)",
+    "Mac/Xcode Apple full host build and host URLSession integration",
+    "Independent crypto review",
+    "Broader cache/native/browser memory attribution",
+    "Clean tagged release and ten Windows/Linux/macOS designated runs"
+  ]
+}

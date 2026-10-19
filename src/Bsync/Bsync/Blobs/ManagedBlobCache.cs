@@ -22,8 +22,10 @@ public sealed record BlobCacheEntry(int SchemaVersion, long Bytes, DateTimeOffse
 /// by reconciliation. Reader/snapshot lifetime pins are reclaimed only after their physical locks can be acquired;
 /// custom/legacy pins remain conservative and require host reconciliation.
 /// </summary>
-public sealed class ManagedBlobCache : IBlobCache
+public sealed partial class ManagedBlobCache : IBlobCacheReplacement
 {
+    /// <inheritdoc />
+    public bool SupportsVerifiedReplacement => _inner is IBlobCacheReplacement { SupportsVerifiedReplacement: true };
     private readonly IBlobCache _inner;
     private readonly IBlobCacheInventory _inventory;
     private readonly IOrchestrationStore _store;
@@ -101,15 +103,28 @@ public sealed class ManagedBlobCache : IBlobCache
     }
     private async Task Reserve(string hash, long bytes, CancellationToken ct)
     {
-        var entries = await Entries(ct).ConfigureAwait(false);
+        if (_inner is FileBlobCache native) await native.CollectRetiredAsync(cancellationToken: ct).ConfigureAwait(false);
+        while (true)
+        {
         var current = await Read(hash, ct).ConfigureAwait(false);
         long total = 0;
         long knownStored = 0;
-        foreach (var entry in entries)
+        var candidates = new List<(string Hash, BlobCacheEntry Entry)>();
+        string? after = null;
+        while (true)
         {
-            var actual = checked((await _inner.SizeAsync(entry.Hash, ct).ConfigureAwait(false) ?? 0) + await _inner.PartialLengthAsync(entry.Hash, ct).ConfigureAwait(false));
-            knownStored = checked(knownStored + actual);
-            total = checked(total + Math.Max(entry.Entry.Bytes, actual));
+            var page = await _store.ReadPageAsync(Prefix, after, 128, ct).ConfigureAwait(false);
+            foreach (var record in page)
+            {
+                var id = record.Key[Prefix.Length..]; var entry = Decode(record);
+                var actual = checked((await _inner.SizeAsync(id, ct).ConfigureAwait(false) ?? 0) + await _inner.PartialLengthAsync(id, ct).ConfigureAwait(false));
+                knownStored = checked(knownStored + actual);
+                total = checked(total + Math.Max(entry.Bytes, actual));
+                if (id != hash && entry.Owners.Length == 0 && Math.Max(entry.Bytes, actual) > 0) candidates.Add((id, entry));
+            }
+            candidates = candidates.OrderBy(e => e.Entry.LastAccessUtc).ThenBy(e => e.Hash, StringComparer.Ordinal).Take(32).ToList();
+            if (page.Count < 128) break;
+            after = page[^1].Key;
         }
         var stored = await _inventory.GetStoredBytesAsync(ct).ConfigureAwait(false);
         total = checked(total + Math.Max(0, stored - knownStored)); // Unknown legacy/staging bytes are protected capacity.
@@ -117,8 +132,7 @@ public sealed class ManagedBlobCache : IBlobCache
         var accountedCurrent = Math.Max(currentStored, current.Bytes);
         var additional = Math.Max(0, bytes - accountedCurrent);
         if (additional > _hard) throw CapacityExceeded();
-        foreach (var candidate in entries.Where(e => e.Hash != hash && e.Entry.Owners.Length == 0)
-            .OrderBy(e => e.Entry.LastAccessUtc).ThenBy(e => e.Hash, StringComparer.Ordinal))
+        foreach (var candidate in candidates)
         {
             if (total <= _soft - additional) break;
             ct.ThrowIfCancellationRequested();
@@ -128,9 +142,17 @@ public sealed class ManagedBlobCache : IBlobCache
             await Save(candidate.Hash, candidate.Entry with { Bytes = 0 }, ct).ConfigureAwait(false);
             total -= removed;
         }
-        if (total > _hard - additional) throw CapacityExceeded();
+        if (total > _hard - additional)
+        {
+            // A bounded candidate page may be insufficient. Rescan after its durable evictions instead of
+            // materializing an unbounded global LRU list. Each successful pass removes at least one nonempty entry.
+            if (candidates.Count > 0) continue;
+            throw CapacityExceeded();
+        }
         // Persist reservation before bytes. Crash between stores can overcount, never undercount a reported write.
         await Save(hash, current with { Bytes = Math.Max(bytes, accountedCurrent), LastAccessUtc = _time.GetUtcNow() }, ct).ConfigureAwait(false);
+        return;
+        }
     }
     /// <summary>
     /// Reconciles known bytes after crashes and adopts complete legacy objects without deleting them. Call before enabling
@@ -140,6 +162,7 @@ public sealed class ManagedBlobCache : IBlobCache
     public async Task ReconcileAsync(CancellationToken cancellationToken = default)
     {
         await using var held = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
+        if (_inner is FileBlobCache native) await native.CollectRetiredAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         var hashes = (await Entries(cancellationToken).ConfigureAwait(false)).Select(e => e.Hash)
             .Concat(await _inner.ListAsync(cancellationToken).ConfigureAwait(false)).Distinct(StringComparer.Ordinal);
         foreach (var hash in hashes)
@@ -161,6 +184,8 @@ public sealed class ManagedBlobCache : IBlobCache
                 owners.Add(owner); // Unknown/custom/legacy owners remain conservative.
             }
             var bytes = checked((await _inner.SizeAsync(hash, cancellationToken).ConfigureAwait(false) ?? 0) + await _inner.PartialLengthAsync(hash, cancellationToken).ConfigureAwait(false));
+            // A live operation can have reserved bytes it has not written yet. Never lower that reservation.
+            if (owners.Any(o => o.StartsWith("reader-v2/", StringComparison.Ordinal))) bytes = Math.Max(bytes, entry.Bytes);
             await Save(hash, entry with { Bytes = bytes, Owners = recognized ? owners.ToArray() : ["recovered/unknown"] }, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -183,16 +208,27 @@ public sealed class ManagedBlobCache : IBlobCache
     /// <inheritdoc />
     public async Task<bool> CompletePartialAsync(string sha256, CancellationToken cancellationToken = default)
     {
-        await using var held = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
-        if (_inner is EncryptedBlobCache)
+        var lifetimeName = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        var owner = "reader-v2/" + lifetimeName;
+        await using var lifetime = await _locks.AcquireAsync("lifetime-" + lifetimeName, cancellationToken).ConfigureAwait(false);
+        await PinAsync(sha256, owner, cancellationToken).ConfigureAwait(false);
+        try
         {
-            var partial = await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false);
-            await Reserve(sha256, checked((await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0) + 2 * partial + 28), cancellationToken).ConfigureAwait(false);
+            if (_inner is EncryptedBlobCache)
+            {
+                await using var reservation = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
+                var partial = await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false);
+                await Reserve(sha256, checked((await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0) + 2 * partial + 28), cancellationToken).ConfigureAwait(false);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            // The durable lifetime pin protects bytes while full verification runs outside global metadata ownership.
+            // Transfer/import callers still serialize the same physical content identity for the complete operation.
+            var complete = await _inner.CompletePartialAsync(sha256, cancellationToken).ConfigureAwait(false);
+            await using var update = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
+            await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
+            return complete;
         }
-        cancellationToken.ThrowIfCancellationRequested();
-        var complete = await _inner.CompletePartialAsync(sha256, CancellationToken.None).ConfigureAwait(false);
-        await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
-        return complete;
+        finally { await UnpinAsync(sha256, owner, CancellationToken.None).ConfigureAwait(false); }
     }
     private async Task UpdateBytes(string hash, CancellationToken ct)
     {
@@ -250,30 +286,33 @@ public sealed class ManagedBlobCache : IBlobCache
         if (!content.CanSeek) throw new NotSupportedException("Managed import requires a seekable stream to reserve capacity before writing.");
         var start = content.Position; var size = checked(content.Length - start);
         if (size > _hard) throw CapacityExceeded();
-        var hash = Convert.ToHexStringLower(await SHA256.HashDataAsync(content, ct).ConfigureAwait(false));
+        var hash = Convert.ToHexStringLower(await StreamingSha256.HashDataAsync(content, ct).ConfigureAwait(false));
         content.Position = start;
         await using var transfer = await AcquireTransferAsync(hash, ct).ConfigureAwait(false);
-        await using var held = await _locks.AcquireAsync("metadata", ct).ConfigureAwait(false);
-        var entry = await Read(hash, ct).ConfigureAwait(false);
-        if (owner is not null && !entry.Owners.Contains(owner, StringComparer.Ordinal))
+        var lifetimeName = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        var operationOwner = "reader-v2/" + lifetimeName;
+        await using var lifetime = await _locks.AcquireAsync("lifetime-" + lifetimeName, ct).ConfigureAwait(false);
+        await PinAsync(hash, operationOwner, ct).ConfigureAwait(false);
+        try
         {
-            if (entry.Owners.Length >= 1000) throw new InvalidOperationException("Pin limit reached.");
-            await Save(hash, entry with { Owners = [.. entry.Owners, owner] }, ct).ConfigureAwait(false);
-        }
+        if (owner is not null) await PinAsync(hash, owner, ct).ConfigureAwait(false);
         var existingSize = await _inner.SizeAsync(hash, ct).ConfigureAwait(false) ?? 0;
         await using (var existing = await _inner.OpenReadAsync(hash, ct).ConfigureAwait(false))
             if (existing is not null && existing.Length == size &&
-                Convert.ToHexStringLower(await SHA256.HashDataAsync(existing, ct).ConfigureAwait(false)) == hash) return (hash, size);
+                Convert.ToHexStringLower(await StreamingSha256.HashDataAsync(existing, ct).ConfigureAwait(false)) == hash) return (hash, size);
         if (_inner is EncryptedBlobCache encrypted)
         {
-            await Reserve(hash, checked(existingSize + await _inner.PartialLengthAsync(hash, ct).ConfigureAwait(false) + size + 28), ct).ConfigureAwait(false);
+            await using (var reservation = await _locks.AcquireAsync("metadata", ct).ConfigureAwait(false))
+                await Reserve(hash, checked(existingSize + await _inner.PartialLengthAsync(hash, ct).ConfigureAwait(false) + size + 28), ct).ConfigureAwait(false);
             var imported = await encrypted.ImportVerifiedAsync(content, hash, ct).ConfigureAwait(false);
-            await UpdateBytes(hash, ct).ConfigureAwait(false);
+            await using (var update = await _locks.AcquireAsync("metadata", ct).ConfigureAwait(false))
+                await UpdateBytes(hash, ct).ConfigureAwait(false);
             return imported;
         }
         // Never delete corrupt bytes before a verified replacement exists. Old readers keep their handles, while
         // durable pins protect the logical identity. Include old bytes and any interrupted staging in the reservation.
-        await Reserve(hash, checked(existingSize + size + await _inner.PartialLengthAsync(hash, ct).ConfigureAwait(false)), ct).ConfigureAwait(false);
+        await using (var reservation = await _locks.AcquireAsync("metadata", ct).ConfigureAwait(false))
+            await Reserve(hash, checked(existingSize + size + await _inner.PartialLengthAsync(hash, ct).ConfigureAwait(false)), ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
         await _inner.DiscardPartialAsync(hash, CancellationToken.None).ConfigureAwait(false);
         var buffer = new byte[81920];
@@ -289,8 +328,11 @@ public sealed class ManagedBlobCache : IBlobCache
         }
         ct.ThrowIfCancellationRequested();
         if (!await _inner.CompletePartialAsync(hash, CancellationToken.None).ConfigureAwait(false)) throw new BlobCorruptedException("Import source changed during reading.");
-        await UpdateBytes(hash, ct).ConfigureAwait(false);
+        await using (var update = await _locks.AcquireAsync("metadata", ct).ConfigureAwait(false))
+            await UpdateBytes(hash, ct).ConfigureAwait(false);
         return (hash, size);
+        }
+        finally { await UnpinAsync(hash, operationOwner, CancellationToken.None).ConfigureAwait(false); }
     }
     /// <inheritdoc />
     public async Task DeleteAsync(string sha256, CancellationToken cancellationToken = default)
@@ -310,11 +352,20 @@ public sealed class ManagedBlobCache : IBlobCache
     {
         if (_inner is not EncryptedBlobCache encrypted) throw new NotSupportedException("The managed cache is not encrypted.");
         await using var transfer = await AcquireTransferAsync(sha256, cancellationToken).ConfigureAwait(false);
-        await using var held = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
-        var logical = checked((await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0) + await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false));
-        await Reserve(sha256, checked(2 * logical + 56), cancellationToken).ConfigureAwait(false);
-        await encrypted.RotateAsync(sha256, cancellationToken).ConfigureAwait(false);
-        await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
+        var lifetimeName = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        var owner = "reader-v2/" + lifetimeName;
+        await using var lifetime = await _locks.AcquireAsync("lifetime-" + lifetimeName, cancellationToken).ConfigureAwait(false);
+        await PinAsync(sha256, owner, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var logical = checked((await _inner.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) ?? 0) + await _inner.PartialLengthAsync(sha256, cancellationToken).ConfigureAwait(false));
+            await using (var reservation = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false))
+                await Reserve(sha256, checked(2 * logical + 56), cancellationToken).ConfigureAwait(false);
+            await encrypted.RotateAsync(sha256, cancellationToken).ConfigureAwait(false);
+            await using var update = await _locks.AcquireAsync("metadata", cancellationToken).ConfigureAwait(false);
+            await UpdateBytes(sha256, cancellationToken).ConfigureAwait(false);
+        }
+        finally { await UnpinAsync(sha256, owner, CancellationToken.None).ConfigureAwait(false); }
     }
 
     private sealed class PinnedStream(Stream inner, Func<Task> release) : Stream

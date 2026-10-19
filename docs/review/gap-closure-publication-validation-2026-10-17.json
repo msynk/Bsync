@@ -1,0 +1,187 @@
+{
+  "date": "2026-10-17",
+  "scope": "Sample-only opt-in dependent publication; no package rebuild or public package API change.",
+  "baseCommit": "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37",
+  "workingTree": "Uncommitted continuation; hashes identify this slice, not an immutable release commit.",
+  "environment": {
+    "os": "Windows 10 x64",
+    "sdk": "10.0.402",
+    "installedRuntimes": [
+      "Microsoft.AspNetCore.App 10.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]",
+      "Microsoft.AspNetCore.App 10.0.10 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]",
+      "Microsoft.AspNetCore.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]",
+      "Microsoft.AspNetCore.App 10.0.13 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]",
+      "Microsoft.NETCore.App 10.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]",
+      "Microsoft.NETCore.App 10.0.10 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]",
+      "Microsoft.NETCore.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]",
+      "Microsoft.NETCore.App 10.0.13 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]",
+      "Microsoft.WindowsDesktop.App 10.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]",
+      "Microsoft.WindowsDesktop.App 10.0.10 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]",
+      "Microsoft.WindowsDesktop.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]",
+      "Microsoft.WindowsDesktop.App 10.0.13 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]"
+    ],
+    "database": "Dedicated LocalDB BsyncGapClosure20261017; engine 17.0.4025.3; stopped after tests."
+  },
+  "commands": [
+    "dotnet test src/Tests/Bsync.Tests.SqlServer/Bsync.Tests.SqlServer.csproj -c Release --filter FullyQualifiedName~TaskDependentPublicationTests --logger trx;LogFileName=dependent-publication.trx --results-directory artifacts/gap-closure/publication",
+    "dotnet test src/Tests/Bsync.Tests.SqlServer/Bsync.Tests.SqlServer.csproj -c Release --no-restore --filter FullyQualifiedName~TaskDependentPublicationTests|FullyQualifiedName~ConcurrentRestAndSyncCreationKeepOneCanonicalDomainEffect --logger trx;LogFileName=publication-fixed.trx --results-directory artifacts/gap-closure/publication",
+    "dotnet test src/Tests/Bsync.Tests.SqlServer/Bsync.Tests.SqlServer.csproj -c Release --no-build --no-restore --logger trx;LogFileName=sqlserver-final.trx --results-directory artifacts/gap-closure/publication"
+  ],
+  "results": [
+    {
+      "path": "artifacts/gap-closure/publication/dependent-publication.trx",
+      "sha256": "66e71a37739464643950abc6629e9f36407951c223795b8c0b58df6d2a368adf",
+      "times": {
+        "creation": "2026-10-17T22:41:50.5176879+03:30",
+        "queuing": "2026-10-17T22:41:50.5176887+03:30",
+        "start": "2026-10-17T22:41:43.8699121+03:30",
+        "finish": "2026-10-17T22:42:15.3236619+03:30"
+      },
+      "counters": {
+        "total": "9",
+        "executed": "9",
+        "passed": "8",
+        "failed": "1",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "nonPassingTests": [
+        {
+          "name": "Bsync.Tests.SqlServer.TaskDependentPublicationTests.IntentPublishesDependencyInLedgerTransactionAndReplayDoesNotExecuteAgain",
+          "outcome": "Failed",
+          "message": "Assert.True() Failure\r\nExpected: True\r\nActual:   False"
+        }
+      ]
+    },
+    {
+      "path": "artifacts/gap-closure/publication/publication-fixed.trx",
+      "sha256": "142e156a88c25f1bfa57150ceb162ae446c924bbce1090cd1fd926538f902d42",
+      "times": {
+        "creation": "2026-10-17T22:43:00.1708803+03:30",
+        "queuing": "2026-10-17T22:43:00.1708811+03:30",
+        "start": "2026-10-17T22:42:54.6687672+03:30",
+        "finish": "2026-10-17T22:43:24.6675142+03:30"
+      },
+      "counters": {
+        "total": "10",
+        "executed": "10",
+        "passed": "10",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "nonPassingTests": []
+    },
+    {
+      "path": "artifacts/gap-closure/publication/sqlserver-final.trx",
+      "sha256": "5804eaa06f89277bcb8b5d9c61e07e3e3a060af323899b529438602ce6d5024e",
+      "times": {
+        "creation": "2026-10-17T22:43:34.6812943+03:30",
+        "queuing": "2026-10-17T22:43:34.6812948+03:30",
+        "start": "2026-10-17T22:43:32.9224775+03:30",
+        "finish": "2026-10-17T22:44:19.4748137+03:30"
+      },
+      "counters": {
+        "total": "108",
+        "executed": "107",
+        "passed": "107",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "nonPassingTests": [
+        {
+          "name": "F1 I01: with an S3-compatible store, attachments land in the bucket once and downloads resume from presigned URLs",
+          "outcome": "NotExecuted",
+          "message": "Set BSYNC_S3 to an S3-compatible endpoint to run object storage tests."
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/TaskAudienceProjection.cs",
+      "sha256": "c0395d3e82a54d61c6906a7769febaae5080cefc15639b0bcc691f5984f3fa10"
+    },
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/TaskAudiencePublication.cs",
+      "sha256": "37d2b18b1a191428988f374f380d8a969d8445357aaee3ded54c7608e272150d"
+    },
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/TaskApiPublication.cs",
+      "sha256": "6bbe2e5184e06519489450efc1f7b4c4c684bf88878da757d5961c337b2c1741"
+    },
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/TaskWriteHandler.cs",
+      "sha256": "1a6b4bcb476ec906e85a28bcac3b0666333f7b29449e9a23153e31d3cc1f4296"
+    },
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/IntentWriteHandler.cs",
+      "sha256": "81ab1dd7db6bcb49eae436553ab9fd87c405c7db23d83c49c814514e379d855d"
+    },
+    {
+      "path": "src/Samples/Bsync.Samples.Tasks.Server/README.md",
+      "sha256": "a2e029a34ec1a75ddae6fd35f3661f8f8b45afc60044394307cc6e84b4e0f273"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests.SqlServer/TaskDependentPublicationTests.cs",
+      "sha256": "e6dfc7bf237e8749c2d72dc94d71f5e39a5292e8bb508959af605cc1c45abbfa"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests.SqlServer/TasksSampleTests.cs",
+      "sha256": "9affb168e2f2697ed2536e8cbbc04e494e7a2490493edcb195087948f8dd25e9"
+    },
+    {
+      "path": "docs/architecture/adr-022-workflow-publication.md",
+      "sha256": "b72a52ea1298a9cc36beb93e1816f94540faf631236859d4fba8ebf302f7603d"
+    },
+    {
+      "path": "Bsync-0.4.0-Gap-Closure-Implementation-Plan.md",
+      "sha256": "ced2a54215c50e644ca8e017c520c1f210bd4a0a28e926a1d5d1a624559d1d43"
+    },
+    {
+      "path": "docs/review/gap-closure-publication-2026-10-17.md",
+      "sha256": "d6223e19736617944b7c02c054656898dddd136bd8c97bdefcc5fda8ac42f44c"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "b4eb2e6d34f26af5c33d4058f74048b09b658ab82b1b46663ede47e9fb649954"
+    }
+  ],
+  "qualificationLimits": [
+    "Initial focused intent replay failure was a fixture timestamp mismatch; original result preserved.",
+    "S3 unconfigured; no real service ticket/CORS/orphan qualification.",
+    "No core/package/browser/native/AOT rerun for this sample-only change.",
+    "No release qualification or package publication; preview .7 remains unchanged."
+  ]
+}

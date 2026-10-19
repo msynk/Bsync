@@ -1,3 +1,21 @@
+record Bsync.Blobs.BlobBuiltInMaintenanceResult
+  Bsync.Client.MaintenancePageResult Progress { get; init; }
+  System.Boolean Equals(Bsync.Blobs.BlobBuiltInMaintenanceResult other)
+  System.Int32 Conflicts { get; init; }
+  System.Int32 ReleasedOwners { get; init; }
+  System.Int32 RetainedOwners { get; init; }
+  System.Int32 UnknownOwners { get; init; }
+  System.Void Deconstruct(out Bsync.Client.MaintenancePageResult Progress, out System.Int32 ReleasedOwners, out System.Int32 RetainedOwners, out System.Int32 UnknownOwners, out System.Int32 Conflicts)
+  ctor(Bsync.Client.MaintenancePageResult Progress, System.Int32 ReleasedOwners, System.Int32 RetainedOwners, System.Int32 UnknownOwners, System.Int32 Conflicts)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+sealed class Bsync.Blobs.BlobCacheChunkStore : Bsync.Blobs.IBlobChunkStore
+  System.Threading.Tasks.Task DeleteAsync(System.String id, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task WriteAsync(System.String id, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Byte[]> ReadAsync(System.String id, System.Int32 expectedLength, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> GetStoredBytesAsync(System.Threading.CancellationToken cancellationToken = default)
+  ctor(Bsync.Blobs.IBlobCache cache)
 record Bsync.Blobs.BlobCacheEntry
   System.Boolean Equals(Bsync.Blobs.BlobCacheEntry other)
   System.DateTimeOffset LastAccessUtc { get; init; }
@@ -30,6 +48,34 @@ abstract class Bsync.Blobs.BlobEncryption
   abstract System.Threading.Tasks.ValueTask<System.Byte[]> OpenAsync(System.ReadOnlyMemory<System.Byte> key, System.ReadOnlyMemory<System.Byte> envelope, System.ReadOnlyMemory<System.Byte> associatedData, System.Threading.CancellationToken cancellationToken = default)
   abstract System.Threading.Tasks.ValueTask<System.Byte[]> SealAsync(System.ReadOnlyMemory<System.Byte> key, System.ReadOnlyMemory<System.Byte> plaintext, System.ReadOnlyMemory<System.Byte> associatedData, System.Threading.CancellationToken cancellationToken = default)
   protected ctor()
+record Bsync.Blobs.BlobOwnerMaintenanceResult
+  System.Boolean Equals(Bsync.Blobs.BlobOwnerMaintenanceResult other)
+  System.Int32 ExaminedOwners { get; init; }
+  System.Int32 ReleasedOwners { get; init; }
+  System.Int32 UnavailableOwners { get; init; }
+  System.Int32 UnknownOwners { get; init; }
+  System.Int64 ProtectedBytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 ExaminedOwners, out System.Int32 ReleasedOwners, out System.Int32 UnknownOwners, out System.Int32 UnavailableOwners, out System.Int64 ProtectedBytes, out System.String Continuation)
+  ctor(System.Int32 ExaminedOwners, System.Int32 ReleasedOwners, System.Int32 UnknownOwners, System.Int32 UnavailableOwners, System.Int64 ProtectedBytes, System.String Continuation)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+enum Bsync.Blobs.BlobOwnerResolution
+  Live = 0
+  Released = 1
+  Unavailable = 3
+  Unknown = 2
+record Bsync.Blobs.BlobReconciliationResult
+  System.Boolean Equals(Bsync.Blobs.BlobReconciliationResult other)
+  System.Int32 Examined { get; init; }
+  System.Int64 AccountedBytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 Examined, out System.Int64 AccountedBytes, out System.String Continuation)
+  ctor(System.Int32 Examined, System.Int64 AccountedBytes, System.String Continuation)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
 record Bsync.Blobs.BlobReference
   System.Boolean Equals(Bsync.Blobs.BlobReference other)
   System.Int64 Size { get; init; }
@@ -39,6 +85,39 @@ record Bsync.Blobs.BlobReference
   System.String Sha256 { get; init; }
   System.Void Deconstruct(out System.String Id, out System.String Sha256, out System.Int64 Size, out System.String ContentType, out System.String FileName)
   ctor(System.String Id, System.String Sha256, System.Int64 Size, System.String ContentType, System.String FileName)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Blobs.BlobRepairJob
+  Bsync.Blobs.BlobRepairState State { get; init; }
+  System.Boolean Equals(Bsync.Blobs.BlobRepairJob other)
+  System.DateTimeOffset? NextAttemptUtc { get; init; }
+  System.Int32 Attempts { get; init; }
+  System.Int32 SchemaVersion { get; init; }
+  System.Int64 Size { get; init; }
+  System.String ErrorCode { get; init; }
+  System.String Generation { get; init; }
+  System.String Sha256 { get; init; }
+  System.String SourceAuthority { get; init; }
+  System.Void Deconstruct(out System.Int32 SchemaVersion, out System.String Sha256, out System.Int64 Size, out System.String SourceAuthority, out System.String Generation, out Bsync.Blobs.BlobRepairState State, out System.Int32 Attempts, out System.DateTimeOffset? NextAttemptUtc, out System.String ErrorCode)
+  ctor(System.Int32 SchemaVersion, System.String Sha256, System.Int64 Size, System.String SourceAuthority, System.String Generation, Bsync.Blobs.BlobRepairState State, System.Int32 Attempts, System.DateTimeOffset? NextAttemptUtc, System.String ErrorCode)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+enum Bsync.Blobs.BlobRepairState
+  Completed = 3
+  Deferred = 4
+  Downloading = 1
+  Needed = 0
+  Promoting = 2
+  RecoveryRequired = 5
+record Bsync.Blobs.BlobRetiredCollectionResult
+  System.Boolean Equals(Bsync.Blobs.BlobRetiredCollectionResult other)
+  System.Int32 ExaminedFiles { get; init; }
+  System.Int64 RemovedBytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 ExaminedFiles, out System.Int64 RemovedBytes, out System.String Continuation)
+  ctor(System.Int32 ExaminedFiles, System.Int64 RemovedBytes, System.String Continuation)
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
@@ -65,14 +144,18 @@ record Bsync.Blobs.BlobTransferJob
 sealed class Bsync.Blobs.BlobTransferManager
   System.Threading.Tasks.Task SetStateAsync(System.String sha256, Bsync.Blobs.BlobTransferDirection direction, Bsync.Blobs.BlobTransferState state, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Blobs.BlobDrainResult> DrainAsync(System.TimeSpan budget, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.BlobRepairJob> GetRepairAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Blobs.BlobTransferJob> EnqueueAsync(System.String sha256, System.Int64 size, Bsync.Blobs.BlobTransferDirection direction, System.Int32 priority = 0, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Blobs.BlobTransferJob> GetAsync(System.String sha256, Bsync.Blobs.BlobTransferDirection direction, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Client.MaintenancePageResult> ReconcilePinsAsync(Bsync.Client.AccountWorkScope scope, Bsync.Client.MaintenancePageRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> ReleaseTerminalAsync(System.String sha256, Bsync.Blobs.BlobTransferDirection direction, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> ResumeCredentialWaitAsync(System.String sha256, Bsync.Blobs.BlobTransferDirection direction, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> ReconcileReleasedAsync(System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.ValueTask<System.Boolean> EnsureUploadsAsync(System.Collections.Generic.IReadOnlyList<Bsync.Blobs.BlobReference> prerequisites, System.TimeSpan budget, System.Threading.CancellationToken cancellationToken = default)
   ctor(Bsync.Storage.IOrchestrationStore store, Bsync.Blobs.IBlobCache cache, Bsync.Blobs.HttpBlobTransfer transfer, Bsync.Blobs.BlobTransferManagerOptions options = null)
   public event System.Action Changed
 sealed class Bsync.Blobs.BlobTransferManagerOptions
+  System.Func<System.String, System.Int64, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<System.Boolean>> AuthorizePromotionAsync { get; init; }
   System.Int32 Concurrency { get; init; }
   System.Int32 ScanLimit { get; init; }
   System.TimeProvider TimeProvider { get; init; }
@@ -110,6 +193,100 @@ record Bsync.Blobs.BlobUploadStatus
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+static class Bsync.Blobs.BlobVerification
+  static System.Threading.Tasks.Task<Bsync.Blobs.BlobVerificationResult> VerifyAsync(Bsync.Blobs.IBlobCache cache, System.String sha256, System.Int64 size, System.Threading.CancellationToken cancellationToken = default)
+  static System.Threading.Tasks.Task<Bsync.Blobs.BlobVerificationResult> VerifyAsync(Bsync.Blobs.IBlobCache cache, System.String sha256, System.Int64 size, System.TimeSpan budget, System.Int64 maximumContentBytes, System.TimeProvider timeProvider = null, System.Threading.CancellationToken cancellationToken = default)
+enum Bsync.Blobs.BlobVerificationResult
+  AuthenticationFailed = 5
+  ContentLimitExceeded = 8
+  InvalidContent = 2
+  IoFailure = 7
+  KeyLocked = 3
+  KeyUnavailable = 4
+  Missing = 1
+  UnsupportedFormat = 6
+  Verified = 0
+record Bsync.Blobs.ChunkCleanupResult
+  System.Boolean Busy { get; init; }
+  System.Boolean Equals(Bsync.Blobs.ChunkCleanupResult other)
+  System.Int32 RemovedChunks { get; init; }
+  System.Int64 RemovedBytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 RemovedChunks, out System.Int64 RemovedBytes, out System.String Continuation, out System.Boolean Busy)
+  ctor(System.Int32 RemovedChunks, System.Int64 RemovedBytes, System.String Continuation, System.Boolean Busy)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Blobs.ChunkKeyRetention
+  Bsync.Client.LocalKeyReference Key { get; init; }
+  System.Boolean Equals(Bsync.Blobs.ChunkKeyRetention other)
+  System.String Generation { get; init; }
+  System.String Sha256 { get; init; }
+  System.Void Deconstruct(out System.String Generation, out System.String Sha256, out Bsync.Client.LocalKeyReference Key)
+  ctor(System.String Generation, System.String Sha256, Bsync.Client.LocalKeyReference Key)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Blobs.ChunkKeyRetentionPage
+  System.Boolean Equals(Bsync.Blobs.ChunkKeyRetentionPage other)
+  System.Collections.Generic.IReadOnlyList<Bsync.Blobs.ChunkKeyRetention> Generations { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Collections.Generic.IReadOnlyList<Bsync.Blobs.ChunkKeyRetention> Generations, out System.String Continuation)
+  ctor(System.Collections.Generic.IReadOnlyList<Bsync.Blobs.ChunkKeyRetention> Generations, System.String Continuation)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Blobs.ChunkScrubResult
+  Bsync.Blobs.ChunkScrubStatus Status { get; init; }
+  System.Boolean Equals(Bsync.Blobs.ChunkScrubResult other)
+  System.Int32 TotalChunks { get; init; }
+  System.Int32 VerifiedChunks { get; init; }
+  System.Int64 TotalBytes { get; init; }
+  System.Int64 VerifiedBytes { get; init; }
+  System.String Generation { get; init; }
+  System.Void Deconstruct(out Bsync.Blobs.ChunkScrubStatus Status, out System.String Generation, out System.Int32 VerifiedChunks, out System.Int32 TotalChunks, out System.Int64 VerifiedBytes, out System.Int64 TotalBytes)
+  ctor(Bsync.Blobs.ChunkScrubStatus Status, System.String Generation, System.Int32 VerifiedChunks, System.Int32 TotalChunks, System.Int64 VerifiedBytes, System.Int64 TotalBytes)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+enum Bsync.Blobs.ChunkScrubStatus
+  Complete = 2
+  Deferred = 1
+  Missing = 0
+record Bsync.Blobs.ChunkStorageObservation
+  System.Boolean Equals(Bsync.Blobs.ChunkStorageObservation other)
+  System.Int32 ExaminedChunks { get; init; }
+  System.Int64 QuarantinedBytes { get; init; }
+  System.Int64 ReservedBytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 ExaminedChunks, out System.Int64 ReservedBytes, out System.Int64 QuarantinedBytes, out System.String Continuation)
+  ctor(System.Int32 ExaminedChunks, System.Int64 ReservedBytes, System.Int64 QuarantinedBytes, System.String Continuation)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+sealed class Bsync.Blobs.ChunkedEncryptedBlobCache : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheInventory
+  System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task MigrateAsync(Bsync.Blobs.EncryptedBlobCache source, System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task MigrateAsync(Bsync.Blobs.EncryptedBlobCache source, System.String sha256, System.TimeSpan budget, System.TimeProvider timeProvider = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task RecoverAsync(System.String sha256, System.IO.Stream verifiedSource, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task RotateAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task RotateAsync(System.String sha256, System.TimeSpan budget, System.TimeProvider timeProvider = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.ChunkCleanupResult> ReconcileChunksAsync(System.String sha256, System.Boolean partial, System.String continuation = null, System.Int32 limit = 128, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.ChunkKeyRetentionPage> GetKeyRetentionPageAsync(System.String continuation = null, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.ChunkScrubResult> ScrubAsync(System.String sha256, System.TimeSpan budget, System.Int64 maximumBytes, System.Int32 maximumChunks = 128, System.Boolean restart = false, System.TimeProvider timeProvider = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.ChunkStorageObservation> ObserveStoragePageAsync(System.String continuation = null, System.Int32 limit = 128, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListPageAsync(System.String afterHash = null, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> GetStoredBytesAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> PartialLengthAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.String> CollectAsync(System.String continuation = null, System.Int32 chunkLimit = 128, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.ValueTuple<System.String, System.Int64>> ImportAsync(System.IO.Stream content, System.Threading.CancellationToken cancellationToken = default)
+  ctor(Bsync.Blobs.IBlobChunkStore chunks, Bsync.Storage.IOrchestrationStore metadata, Bsync.Blobs.IBlobCacheLock operations, Bsync.Client.IAccountResourceLock generationLifetimes, Bsync.Client.ILocalKeyProvider keys, Bsync.Client.LocalKeyReference writeKey, Bsync.Blobs.BlobEncryption encryption, System.Int32 chunkSize = 1048576, System.Int64 maximumBlobBytes = 1073741824, System.Int64 hardBudgetBytes = 9223372036854775807)
 sealed class Bsync.Blobs.EncryptedBlobCache : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheInventory
   System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
@@ -125,15 +302,19 @@ sealed class Bsync.Blobs.EncryptedBlobCache : Bsync.Blobs.IBlobCache, Bsync.Blob
   System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.ValueTuple<System.String, System.Int64>> ImportAsync(System.IO.Stream content, System.Threading.CancellationToken cancellationToken = default)
   ctor(Bsync.Blobs.IBlobCache backing, Bsync.Storage.IOrchestrationStore metadata, Bsync.Blobs.IBlobCacheLock locks, Bsync.Client.ILocalKeyProvider keys, Bsync.Client.LocalKeyReference writeKey, Bsync.Blobs.BlobEncryption encryption, System.Int32 maximumBlobBytes = 16777216)
-sealed class Bsync.Blobs.FileBlobCache : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheInventory
+sealed class Bsync.Blobs.FileBlobCache : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheInventory, Bsync.Blobs.IBlobCachePagedInventory, Bsync.Blobs.IBlobCacheReplacement
+  System.Boolean SupportsVerifiedReplacement { get; }
   System.Int64 Evict(System.Int64 maxBytes, System.Collections.Generic.IReadOnlySet<System.String> keep)
   System.String Directory { get; }
   System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.BlobRetiredCollectionResult> CollectRetiredPageAsync(System.String afterFileName = null, System.Int32 limit = 128, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListCompletedPageAsync(System.String afterHash = null, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int64> CollectRetiredAsync(System.Int32 limit = 128, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64> GetStoredBytesAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64> PartialLengthAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Int64?> SizeAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
@@ -177,10 +358,22 @@ interface Bsync.Blobs.IBlobCacheInventory
 interface Bsync.Blobs.IBlobCacheLock
   abstract System.Threading.Tasks.ValueTask<System.IAsyncDisposable> AcquireAsync(System.String name, System.Threading.CancellationToken cancellationToken = default)
   virtual System.Threading.Tasks.ValueTask<System.IAsyncDisposable> TryAcquireAsync(System.String name, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Blobs.IBlobCachePagedInventory
+  abstract System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListCompletedPageAsync(System.String afterHash = null, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Blobs.IBlobCacheReplacement : Bsync.Blobs.IBlobCache
+  System.Boolean SupportsVerifiedReplacement { get; }
+interface Bsync.Blobs.IBlobChunkStore
+  abstract System.Threading.Tasks.Task DeleteAsync(System.String id, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task WriteAsync(System.String id, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Byte[]> ReadAsync(System.String id, System.Int32 expectedLength, System.Threading.CancellationToken cancellationToken = default)
+  abstract System.Threading.Tasks.Task<System.Int64> GetStoredBytesAsync(System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Blobs.IBlobOwnerResolver
+  abstract System.Threading.Tasks.ValueTask<Bsync.Blobs.BlobOwnerResolution> ResolveAsync(System.String sha256, System.String owner, System.Threading.CancellationToken cancellationToken = default)
 interface Bsync.Blobs.IBlobSource
   System.Int64 Length { get; }
   abstract System.Threading.Tasks.ValueTask<System.IO.Stream> OpenAsync(System.Int64 offset, System.Threading.CancellationToken cancellationToken = default)
-sealed class Bsync.Blobs.ManagedBlobCache : Bsync.Blobs.IBlobCache
+sealed class Bsync.Blobs.ManagedBlobCache : Bsync.Blobs.IBlobCache, Bsync.Blobs.IBlobCacheReplacement
+  System.Boolean SupportsVerifiedReplacement { get; }
   System.Threading.Tasks.Task AppendPartialAsync(System.String sha256, System.ReadOnlyMemory<System.Byte> bytes, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DeleteAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task DiscardPartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
@@ -188,7 +381,10 @@ sealed class Bsync.Blobs.ManagedBlobCache : Bsync.Blobs.IBlobCache
   System.Threading.Tasks.Task ReconcileAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task RotateEncryptionAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task UnpinAsync(System.String hash, System.String owner, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.BlobBuiltInMaintenanceResult> ReconcileBuiltInOwnersAsync(Bsync.Client.AccountWorkScope scope, Bsync.Client.MaintenancePageRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Blobs.BlobCacheEntry> GetEntryAsync(System.String hash, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.BlobOwnerMaintenanceResult> MaintainOwnersAsync(Bsync.Blobs.IBlobOwnerResolver resolver, System.TimeSpan budget, System.String afterHash = null, System.Int32 recordLimit = 16, System.Boolean dryRun = false, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Blobs.BlobReconciliationResult> ReconcilePageAsync(System.TimeSpan budget, System.String continuation = null, System.Int32 limit = 128, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> CompletePartialAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.String>> ListAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.IO.Stream> OpenReadAsync(System.String sha256, System.Threading.CancellationToken cancellationToken = default)
@@ -218,6 +414,7 @@ sealed class Bsync.Blobs.OfflinePackageManager
   System.Threading.Tasks.Task<Bsync.Blobs.OfflinePackageStatus> PrepareAsync(System.String packageId, System.TimeSpan budget, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Blobs.PackagePreparationStatus> GetPreparationAsync(System.String packageId, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Blobs.PackageSnapshot> OpenActiveAsync(System.String packageId, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Client.MaintenancePageResult> ReconcilePinsAsync(Bsync.Client.AccountWorkScope scope, Bsync.Client.MaintenancePageRequest request, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> TryActivateAsync(System.String packageId, System.String revision, System.Threading.CancellationToken cancellationToken = default)
   ctor(Bsync.Storage.IOrchestrationStore store, Bsync.Blobs.ManagedBlobCache cache, Bsync.Blobs.BlobTransferManager transfers, Bsync.Blobs.IBlobCacheLock locks, System.Func<Bsync.Blobs.OfflinePackageManifest, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Boolean>> authorize, System.TimeProvider timeProvider = null)
   static System.Void Validate(Bsync.Blobs.OfflinePackageManifest manifest)
@@ -295,12 +492,44 @@ struct Bsync.Checkpoint
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+sealed class Bsync.Client.AccountComposition
+  Bsync.Client.AccountComposition Register(Bsync.Client.AccountResource resource, System.Func<Bsync.Client.AccountScope, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.IAsyncDisposable>> openAsync = null, System.Boolean keyResource = false)
+  Bsync.Client.SyncCoordinator CreateCoordinator(System.Func<Bsync.Client.AccountScope, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Boolean>> credentials = null, System.Func<Bsync.Client.AccountScope, System.Threading.CancellationToken, System.Threading.Tasks.Task> export = null, System.TimeProvider timeProvider = null)
+  System.Threading.Tasks.Task UpgradeFeatureStoreAsync(Bsync.Client.AccountScope account, System.Func<Bsync.Client.AccountScope, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Storage.IOrchestrationFeatureStore>> openStore, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Client.AccountWorkScope> OpenMaintenanceAsync(Bsync.Client.AccountScope account, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Client.AccountWorkScope> OpenWorkAsync(Bsync.Client.AccountScope account, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<T> RunAsync<T>(Bsync.Client.AccountScope account, System.TimeSpan budget, System.Func<Bsync.Client.AccountWorkScope, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>> work, System.TimeProvider timeProvider = null, System.Threading.CancellationToken cancellationToken = default)
+  ctor(Bsync.Storage.IOrchestrationStore catalog, Bsync.Client.IAccountResourceLock locks)
 sealed class Bsync.Client.AccountCredentialsUnavailableException : System.Exception, System.Runtime.Serialization.ISerializable
   ctor()
 enum Bsync.Client.AccountDeletionPolicy
   DiscardPending = 2
   ExportPending = 1
   PreservePending = 0
+sealed class Bsync.Client.AccountMaintenance
+  System.Threading.Tasks.Task<Bsync.Client.AccountMaintenanceResult> MaintainAsync(Bsync.Client.AccountScope account, System.String planName, System.Collections.Generic.IReadOnlyList<Bsync.Client.AccountMaintenanceStep> steps, System.TimeSpan budget, System.Func<Bsync.Client.AccountWorkScope, System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Boolean>> hasUrgentWork, System.Int32 maximumItems = 128, System.Int64 maximumBytes = 8388608, System.Boolean dryRun = false, System.Threading.CancellationToken cancellationToken = default)
+  ctor(Bsync.Client.AccountComposition accounts, Bsync.Storage.IOrchestrationStore catalog, System.TimeProvider timeProvider = null)
+record Bsync.Client.AccountMaintenanceResult
+  Bsync.Client.MaintenanceOutcome Outcome { get; init; }
+  System.Boolean Equals(Bsync.Client.AccountMaintenanceResult other)
+  System.Int32 Items { get; init; }
+  System.Int32 Pages { get; init; }
+  System.Int64 Bytes { get; init; }
+  System.Void Deconstruct(out Bsync.Client.MaintenanceOutcome Outcome, out System.Int32 Items, out System.Int64 Bytes, out System.Int32 Pages)
+  ctor(Bsync.Client.MaintenanceOutcome Outcome, System.Int32 Items, System.Int64 Bytes, System.Int32 Pages)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Client.AccountMaintenanceStep
+  System.Boolean Equals(Bsync.Client.AccountMaintenanceStep other)
+  System.Func<Bsync.Client.AccountWorkScope, Bsync.Client.MaintenancePageRequest, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.MaintenancePageResult>> ExecuteAsync { get; init; }
+  System.String Name { get; init; }
+  System.String Version { get; init; }
+  System.Void Deconstruct(out System.String Name, out System.String Version, out System.Func<Bsync.Client.AccountWorkScope, Bsync.Client.MaintenancePageRequest, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.MaintenancePageResult>> ExecuteAsync)
+  ctor(System.String Name, System.String Version, System.Func<Bsync.Client.AccountWorkScope, Bsync.Client.MaintenancePageRequest, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Client.MaintenancePageResult>> ExecuteAsync)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
 record Bsync.Client.AccountOpenResult
   Bsync.Client.AccountOpenState State { get; init; }
   Bsync.Client.AccountPendingWork PendingWork { get; init; }
@@ -366,6 +595,10 @@ record Bsync.Client.AccountScope
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+sealed class Bsync.Client.AccountWorkScope : System.IAsyncDisposable
+  Bsync.Client.AccountScope Account { get; }
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  T Get<T>(System.String name) where T : class, System.IAsyncDisposable
 record Bsync.Client.BackgroundCapabilities
   System.Boolean ChargingConstraint { get; init; }
   System.Boolean Equals(Bsync.Client.BackgroundCapabilities other)
@@ -529,9 +762,12 @@ enum Bsync.Client.LocalKeyState
   Locked = 1
   Unavailable = 2
 sealed class Bsync.Client.LocalReadModel
+  System.Threading.Tasks.Task<Bsync.Client.ReadModelCleanupResult> CollectRetiredAsync(System.String continuation = null, System.Int32 generationLimit = 32, System.Int32 rowLimit = 128, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Client.ReadModelSnapshot> OpenActiveAsync(System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Client.ReadModelStatus> GetStatusAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Client.ReadModelStorageStatus> GetStorageStatusAsync(System.TimeSpan budget, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> RebuildAsync(System.String schemaVersion, System.String sourceVersion, System.Collections.Generic.IAsyncEnumerable<Bsync.Client.ReadModelRow> rows, System.TimeSpan budget, System.Threading.CancellationToken cancellationToken = default)
+  ctor(Bsync.Storage.IOrchestrationStore store, System.String name, Bsync.Client.AccountScope account, Bsync.Client.IAccountResourceLock generationLocks, System.TimeProvider timeProvider = null, Bsync.Client.ReadModelRetentionOptions retention = null)
   ctor(Bsync.Storage.IOrchestrationStore store, System.String name, System.TimeProvider timeProvider = null)
 record Bsync.Client.LocalReplica<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Storage.ILocalStore<TDocument> Store { get; init; }
@@ -562,6 +798,49 @@ sealed class Bsync.Client.LocalSyncCollection<TDocument> : Bsync.Client.ISyncCol
   System.Threading.Tasks.Task<System.Int32> CountAsync(Bsync.Client.SyncQuery<TDocument> query = null, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<TDocument> GetAsync(System.String id, System.Threading.CancellationToken cancellationToken = default)
   ctor(Bsync.Client.SyncSession<TDocument> session, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.String>> resolveAccount)
+enum Bsync.Client.MaintenanceOutcome
+  BudgetExpired = 4
+  Busy = 2
+  Completed = 0
+  RemainingWork = 1
+  RequiresLargerBudget = 5
+  UrgentWork = 3
+record Bsync.Client.MaintenancePageRequest
+  System.Boolean DryRun { get; init; }
+  System.Boolean Equals(Bsync.Client.MaintenancePageRequest other)
+  System.Int32 MaximumItems { get; init; }
+  System.Int64 MaximumBytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.String Continuation, out System.Int32 MaximumItems, out System.Int64 MaximumBytes, out System.Boolean DryRun)
+  ctor(System.String Continuation, System.Int32 MaximumItems, System.Int64 MaximumBytes, System.Boolean DryRun)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Client.MaintenancePageResult
+  System.Boolean Equals(Bsync.Client.MaintenancePageResult other)
+  System.Boolean RequiresLargerBudget { get; init; }
+  System.Int32 Items { get; init; }
+  System.Int64 Bytes { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 Items, out System.Int64 Bytes, out System.String Continuation, out System.Boolean RequiresLargerBudget)
+  ctor(System.Int32 Items, System.Int64 Bytes, System.String Continuation, System.Boolean RequiresLargerBudget = false)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+sealed class Bsync.Client.ReadModelCapacityException : System.IO.IOException, System.Runtime.Serialization.ISerializable
+  ctor()
+record Bsync.Client.ReadModelCleanupResult
+  System.Boolean Busy { get; init; }
+  System.Boolean Equals(Bsync.Client.ReadModelCleanupResult other)
+  System.Int32 ProtectedGenerations { get; init; }
+  System.Int32 RemovedGenerations { get; init; }
+  System.Int32 RemovedRows { get; init; }
+  System.String Continuation { get; init; }
+  System.Void Deconstruct(out System.Int32 RemovedRows, out System.Int32 RemovedGenerations, out System.Int32 ProtectedGenerations, out System.String Continuation, out System.Boolean Busy)
+  ctor(System.Int32 RemovedRows, System.Int32 RemovedGenerations, System.Int32 ProtectedGenerations, System.String Continuation, System.Boolean Busy)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
 record Bsync.Client.ReadModelGeneration
   System.Boolean Equals(Bsync.Client.ReadModelGeneration other)
   System.DateTimeOffset CompletedAt { get; init; }
@@ -583,6 +862,11 @@ record Bsync.Client.ReadModelPage
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+sealed class Bsync.Client.ReadModelRetentionOptions
+  System.Int32 MaximumGenerations { get; init; }
+  System.Int64 MaximumPayloadBytes { get; init; }
+  System.Int64 MaximumRows { get; init; }
+  ctor()
 record Bsync.Client.ReadModelRow
   System.Boolean Equals(Bsync.Client.ReadModelRow other)
   System.String Id { get; init; }
@@ -592,9 +876,10 @@ record Bsync.Client.ReadModelRow
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
-sealed class Bsync.Client.ReadModelSnapshot
+sealed class Bsync.Client.ReadModelSnapshot : System.IAsyncDisposable
   Bsync.Client.ReadModelGeneration Generation { get; }
   System.Threading.Tasks.Task<Bsync.Client.ReadModelPage> ReadPageAsync(System.Int32 limit, System.String continuation = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.ValueTask DisposeAsync()
 record Bsync.Client.ReadModelStatus
   Bsync.Client.ReadModelGeneration Active { get; init; }
   System.Boolean Equals(Bsync.Client.ReadModelStatus other)
@@ -603,6 +888,16 @@ record Bsync.Client.ReadModelStatus
   System.String BuildingGeneration { get; init; }
   System.Void Deconstruct(out System.Int32 FormatVersion, out Bsync.Client.ReadModelGeneration Active, out System.String BuildingGeneration, out System.Int64 AppliedRows)
   ctor(System.Int32 FormatVersion, Bsync.Client.ReadModelGeneration Active, System.String BuildingGeneration, System.Int64 AppliedRows)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Client.ReadModelStorageStatus
+  System.Boolean Equals(Bsync.Client.ReadModelStorageStatus other)
+  System.Int32 Generations { get; init; }
+  System.Int64 PayloadBytes { get; init; }
+  System.Int64 Rows { get; init; }
+  System.Void Deconstruct(out System.Int32 Generations, out System.Int64 Rows, out System.Int64 PayloadBytes)
+  ctor(System.Int32 Generations, System.Int64 Rows, System.Int64 PayloadBytes)
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
@@ -727,6 +1022,7 @@ record Bsync.Client.SyncGoalResult
   Bsync.SyncResult Work { get; init; }
   System.Boolean CaughtUp { get; init; }
   System.Boolean Equals(Bsync.Client.SyncGoalResult other)
+  System.Boolean HasObservation { get; init; }
   System.Boolean Reached { get; init; }
   System.Collections.Generic.IReadOnlyList<Bsync.Client.SyncDocumentRevision> Unaccepted { get; init; }
   System.Int32 Pending { get; init; }
@@ -1431,6 +1727,8 @@ interface Bsync.Storage.ILocalStore<TDocument> where TDocument : class, Bsync.IS
   virtual System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDocument>> QueryIndexAsync(Bsync.Storage.SyncIndexQuery<TDocument> query, Bsync.Storage.SyncIndexCursor? after, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
   virtual System.Threading.Tasks.Task<System.Int32> CountIndexAsync(Bsync.Storage.SyncIndexQuery<TDocument> query, System.Threading.CancellationToken cancellationToken = default)
   virtual System.Threading.Tasks.Task<System.Int32> PurgeTombstonesAsync(System.Int64 throughVersion, System.Int64 generation, System.Threading.CancellationToken cancellationToken = default)
+interface Bsync.Storage.IOrchestrationFeatureStore : Bsync.Storage.IOrchestrationStore, System.IAsyncDisposable
+  abstract System.Threading.Tasks.Task RequireFeatureVersionAsync(System.Int32 version, System.Threading.CancellationToken cancellationToken = default)
 interface Bsync.Storage.IOrchestrationStore : System.IAsyncDisposable
   abstract System.Threading.Tasks.Task DeleteAllAsync(System.Threading.CancellationToken cancellationToken = default)
   abstract System.Threading.Tasks.Task<Bsync.Storage.OrchestrationRecord> ReadAsync(System.String key, System.Threading.CancellationToken cancellationToken = default)
@@ -1457,8 +1755,9 @@ sealed class Bsync.Storage.InMemoryLocalStore<TDocument> : Bsync.Storage.ILocalS
   ctor()
   ctor(System.Func<TDocument, TDocument> cloner)
   ctor(System.Func<TDocument, TDocument> cloner, System.Collections.Generic.IEnumerable<Bsync.Storage.SyncIndex<TDocument>> indexes)
-sealed class Bsync.Storage.InMemoryOrchestrationStore : Bsync.Storage.IOrchestrationStore, System.IAsyncDisposable
+sealed class Bsync.Storage.InMemoryOrchestrationStore : Bsync.Storage.IOrchestrationFeatureStore, Bsync.Storage.IOrchestrationStore, System.IAsyncDisposable
   System.Threading.Tasks.Task DeleteAllAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task RequireFeatureVersionAsync(System.Int32 version, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<Bsync.Storage.OrchestrationRecord> ReadAsync(System.String key, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Boolean> TryWriteAsync(System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationMutation> mutations, Bsync.Storage.OrchestrationFence fence = null, System.Threading.CancellationToken cancellationToken = default)
   System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationRecord>> ReadPageAsync(System.String prefix, System.String afterKey, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
@@ -1493,6 +1792,11 @@ record Bsync.Storage.OrchestrationMutation
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+sealed class Bsync.Storage.OrchestrationPayloadPolicy
+  Bsync.Storage.OrchestrationPayloadPolicy Control(System.String key)
+  Bsync.Storage.OrchestrationPayloadPolicy Protect(System.String prefix, System.String kind)
+  System.Func<System.String, System.String> CreateSelector()
+  ctor()
 record Bsync.Storage.OrchestrationRecord
   System.Boolean Equals(Bsync.Storage.OrchestrationRecord other)
   System.Int64? ExpiresAtUnixMilliseconds { get; init; }
@@ -1521,6 +1825,15 @@ record Bsync.Storage.PendingOperation<TDocument> where TDocument : class, Bsync.
   virtual System.Boolean Equals(System.Object obj)
   virtual System.Int32 GetHashCode()
   virtual System.String ToString()
+sealed class Bsync.Storage.ProtectedOrchestrationStore : Bsync.Storage.IOrchestrationFeatureStore, Bsync.Storage.IOrchestrationStore, System.IAsyncDisposable
+  System.Threading.Tasks.Task DeleteAllAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task RequireFeatureVersionAsync(System.Int32 version, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Storage.OrchestrationRecord> ReadAsync(System.String key, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> TryWriteAsync(System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationMutation> mutations, Bsync.Storage.OrchestrationFence fence = null, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Bsync.Storage.OrchestrationRecord>> ReadPageAsync(System.String prefix, System.String afterKey, System.Int32 limit, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.String> ProtectPageAsync(System.String prefix, System.String afterKey, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.ValueTask DisposeAsync()
+  ctor(Bsync.Storage.IOrchestrationStore inner, Bsync.Client.LocalKeyReference writeKey, Bsync.Client.ILocalKeyProvider keys, Bsync.Blobs.BlobEncryption encryption, System.Func<System.String, System.String> recordKind, System.Boolean leaveOpen = false)
 record Bsync.Storage.RecordUpdateResult<TDocument> where TDocument : class, Bsync.ISyncEntity
   Bsync.Storage.SyncRecord<TDocument> Record { get; init; }
   System.Boolean Changed { get; init; }
@@ -1730,6 +2043,7 @@ sealed class Bsync.SyncOptions<TDocument> where TDocument : class, Bsync.ISyncEn
   System.Int32 PullBatchSize { get; init; }
   System.Int32 PushBatchSize { get; init; }
   System.String DiagnosticsName { get; init; }
+  System.TimeProvider TimeProvider { get; init; }
   System.Void Validate()
   ctor()
 class Bsync.SyncProtocolException : System.Exception, System.Runtime.Serialization.ISerializable

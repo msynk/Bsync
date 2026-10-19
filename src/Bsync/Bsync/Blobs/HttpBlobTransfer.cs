@@ -190,16 +190,28 @@ public sealed class HttpBlobTransfer
     /// a server may redirect to a presigned URL). Returns the bytes received by this call; 0 when the content was already
     /// there. On a hash mismatch the partial transfer is discarded and <see cref="BlobCorruptedException"/> is thrown.
     /// </summary>
-    public async Task<long> DownloadAsync(IBlobCache cache, string sha256, long size, CancellationToken cancellationToken = default)
+    public Task<long> DownloadAsync(IBlobCache cache, string sha256, long size, CancellationToken cancellationToken = default) =>
+        DownloadCoreAsync(cache, sha256, size, false, null, cancellationToken);
+
+    // The manager holds the physical content lock from revalidation through promotion and durable acknowledgement.
+    internal Task<long> DownloadReplacementAsync(ManagedBlobCache cache, string sha256, long size,
+        Func<CancellationToken, Task> beforePromotion, CancellationToken cancellationToken)
+    {
+        if (!cache.SupportsVerifiedReplacement) throw new NotSupportedException("This provider has not opted into verified replacement.");
+        return DownloadCoreAsync(cache, sha256, size, true, beforePromotion, cancellationToken);
+    }
+
+    private async Task<long> DownloadCoreAsync(IBlobCache cache, string sha256, long size, bool replacement,
+        Func<CancellationToken, Task>? beforePromotion, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentOutOfRangeException.ThrowIfNegative(size);
-        if (await cache.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) is { } existing)
+        if (!replacement && await cache.SizeAsync(sha256, cancellationToken).ConfigureAwait(false) is { } existing)
         {
             if (existing != size) throw new BlobCorruptedException("Existing content length disagrees with the requested blob length; content was retained.");
             await using var verified = await cache.OpenReadAsync(sha256, cancellationToken).ConfigureAwait(false);
             if (verified is null || verified.Length != size ||
-                Convert.ToHexStringLower(await System.Security.Cryptography.SHA256.HashDataAsync(verified, cancellationToken).ConfigureAwait(false)) != sha256)
+                Convert.ToHexStringLower(await StreamingSha256.HashDataAsync(verified, cancellationToken).ConfigureAwait(false)) != sha256)
                 throw new BlobCorruptedException("Existing content failed verification; content was retained for explicit repair.");
             Report(sha256, BlobTransferDirection.Download, size, size, verified: true);
             return 0;
@@ -252,10 +264,14 @@ public sealed class HttpBlobTransfer
                     throw new IOException($"The download of {sha256} ended at {held} of {size} bytes.");
                 }
                 if (await stream.ReadAsync(buffer.AsMemory(0, 1), cancellationToken).ConfigureAwait(false) != 0)
-                    throw new InvalidDataException("Download exceeds its announced content length; partial retained for explicit recovery.");
+                {
+                    await cache.DiscardPartialAsync(sha256, cancellationToken).ConfigureAwait(false);
+                    throw new InvalidDataException("Download exceeds its announced content length; partial discarded.");
+                }
             }
 
             if (size == 0) await cache.AppendPartialAsync(sha256, ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
+            if (beforePromotion is not null) await beforePromotion(cancellationToken).ConfigureAwait(false);
             if (!await cache.CompletePartialAsync(sha256, cancellationToken).ConfigureAwait(false))
             {
                 result = "corrupt";

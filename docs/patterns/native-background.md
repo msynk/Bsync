@@ -6,6 +6,34 @@ fresh-scope runner; select `-p:NativeBackgroundTarget=net10.0-android` or `net10
 The core libraries acquire no Android, Apple or MAUI dependencies. Record exact workload, platform SDK, device and OS
 when qualifying these adapters; a portable build does not compile the platform-conditional files.
 
+## Complete reference-host source
+
+The unpackaged [`Bsync.Samples.Background.Android`](../../src/Samples/Bsync.Samples.Background.Android) and
+[`Bsync.Samples.Background.Apple`](../../src/Samples/Bsync.Samples.Background.Apple) projects provide application
+bootstrap, declared platform configuration, a queue button and foreground/resume reconciliation. Their shared
+[`HeadlessSampleHost`](../../src/Samples/Bsync.Samples.NativeBackground/HeadlessSampleHost.cs) opens a durable account
+catalog and fresh SQLite scope under the same physical account lock. It verifies registration and deletion tombstones
+before reading work. Background callbacks never provision an account; only the explicit foreground demo action does.
+Demo work atomically moves bounded local queue items to results; it does not pretend to synchronize a domain server.
+
+Work is persisted before requesting the dispatcher. Fresh scopes reconcile the enqueue/request crash window. Runtime
+budgets begin before scope opening and include joined disposal; overruns are reported instead of claiming timely
+completion. Production hosts replace the demo handler with their document/transfer work, existing-key provider and
+dispatch-time credential acquisition. The demo does not create a replacement encryption key in a headless callback.
+
+| Target | New host evidence | Remaining gates |
+|---|---|---|
+| Portable headless bootstrap | Executed core tests: relaunch, durable work, stale removed-account callback | Production identity/key/credential integration |
+| Android application | Complete source and manual CI build job; local build blocked by missing SDK and SDK download HTTP 404 | Full app build, signed install, custom worker factory, physical lifecycle/key tests |
+| Apple application | Complete source and manual simulator build job; not built on this Windows host | Matching Mac/Xcode workload, simulator build, signed device lifecycle/key tests |
+
+The Apple host enables BGProcessing only. The separate URLSession download recipe below is **not enabled or qualified
+by this host**. Background uploads remain unsupported. OS-owned plaintext download spool/file-protection policy must
+be supplied and tested before enabling downloads on a device. `.github/workflows/native-background.yml` builds the
+full hosts after recipe compilation when explicitly dispatched; this local change does not assert that CI ran.
+
+Distribution remains maintained source recipes, not new NuGet packages; the six-package release inventory is unchanged.
+
 At application bootstrap, including headless process relaunch, configure `NativeBackgroundRuntime.Current` with:
 
 - An account-key resolver that consults the durable local account catalog and creates a **fresh** account service scope.

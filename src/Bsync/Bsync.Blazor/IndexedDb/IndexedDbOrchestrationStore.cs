@@ -7,7 +7,7 @@ using Microsoft.JSInterop;
 namespace Bsync.Blazor.IndexedDb;
 
 /// <summary>Account-scoped orchestration metadata in IndexedDB schema 1. Browser eviction remains outside durability guarantees.</summary>
-public sealed class IndexedDbOrchestrationStore : IOrchestrationStore
+public sealed class IndexedDbOrchestrationStore : IOrchestrationFeatureStore
 {
     private readonly IJSObjectReference _module;
     private readonly string _name;
@@ -32,7 +32,7 @@ public sealed class IndexedDbOrchestrationStore : IOrchestrationStore
         token.ThrowIfCancellationRequested();
         // Once a write starts, join its transaction even if the caller cancels. Abandoning the JS promise could let a
         // physical cache lock go before its metadata transaction finishes. Cancellation after commit is unknown outcome.
-        var interopToken = method is "write" or "clear" ? CancellationToken.None : token;
+        var interopToken = method is "write" or "clear" or "requireFeatureVersion" ? CancellationToken.None : token;
         try { return await _module.InvokeAsync<string>(method, interopToken, new object?[] { _name }.Concat(args).ToArray()).ConfigureAwait(false); }
         catch (JSException error)
         {
@@ -40,6 +40,13 @@ public sealed class IndexedDbOrchestrationStore : IOrchestrationStore
                 : error.Message.Contains("VersionError", StringComparison.Ordinal) ? "outdated" : "unavailable";
             throw new LocalStoreUnavailableException(reason, "Orchestration storage is unavailable; existing data was not discarded.", error);
         }
+    }
+
+    /// <summary>Requires a permanent feature-format barrier. Close older tabs under exclusive account ownership first; published 0.4.0 subsequently fails with VersionError.</summary>
+    public async Task RequireFeatureVersionAsync(int version, CancellationToken cancellationToken = default)
+    {
+        if (version is < 1 or > 2) throw new LocalStoreUnavailableException("outdated", "Unsupported feature version; data retained.");
+        if (version == 2) await CallAsync("requireFeatureVersion", cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

@@ -16,6 +16,9 @@ public sealed class TaskCreationConflictException() : InvalidOperationException(
 /// </summary>
 public sealed class TaskApiPublication(string connectionString, SqlServerSyncAuthority<TaskDocument> authority)
 {
+    /// <summary>Optional dependency, registered before serving writes. Forward task authority commit hints to it once per host.</summary>
+    public TaskAudienceProjection? AudienceProjection { get; init; }
+
     internal Func<DbContext, IExecutionStrategy>? StrategyFactory { get; init; }
     internal Func<string, Task>? Boundary { get; init; }
 
@@ -32,6 +35,8 @@ public sealed class TaskApiPublication(string connectionString, SqlServerSyncAut
             await using var db = TasksDb.Open(connectionString);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await authority.AcquirePublicationLockAsync(tenant, transaction.GetDbTransaction(), cancellationToken);
+            if (AudienceProjection is not null)
+                await AudienceProjection.AcquireLockAsync(tenant, transaction.GetDbTransaction(), cancellationToken);
             var existing = await db.Tasks.SingleOrDefaultAsync(t => t.Tenant == tenant && t.Id == request.Id, cancellationToken);
             if (existing is not null)
             {
@@ -44,6 +49,8 @@ public sealed class TaskApiPublication(string connectionString, SqlServerSyncAut
             await db.SaveChangesAsync(cancellationToken);
             var projection = row.ToDocument([]);
             await authority.UpsertAsync(tenant, projection, transaction.GetDbTransaction(), cancellationToken);
+            if (AudienceProjection is not null)
+                await AudienceProjection.PublishAsync(db.Database.GetDbConnection(), transaction.GetDbTransaction(), tenant, row.Id, cancellationToken);
             if (Boundary is not null) await Boundary("before-commit");
             await transaction.CommitAsync(cancellationToken);
             if (Boundary is not null) await Boundary("after-commit");

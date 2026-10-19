@@ -64,6 +64,12 @@ public sealed record BlobDrainResult(int Completed, bool HasRemainingWork, bool 
 /// <summary>Bounds for a managed transfer drain.</summary>
 public sealed class BlobTransferManagerOptions
 {
+    /// <summary>
+    /// Optional host authorization recheck after replacement bytes arrive and before provider verification/publication.
+    /// False retains staging and reports authorization-required. Runs outside metadata transactions while this content
+    /// is owned. Never acquire a package pointer lock here; read the host's authorization state directly.
+    /// </summary>
+    public Func<string, long, CancellationToken, ValueTask<bool>>? AuthorizePromotionAsync { get; init; }
     /// <summary>Maximum simultaneous jobs, 1..16. Default 2 leaves room for small urgent work.</summary>
     public int Concurrency { get; init; } = 2;
     /// <summary>Maximum attempt duration before rotating to another job. Partial progress is retained.</summary>
@@ -82,7 +88,7 @@ public sealed class BlobTransferManagerOptions
 /// keep pending-upload bytes pinned until completion/cancellation. Managed caches pin jobs until ReleaseTerminalAsync;
 /// other cache implementations require host-owned pinning.
 /// </summary>
-public sealed class BlobTransferManager
+public sealed partial class BlobTransferManager
 {
     private readonly IOrchestrationStore _store;
     private readonly IBlobCache _cache;
@@ -126,7 +132,8 @@ public sealed class BlobTransferManager
     public async ValueTask<bool> EnsureUploadsAsync(IReadOnlyList<BlobReference> prerequisites, TimeSpan budget, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(prerequisites);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
+        using var deadline = new CooperativeDeadline(budget, _options.TimeProvider, cancellationToken, "upload_prerequisites");
+        cancellationToken = deadline.Token;
         if (prerequisites.Count > 256) throw new ArgumentException("Upload prerequisites are bounded to 256 items.", nameof(prerequisites));
         var items = prerequisites.ToArray();
         // Validate the complete request before creating durable jobs.
@@ -148,7 +155,7 @@ public sealed class BlobTransferManager
             }
         }
         if (items.Length == 0) return true;
-        await DrainAsync(budget, cancellationToken).ConfigureAwait(false);
+        await DrainAsync(deadline.Remaining, cancellationToken).ConfigureAwait(false);
         foreach (var item in items)
             if ((await GetAsync(item.Sha256, BlobTransferDirection.Upload, cancellationToken).ConfigureAwait(false))?.State != BlobTransferState.Complete) return false;
         return true;
@@ -177,6 +184,7 @@ public sealed class BlobTransferManager
         var key = Key(sha256, direction);
         await using var contentLock = _cache is ManagedBlobCache locked
             ? await locked.AcquireTransferAsync(sha256, cancellationToken).ConfigureAwait(false) : null;
+        await FinishReleaseAsync(key, sha256, cancellationToken).ConfigureAwait(false);
         while (true)
         {
             var existing = await _store.ReadAsync(key, cancellationToken).ConfigureAwait(false);
@@ -199,7 +207,8 @@ public sealed class BlobTransferManager
 
     /// <summary>
     /// Removes a complete/canceled job and releases its managed-cache pin. Pending documents/packages must own separate
-    /// pins before calling. Crash after record removal can leave a conservative pin for host reconciliation.
+    /// pins before calling. A durable cleanup record recovers interruption between record removal and unpinning;
+    /// call ReconcileReleasedAsync on startup or maintenance, or repeat this operation.
     /// </summary>
     public async Task<bool> ReleaseTerminalAsync(string sha256, BlobTransferDirection direction, CancellationToken cancellationToken = default)
     {
@@ -207,12 +216,47 @@ public sealed class BlobTransferManager
         await using var contentLock = _cache is ManagedBlobCache managed
             ? await managed.AcquireTransferAsync(sha256, cancellationToken).ConfigureAwait(false) : null;
         var record = await _store.ReadAsync(key, cancellationToken).ConfigureAwait(false);
-        if (record is null) return true;
+        if (record is null) { await FinishReleaseAsync(key, sha256, cancellationToken).ConfigureAwait(false); return true; }
         if (Decode(record).State is not (BlobTransferState.Complete or BlobTransferState.Canceled)) return false;
-        if (!await _store.TryWriteAsync([new(key, record.Revision, null)], cancellationToken: cancellationToken).ConfigureAwait(false)) return false;
-        if (_cache is ManagedBlobCache pinned) await pinned.UnpinAsync(sha256, key, cancellationToken).ConfigureAwait(false);
+        var cleanup = await _store.ReadAsync(ReleaseKey(key), cancellationToken).ConfigureAwait(false);
+        if (!await _store.TryWriteAsync([new(key, record.Revision, null), new(ReleaseKey(key), cleanup?.Revision, "1")], cancellationToken: cancellationToken).ConfigureAwait(false)) return false;
+        await FinishReleaseAsync(key, sha256, cancellationToken).ConfigureAwait(false);
         Notify();
         return true;
+    }
+
+    private static string ReleaseKey(string jobKey) => "transfer-cleanup/v1/" + jobKey;
+
+    // Caller holds the physical content lock. A new enqueue first finishes old cleanup, then creates its pin/job.
+    private async Task FinishReleaseAsync(string key, string hash, CancellationToken ct)
+    {
+        var journal = await _store.ReadAsync(ReleaseKey(key), ct).ConfigureAwait(false);
+        if (journal is null) return;
+        if (journal.Payload != "1") throw new LocalStoreUnavailableException("outdated", "Unsupported transfer cleanup journal; pins retained.");
+        if (await _store.ReadAsync(key, ct).ConfigureAwait(false) is null && _cache is ManagedBlobCache managed)
+            await managed.UnpinAsync(hash, key, ct).ConfigureAwait(false);
+        if (!await _store.TryWriteAsync([new(journal.Key, journal.Revision, null)], cancellationToken: ct).ConfigureAwait(false))
+            throw new IOException("Transfer cleanup changed outside content ownership.");
+    }
+
+    /// <summary>
+    /// Finishes at most limit terminal-job pin releases after interruption. Other owners are preserved. Repeat while the
+    /// returned count equals limit. Run within the host's account lifetime scope; cancellation retains the cleanup journal.
+    /// </summary>
+    public async Task<int> ReconcileReleasedAsync(int limit = 100, CancellationToken cancellationToken = default)
+    {
+        if (limit is < 1 or > 1000) throw new ArgumentOutOfRangeException(nameof(limit));
+        var records = await _store.ReadPageAsync(ReleaseKey(_prefix), null, limit, cancellationToken).ConfigureAwait(false);
+        foreach (var record in records)
+        {
+            var key = record.Key["transfer-cleanup/v1/".Length..];
+            var hash = key[(key.LastIndexOf('/') + 1)..];
+            if (key != Key(hash, BlobTransferDirection.Download) && key != Key(hash, BlobTransferDirection.Upload))
+                throw new InvalidDataException("Invalid transfer cleanup identity; pins retained.");
+            await using var held = _cache is ManagedBlobCache managed ? await managed.AcquireTransferAsync(hash, cancellationToken).ConfigureAwait(false) : null;
+            await FinishReleaseAsync(key, hash, cancellationToken).ConfigureAwait(false);
+        }
+        return records.Count;
     }
 
     /// <summary>After a host restores credentials, resumes only a credential-waiting job. A concurrent pause/cancel is preserved.</summary>
@@ -250,17 +294,20 @@ public sealed class BlobTransferManager
     /// <summary>Drains one bounded queue window. A restarted worker resumes Running jobs from verified cache/server offsets.</summary>
     public async Task<BlobDrainResult> DrainAsync(TimeSpan budget, CancellationToken cancellationToken = default)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
-        await _drain.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using var deadline = new CooperativeDeadline(budget, _options.TimeProvider, cancellationToken, "transfer_drain");
+        var acquired = false;
         var completed = 0;
         var owned = false;
         try
         {
-            await using var lease = await ExecutionLease.TryAcquireAsync(_store, _leaseKey, TimeSpan.FromSeconds(30), _options.TimeProvider, cancellationToken).ConfigureAwait(false);
+            await _drain.WaitAsync(deadline.Token).ConfigureAwait(false);
+            acquired = true;
+            await using var lease = await ExecutionLease.TryAcquireAsync(_store, _leaseKey, TimeSpan.FromSeconds(30), _options.TimeProvider, deadline.Token).ConfigureAwait(false);
             if (lease is null) return new(0, true, false);
+            using var observation = deadline.ObserveLease(lease.Lost);
             owned = true;
-            using var expiry = new CancellationTokenSource(budget, _options.TimeProvider);
-            using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, expiry.Token, lease.Lost);
+            using var stopping = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token, lease.Lost);
+            using var cause = deadline.TrackToken(stopping.Token, lease.Lost);
             var records = new List<OrchestrationRecord>();
             var cursor = await _store.ReadAsync(_cursorKey, stopping.Token).ConfigureAwait(false);
             string? after = cursor?.Payload;
@@ -299,28 +346,30 @@ public sealed class BlobTransferManager
             return new(completed, remaining, true);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return new(completed, true, owned); }
-        finally { _drain.Release(); }
+        finally { if (acquired) _drain.Release(); }
     }
 
     private async Task<bool> RunAsync(OrchestrationRecord record, BlobTransferJob job, OrchestrationFence fence, CancellationToken stopping)
     {
-        using var attempt = new CancellationTokenSource(_options.AttemptBudget, _options.TimeProvider);
-        using var token = CancellationTokenSource.CreateLinkedTokenSource(stopping, attempt.Token);
+        using var attempt = new CooperativeDeadline(_options.AttemptBudget, _options.TimeProvider, stopping, "transfer_attempt");
+        using var token = CancellationTokenSource.CreateLinkedTokenSource(attempt.Token);
+        using var cause = attempt.TrackToken(token.Token);
         lock (_running) _running[record.Key] = token;
         try
         {
             await using var contentLock = _cache is ManagedBlobCache managed
                 ? await managed.AcquireTransferAsync(job.Sha256, token.Token).ConfigureAwait(false) : null;
             job = job with { State = BlobTransferState.Running, Attempts = job.Attempts + 1, ErrorCode = null };
-            if (!await _store.TryWriteAsync([new(record.Key, record.Revision, Encode(job))], fence, stopping).ConfigureAwait(false)) return false;
-            record = (await _store.ReadAsync(record.Key, stopping).ConfigureAwait(false))!;
+            _ = attempt.Remaining;
+            if (!await _store.TryWriteAsync([new(record.Key, record.Revision, Encode(job))], fence, token.Token).ConfigureAwait(false)) return false;
+            record = (await _store.ReadAsync(record.Key, token.Token).ConfigureAwait(false))!;
             if (record.Payload != Encode(job)) return false;
             Notify();
             try
             {
                 if (job.Direction == BlobTransferDirection.Download)
                 {
-                    await _transfer.DownloadAsync(_cache, job.Sha256, job.Size, token.Token).ConfigureAwait(false);
+                    await DownloadManagedAsync(job, fence, token.Token).ConfigureAwait(false);
                     if (await _cache.SizeAsync(job.Sha256, token.Token).ConfigureAwait(false) != job.Size) throw new BlobCorruptedException("Verified content has an unexpected length.");
                 }
                 else
@@ -328,10 +377,17 @@ public sealed class BlobTransferManager
                     if (await _cache.SizeAsync(job.Sha256, token.Token).ConfigureAwait(false) != job.Size) throw new FileNotFoundException("Verified upload content is unavailable.");
                     await _transfer.UploadAsync(job.Sha256, new CacheSource(_cache, job.Sha256, job.Size), token.Token).ConfigureAwait(false);
                 }
+                _ = attempt.Remaining;
+                token.Token.ThrowIfCancellationRequested();
                 job = job with { State = BlobTransferState.Complete, NextAttemptUtc = null };
             }
             catch (OperationCanceledException) { job = job with { State = BlobTransferState.Queued, ErrorCode = "interrupted", NextAttemptUtc = null }; }
+            catch (BlobVerificationException error) { job = job with { State = BlobTransferState.Failed, ErrorCode = error.Code }; }
+            catch (BlobCapacityException) { job = job with { State = BlobTransferState.Failed, ErrorCode = "capacity-required" }; }
+            catch (ReplicaKeyUnavailableException error) { job = job with { State = BlobTransferState.Failed, ErrorCode = error.Locked ? "key-locked" : "key-unavailable" }; }
+            catch (CryptographicException) { job = job with { State = BlobTransferState.Failed, ErrorCode = "authentication-failed" }; }
             catch (BlobCorruptedException) { job = job with { State = BlobTransferState.Failed, ErrorCode = "hash-or-length-mismatch" }; }
+            catch (InvalidDataException) { job = job with { State = BlobTransferState.Failed, ErrorCode = "invalid-transfer-data" }; }
             catch (FileNotFoundException) { job = job with { State = BlobTransferState.Failed, ErrorCode = "missing-local-content" }; }
             catch (HttpRequestException error) when (error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             { job = job with { State = BlobTransferState.WaitingForCredentials, ErrorCode = "credentials-required" }; }
@@ -339,12 +395,13 @@ public sealed class BlobTransferManager
             { job = job with { State = BlobTransferState.Failed, ErrorCode = error.StatusCode == HttpStatusCode.NotFound ? "not-found" : "too-large" }; }
             catch (Exception error) when (error is HttpRequestException or IOException)
             { job = job with { State = BlobTransferState.WaitingForConnectivity, ErrorCode = "unavailable", NextAttemptUtc = _options.TimeProvider.GetUtcNow() + _options.RetryDelay * Math.Min(128, Math.Pow(2, Math.Min(job.Attempts - 1, 7))) }; }
+            await ReconcileRepairAsync(job, fence).ConfigureAwait(false);
             // A concurrent pause/cancel/resume changes the revision and wins over this worker's completion.
             var saved = await _store.TryWriteAsync([new(record.Key, record.Revision, Encode(job))], fence, CancellationToken.None).ConfigureAwait(false);
             if (saved) Notify();
             return saved && job.State == BlobTransferState.Complete;
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { return false; }
+        catch (OperationCanceledException) { return false; }
         finally { lock (_running) _running.Remove(record.Key); }
     }
 

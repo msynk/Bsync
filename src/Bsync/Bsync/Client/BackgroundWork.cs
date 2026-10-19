@@ -121,16 +121,21 @@ public sealed class BackgroundWorkDispatcher
     {
         ArgumentNullException.ThrowIfNull(execute);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(budget, TimeSpan.Zero);
-        await using var lease = await ExecutionLease.TryAcquireAsync(_catalog, "background-owner/" + account.StorageKey, TimeSpan.FromSeconds(30), _time, cancellationToken).ConfigureAwait(false);
+        using var deadline = new CooperativeDeadline(budget, _time, cancellationToken, "background");
+        try
+        {
+        await using var lease = await ExecutionLease.TryAcquireAsync(_catalog, "background-owner/" + account.StorageKey, TimeSpan.FromSeconds(30), _time, deadline.Token).ConfigureAwait(false);
         if (lease is null) return BackgroundWorkOutcome.RemainingWork;
-        var key = Key(account); var record = await _catalog.ReadAsync(key, cancellationToken).ConfigureAwait(false);
+        using var observation = deadline.ObserveLease(lease.Lost);
+        var key = Key(account); var record = await _catalog.ReadAsync(key, deadline.Token).ConfigureAwait(false);
+        _ = deadline.Remaining;
         if (record is null || !Decode(record).Pending) return BackgroundWorkOutcome.Completed;
         var state = Decode(record);
         if (state.Request.Account != account) throw new InvalidDataException("Background request account mismatch.");
-        using var deadline = new CancellationTokenSource(budget, _time);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token, lease.Lost);
+        using var cause = deadline.TrackToken(stop.Token, lease.Lost);
         BackgroundWorkOutcome outcome;
-        try { outcome = await execute(account, stop.Token).ConfigureAwait(false); }
+        try { outcome = await execute(account, stop.Token).ConfigureAwait(false); _ = deadline.Remaining; }
         catch (ReplicaKeyUnavailableException) { outcome = BackgroundWorkOutcome.KeyUnavailable; }
         catch (OperationCanceledException) { outcome = cancellationToken.IsCancellationRequested ? BackgroundWorkOutcome.Canceled : BackgroundWorkOutcome.RemainingWork; }
         catch (Exception) { outcome = BackgroundWorkOutcome.Failed; }
@@ -141,6 +146,8 @@ public sealed class BackgroundWorkDispatcher
         var saved = await _catalog.TryWriteAsync([new(key, record.Revision, Encode(state with { Pending = outcome != BackgroundWorkOutcome.Completed, LastOutcome = outcome }))],
             lease.Fence, CancellationToken.None).ConfigureAwait(false);
         return !saved && outcome == BackgroundWorkOutcome.Completed ? BackgroundWorkOutcome.RemainingWork : outcome;
+        }
+        catch (OperationCanceledException) { return cancellationToken.IsCancellationRequested ? BackgroundWorkOutcome.Canceled : BackgroundWorkOutcome.RemainingWork; }
     }
 }
 

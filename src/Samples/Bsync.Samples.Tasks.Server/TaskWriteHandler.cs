@@ -11,6 +11,9 @@ namespace Bsync.Samples.Tasks.Server;
 /// </summary>
 public sealed class TaskWriteHandler : ISyncWriteHandler<TaskDocument>
 {
+    /// <summary>Optional dependency, registered before serving writes. Also forward committed hints from the task authority.</summary>
+    public TaskAudienceProjection? AudienceProjection { get; init; }
+
     public async ValueTask<SyncWriteDecision<TaskDocument>> HandleAsync(SyncWriteContext<TaskDocument> write, CancellationToken cancellationToken)
     {
         var task = write.Submitted;
@@ -21,6 +24,9 @@ public sealed class TaskWriteHandler : ISyncWriteHandler<TaskDocument>
 
         task.Slug = TaskRules.Slug(task.Title);
 
+        // The authority already owns the Tasks feed lock. Acquire every dependent feed before any domain/attachment read.
+        if (AudienceProjection is not null)
+            await AudienceProjection.AcquireLockAsync(write.Caller.Scope, write.Transaction!, cancellationToken);
         await using var db = TasksDb.Enlist(write.Connection!, write.Transaction!);
         var tenant = write.Caller.Scope;
 
@@ -55,6 +61,8 @@ public sealed class TaskWriteHandler : ISyncWriteHandler<TaskDocument>
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        if (AudienceProjection is not null)
+            await AudienceProjection.PublishAsync(write.Connection!, write.Transaction!, tenant, task.Id, cancellationToken);
 
         return SyncWriteDecision<TaskDocument>.Accept(task);
     }

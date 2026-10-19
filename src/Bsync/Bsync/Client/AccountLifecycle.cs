@@ -359,9 +359,7 @@ public sealed partial class SyncCoordinator
     private async Task SuspendAccountCoreAsync()
     {
         foreach (var member in Snapshot()) await member.Session.SetReplicationEnabledAsync(false, CancellationToken.None).ConfigureAwait(false);
-        Task? hints;
-        lock (_gate) { _hintsStopping?.Cancel(); hints = _hints; _hints = null; _hintAccount = null; }
-        if (hints is not null) { try { await hints.ConfigureAwait(false); } catch (OperationCanceledException) { } }
+        await StopHintsAsync().ConfigureAwait(false);
         if (_account is { } account)
             foreach (var resource in _options.AccountResources) await resource.StopAsync(account, CancellationToken.None).ConfigureAwait(false);
     }

@@ -82,11 +82,7 @@ public sealed class TaskAudiencePublication(string connectionString, SqlServerSy
     {
         if (!ReferenceEquals(transaction.Connection, connection)) throw new ArgumentException("Connection and transaction must match.");
         await LockAsync(tenant, transaction, cancellationToken);
-        await using var db = TasksDb.Enlist(connection, transaction);
-        var row = await db.Tasks.AsNoTracking().SingleOrDefaultAsync(t => t.Tenant == tenant && t.Id == taskId, cancellationToken);
-        if (row is null || row.Deleted) { await audience.DeleteAsync(tenant, taskId, transaction, cancellationToken); return; }
-        var readers = await ReadersAsync(connection, transaction, tenant, row.Id, 256, cancellationToken);
-        await audience.UpsertAsync(tenant, Project(row, readers.Select(r => r.Principal).ToArray()), transaction, cancellationToken);
+        await new TaskAudienceProjection(audience).PublishAsync(connection, transaction, tenant, taskId, cancellationToken);
     }
 
     /// <summary>Reconciles deletions and all related reader rows from one complete protected source snapshot; never publishes a truncated enumeration.</summary>
@@ -114,8 +110,8 @@ public sealed class TaskAudiencePublication(string connectionString, SqlServerSy
         await audience.AcquirePublicationLockAsync(tenant, transaction, cancellationToken);
     }
     private Task LockAsync(string tenant, SqlTransaction transaction, CancellationToken ct) => AcquirePublicationLocksAsync(tenant, transaction, ct);
-    private static AudienceTask Project(TaskEntity row, string[] readers) => new() { Id = row.Id, Title = row.Title, Done = row.Done, Revision = row.Revision, Readers = readers };
-    private static async Task<List<(string TaskId, string Principal)>> ReadersAsync(SqlConnection connection, SqlTransaction transaction, string tenant, string? taskId, int limit, CancellationToken ct)
+    internal static AudienceTask Project(TaskEntity row, string[] readers) => new() { Id = row.Id, Title = row.Title, Done = row.Done, Revision = row.Revision, Readers = readers };
+    internal static async Task<List<(string TaskId, string Principal)>> ReadersAsync(SqlConnection connection, SqlTransaction transaction, string tenant, string? taskId, int limit, CancellationToken ct)
     {
         // Join yields the canonical domain ID under its SQL collation; principal keys themselves stay ordinal binary values.
         await using var command = new SqlCommand("""

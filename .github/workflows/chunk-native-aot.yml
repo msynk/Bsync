@@ -1,0 +1,48 @@
+name: Optional Windows native AOT chunk qualification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-aot:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      DOTNET_PROCESSOR_COUNT: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pack unique artifacts and publish native consumer
+        shell: pwsh
+        run: |
+          $suffix = 'nativeaot.${{ github.run_id }}.${{ github.run_attempt }}'
+          foreach ($package in @('Bsync', 'Bsync.Storage.Sqlite')) {
+            dotnet pack "src/Bsync/$package" -c Release -o artifacts/packages -p:VersionSuffix=$suffix
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          dotnet publish src/Tools/Bsync.ChunkBenchmark -c Release -r win-x64 --self-contained true -p:BsyncPackageVersion=0.5.0-$suffix -p:PublishAot=true -p:IlcTreatWarningsAsErrors=true -p:ILLinkTreatWarningsAsErrors=true -p:IntermediateOutputPath=obj/native-aot/ -p:OutputPath=bin/native-aot/ -o artifacts/native-aot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Path artifacts/native-aot-results | Out-Null
+          Get-FileHash artifacts/packages/*.nupkg, artifacts/native-aot/Bsync.ChunkBenchmark.exe, src/Tools/Bsync.ChunkBenchmark/bin/native-aot/Bsync.dll, src/Tools/Bsync.ChunkBenchmark/bin/native-aot/Bsync.Storage.Sqlite.dll -Algorithm SHA256 | Select-Object Path,Hash | ConvertTo-Json | Set-Content artifacts/native-aot-results/inputs-and-executable.json
+      - name: Execute five sizes and five isolated 31 MiB-cap cases
+        shell: pwsh
+        run: |
+          & artifacts/native-aot/Bsync.ChunkBenchmark.exe artifacts/native-aot-results/latency.json 1,16,17,256,1024 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:DOTNET_GCHeapHardLimit = '1F00000'
+          $qualificationFailed = $false
+          foreach ($size in @(1,16,17,256,1024)) {
+            & artifacts/native-aot/Bsync.ChunkBenchmark.exe --memory "artifacts/native-aot-results/memory-$size.json" $size 1 31
+            if ($LASTEXITCODE -ne 0) { $qualificationFailed = $true }
+          }
+          if ($qualificationFailed) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-native-aot-chunks
+          path: |
+            artifacts/native-aot-results/**
+            artifacts/native-aot/**
+            artifacts/packages/**

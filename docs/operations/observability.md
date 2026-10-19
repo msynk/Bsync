@@ -138,6 +138,10 @@ Not verified: an OTLP collector over the network, and browser-side telemetry exp
 
 ## Managed offline metrics (unreleased)
 
+`bsync.maintenance.runs{bsync.outcome}` reports completed maintenance invocations, including distinct caller cancellation,
+budget expiry, busy ownership, urgent-work deferral and failures. It contains no account, plan or cursor identifiers.
+See [account maintenance](../patterns/account-maintenance.md) for its cooperative limits and durable progress.
+
 Create one `OfflineMetrics` per distinct account metadata store in a process and periodically call `RefreshAsync` with
 a bounded record limit. Dispose on account close. Metric callbacks read cached aggregates and never access storage.
 Multiple registrations for the same store double-count it; metadata in a separate application catalog needs its own
@@ -149,6 +153,8 @@ registration. No metric includes account IDs, content hashes, endpoints, package
 | `bsync.transfer.pending_expected_bytes` | Full expected job sizes, not remaining bytes or deduplicated storage |
 | `bsync.transfer.oldest_known_age`, `bsync.transfer.unknown_age` | Oldest timestamped pending job and number with unknown original enqueue time |
 | `bsync.cache.reserved_bytes`, `bsync.cache.pinned_reserved_bytes` | Conservative durable metadata reservations |
+| `bsync.blob.repair_queued` | Repair journals in `Needed`; excludes deferred, running and terminal repairs |
+| `bsync.blob.chunk_reserved_bytes`, `bsync.blob.quarantined_reserved_bytes` | Journaled v2 ciphertext reservations and the subset protected by explicit recovery; interrupted writes may not have reached physical storage |
 | `bsync.cache.capacity_refusals` | Operations refused by the hard storage budget |
 | `bsync.blob.verified_bytes` | Locally verified download bytes or authority-acknowledged upload bytes; repeated verification counts again |
 | `bsync.package.last_verified{bsync.readiness}` | Last persisted verification observations, not proof of present completeness |
@@ -159,7 +165,57 @@ Always collect the snapshot-age/partial and unknown-age metrics with backlog met
 without `CreatedUtc` retain unknown age rather than inventing a timestamp. The redacted export contains the same
 allowlisted aggregates. These are live bounded scans; concurrent changes can make counts approximate.
 
+Repair transitions emit `bsync.blob.repairs{bsync.state,bsync.error}` only after durable writes, including queued
+repairs, retries and changed error codes. Repeated acknowledgements of the same completed generation do not increment
+`bsync.blob.repaired_bytes`. `bsync.blob.repair_attempt_duration` includes failed/canceled attempts and excludes downtime
+between attempts. Error tags use a fixed allowlist; unknown journal error strings become `other`.
+
+`ChunkedEncryptedBlobCache.ObserveStoragePageAsync` supports persisted progress through larger chunk inventories,
+even with locked keys or damaged ciphertext. It reports reserved and quarantined bytes without opening content.
+`bsync.blob.quarantined_page_bytes` and `bsync.cache.protected_page_bytes{bsync.dry_run}` are histograms of individual
+observation/maintenance pages. Never sum repeated page samples as cache size. Use the cached snapshot gauges above
+with their age/partial indicators for monitoring. Neither observations nor gauges authorize deletion or key retirement.
+
 The Tasks outbox recipe emits `bsync.sample.publication.lag` on meter `Bsync.Samples.Tasks`, after commit, with no tags.
 Coalescing preserves the oldest unconsumed request time, so repeated updates do not hide backlog age. The histogram
 measures completed publications only: alert separately on retained/poisoned outbox rows. It cannot measure unregistered
 domain writes or a dispatcher that never runs. Full database capture lag remains outside this recipe.
+
+`bsync.execution.stops` on the `Bsync` meter records observed cancellation/deadline/lease signals once per instrumented
+invocation. `bsync.reason` is `caller_canceled`, `lease_lost`, or `budget_expired`, in that precedence if several signals
+are present at return. It is a signal counter, not proof that no work committed. Normal lease disposal is excluded.
+No account, endpoint, hash, workflow identity, payload or cursor is tagged.
+
+`bsync.operation` is one of `account_work`, `account_maintenance`, `background`, `workflow`, `read_model_rebuild`,
+`read_model_inventory`, `package_prepare`, `upload_prerequisites`, `transfer_drain`, `transfer_attempt`,
+`cache_owner_maintenance`, `cache_inventory`, `chunk_rotation`, `chunk_migration`, `chunk_scrub`, `blob_verification`, `sync_for`, `session_run`,
+`sync_goal`, `session_lease`, `session_hints`, `coordinator_hints`, or `session_ownership`.
+Only budgeted overloads are instrumented where both forms exist. Nested deadline tokens and registered Bsync aliases
+preserve observed parent budget/lease causes while their scopes are active. Opaque host-created linked tokens and
+unrecognized host aliases remain caller-relative; session lifecycle/transport aliases preserve known causes. See
+[ADR-034](../architecture/adr-034-nested-stop-causes.md). Inspect the enclosing operation as well, and do not sum nested
+invocations or interpret every child cancellation as a user action. `session_run` covers an engine run
+and coordinator admission, not the entire session lifetime: network suspension/shutdown is caller cancellation,
+execution lease loss is lease loss, and ordinary lease disposal emits neither. It has no implicit deadline.
+`sync_goal` covers the caller's complete goal-wait deadline,
+including account resolution, opening and observations. It records caller cancellation, budget expiry or a cause
+inherited from a registered parent token;
+account shutdown alone ends a wait unreached without manufacturing a goal stop signal. Unrelated callback cancellation
+emits no stop reason. See [ADR-030](../architecture/adr-030-execution-budgets-and-verification.md) and
+[ADR-031](../architecture/adr-031-goal-wait-budgets.md).
+
+`session_lease` observes acquisition through post-return cancellation/ownership checks; null denial and normal disposal
+emit nothing. `session_hints` and `coordinator_hints` observe an entire listener lifetime, including retry backoff and
+iterator cleanup; the latter includes waiting for a predecessor. Suspension/shutdown/replacement is `caller_canceled`.
+Unsupported hints that finish while active and unrelated provider cancellation emit no stop. These phases have no
+implicit deadline. Hints do not depend on the execution lease; lease loss is classified by acquisition/run observations.
+Arbitrary host callbacks are not covered. See
+[ADR-032](../architecture/adr-032-session-listener-lifetimes.md). Do not sum these overlapping lifetime/phase counts as
+unique syncs, user actions or terminal failures.
+
+`session_ownership` observes one loss-token notification per admitted execution lease, including idle/paused periods.
+It records `lease_lost`, with `caller_canceled` taking precedence if network shutdown is already requested at observation.
+Normal release detaches the observer before disposal and emits nothing. A lease rejected as already lost at acquisition
+has no admitted ownership lifetime. An active run can emit a separate `session_run` signal for the same loss; filter by
+operation. Pause and server `Retry-After` still govern when new work may execute. See
+[ADR-033](../architecture/adr-033-idle-lease-observation.md).

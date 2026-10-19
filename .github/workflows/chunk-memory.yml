@@ -1,0 +1,52 @@
+name: Optional native chunk memory qualification
+
+# Exact-package, constrained managed-heap evidence; no publishing or device-support claim.
+on:
+  workflow_dispatch:
+    inputs:
+      heap_limit_mib:
+        description: Whole managed heap cap; 31 MiB stress profile reproduces earlier candidate memory pressure
+        type: choice
+        options: ['64', '31']
+        default: '64'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-memory:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pack unique local artifacts
+        shell: pwsh
+        run: |
+          $suffix = "memory.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT"
+          foreach ($package in @('Bsync', 'Bsync.Storage.Sqlite')) {
+            dotnet pack "src/Bsync/$package" -c Release -o artifacts/packages "-p:VersionSuffix=$suffix"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $archives = @(Get-ChildItem artifacts/packages -Filter 'Bsync.Storage.Sqlite.*.nupkg')
+          if ($archives.Count -ne 1) { throw 'Expected exactly one SQLite package archive.' }
+          $version = $archives[0].Name.Substring('Bsync.Storage.Sqlite.'.Length) -replace '\.nupkg$', ''
+          "MEMORY_PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Qualify 15 isolated native workloads
+        shell: pwsh
+        env:
+          HEAP_LIMIT_MIB: ${{ inputs.heap_limit_mib }}
+        run: python src/Tools/Bsync.ChunkBenchmark/run-memory.py --package-version "$env:MEMORY_PACKAGE_VERSION" --output artifacts/chunk-memory --heap-limit-mib "$env:HEAP_LIMIT_MIB"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-chunk-memory
+          path: |
+            artifacts/chunk-memory
+            artifacts/packages
+          if-no-files-found: warn

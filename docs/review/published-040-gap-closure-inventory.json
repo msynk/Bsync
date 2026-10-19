@@ -1,0 +1,38 @@
+[
+    {
+        "package":  "Bsync",
+        "version":  "0.4.0",
+        "sha256":  "a5365067ebb4cedfa41da606d8458204c6dc04e7cfa5867e52caf39ab76667f6",
+        "commit":  "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+    },
+    {
+        "package":  "Bsync.Blazor",
+        "version":  "0.4.0",
+        "sha256":  "62249a872ac0e274cf2486f29570930f8d3c7c0ac904af4eb98e9c1f86aceba7",
+        "commit":  "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+    },
+    {
+        "package":  "Bsync.Storage.Sqlite",
+        "version":  "0.4.0",
+        "sha256":  "108295d8cb9375410d1e0a61a7944f524c8d1ec7a08c6565709c4ba20cd2569f",
+        "commit":  "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+    },
+    {
+        "package":  "Bsync.Server.AspNetCore",
+        "version":  "0.4.0",
+        "sha256":  "f8228467df243d1912fe8cf718e3e1140f416fca1cd2af75c491196902c81c5d",
+        "commit":  "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+    },
+    {
+        "package":  "Bsync.Server.PostgreSql",
+        "version":  "0.4.0",
+        "sha256":  "6bc4da47b0cb82d75e1078c35a70947c86b1f6b87508d3f8490735aad5b7d7bc",
+        "commit":  "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+    },
+    {
+        "package":  "Bsync.Server.SqlServer",
+        "version":  "0.4.0",
+        "sha256":  "e254c4ade3984e4594aadd456a1d99f5a764b79841c275f3ed4d7db3cd0e2660",
+        "commit":  "e4286fe2141d0d1e836cfc88dbfa5dfd82154d37"
+    }
+]
