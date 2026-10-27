@@ -37,4 +37,11 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(BsyncCapabilitiesTests)' == 'true'">
+    <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <Compile Include="../../Bsync.Tests/EncryptionUsageBudgetTests.cs" Link="EncryptionUsageBudgetTests.cs" />
+    <Compile Include="../../Bsync.Tests/MultipartUploadTests.cs" Link="MultipartUploadTests.cs" />
+    <Compile Include="../../Bsync.Tests/OfflinePackageTests.cs" Link="OfflinePackageTests.cs" />
+  </ItemGroup>
 </Project>

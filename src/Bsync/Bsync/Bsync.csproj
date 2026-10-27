@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Bsync.Tests" />
+    <InternalsVisibleTo Include="Bsync.Blazor" />
   </ItemGroup>
 
 </Project>

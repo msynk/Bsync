@@ -36,6 +36,125 @@ public sealed class OfflinePackageTests : IAsyncLifetime
         [new("page", Convert.ToHexStringLower(SHA256.HashData(new[] { value })), 1, true, [])]);
 
     [Fact]
+    public async Task OptionalChildrenDoNotBlockActivationAndSnapshotsKeepTheirObservedMembership()
+    {
+        var required = Manifest("one", 1);
+        var optional = Manifest("one", 2) with { PackageId = "optional" };
+        var root = new OfflinePackageSetManifest(2, "optional-set", "one", null,
+            [new(required.PackageId, required.Revision, OfflinePackageManager.GetManifestSha256(required)),
+             new(optional.PackageId, optional.Revision, OfflinePackageManager.GetManifestSha256(optional)) { Optional = true }]);
+        Assert.Throws<ArgumentException>(() => OfflinePackageManager.ValidateSet(root with { SchemaVersion = 1 }));
+        await _manager.StageSetAsync(root, [required, optional]);
+        Assert.False(await _manager.TryActivateSetAsync(root.SetId, root.Revision));
+        await _cache.ImportAsync(new MemoryStream([1]));
+        Assert.True(await _manager.TryActivateSetAsync(root.SetId, root.Revision));
+        var status = await _manager.GetSetStatusAsync(root.SetId);
+        Assert.Empty(status.MissingRequired); Assert.Equal(0, status.BytesRemaining);
+        Assert.Equal("incomplete", Assert.Single(status.OptionalFailures).Reason);
+        await using var old = await _manager.OpenActiveSetAsync(root.SetId);
+        Assert.Null(await old.OpenAsync(optional.PackageId, "page"));
+        await _cache.ImportAsync(new MemoryStream([2]));
+        Assert.Null(await old.OpenAsync(optional.PackageId, "page"));
+        await using var repaired = await _manager.OpenActiveSetAsync(root.SetId);
+        await using var content = await repaired.OpenAsync(optional.PackageId, "page");
+        Assert.NotNull(content);
+        var locks = new FileBlobCacheLock(Path.Combine(_root, "locks"));
+        using var http = new HttpClient(new NoNetwork()) { BaseAddress = new("https://offline.test/") };
+        var revoked = new OfflinePackageManager(_store, _cache, new(_store, _cache, new(http)), locks,
+            (manifest, _) => Task.FromResult(manifest.PackageId != optional.PackageId));
+        Assert.True(await revoked.TryActivateSetAsync(root.SetId, root.Revision));
+        Assert.Equal("unauthorized", Assert.Single((await revoked.GetSetStatusAsync(root.SetId)).OptionalFailures).Reason);
+        await using var limited = await revoked.OpenActiveSetAsync(root.SetId);
+        Assert.Null(await limited.OpenAsync(optional.PackageId, "page"));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => limited.OpenAsync("unknown", "page"));
+    }
+
+    [Fact]
+    public async Task PackageSetQuotaRevocationAndCorruptionPreserveActiveRootAndPins()
+    {
+        var locks = new FileBlobCacheLock(Path.Combine(_root, "locks"));
+        var limited = new ManagedBlobCache(new FileBlobCache(Path.Combine(_root, "bytes")), _store, locks, 1, 1);
+        using var http = new HttpClient(new NoNetwork()) { BaseAddress = new("https://offline.test/") };
+        var authorized = true;
+        var manager = new OfflinePackageManager(_store, limited, new(_store, limited, new(http)), locks, (_, _) => Task.FromResult(authorized));
+        static OfflinePackageSetManifest Root(OfflinePackageManifest child) => new(1, "set", child.Revision, null,
+            [new(child.PackageId, child.Revision, OfflinePackageManager.GetManifestSha256(child))]);
+        var first = Manifest("one", 1); var next = Manifest("two", 2);
+        await manager.StageSetAsync(Root(first), [first]); await limited.ImportAsync(new MemoryStream([1]));
+        Assert.True(await manager.TryActivateSetAsync("set", "one"));
+        await manager.StageSetAsync(Root(next), [next]);
+        await Assert.ThrowsAsync<BlobCapacityException>(() => limited.ImportAsync(new MemoryStream([2])));
+        Assert.False(await manager.TryActivateSetAsync("set", "two"));
+        Assert.Equal("one", (await manager.GetSetStatusAsync("set")).ActiveRevision);
+        Assert.NotEmpty((await limited.GetEntryAsync(first.Items[0].Sha256)).Owners);
+        authorized = false;
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => manager.TryActivateSetAsync("set", "two"));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => manager.OpenActiveSetAsync("set"));
+        authorized = true;
+        var hash = first.Items[0].Sha256;
+        await File.WriteAllBytesAsync(Path.Combine(_root, "bytes", "objects", hash[..2], hash), [9]);
+        Assert.Single((await manager.GetSetStatusAsync("set")).ActiveMissingRequired);
+        await Assert.ThrowsAsync<FileNotFoundException>(() => manager.OpenActiveSetAsync("set"));
+        Assert.NotEmpty((await limited.GetEntryAsync(hash)).Owners);
+        await _cache.ImportAsync(new MemoryStream([1]));
+        Assert.Empty((await manager.GetSetStatusAsync("set")).ActiveMissingRequired);
+        await using var reader = await manager.OpenActiveSetAsync("set");
+        await using var read = await reader.OpenAsync("manual", "page"); Assert.Equal(1, read!.ReadByte());
+    }
+
+    [Fact]
+    public async Task PackageSetActivatesMoreThan256ItemsAndRetainsOldSnapshotThroughRetirement()
+    {
+        static OfflinePackageManifest Child(string id, string revision, byte value) => new(1, id, revision, null,
+            Enumerable.Range(0, 150).Select(i => new OfflinePackageItem(i.ToString(), Convert.ToHexStringLower(SHA256.HashData(new[] { value })), 1, true, [])).ToArray());
+        static OfflinePackageSetManifest Root(string revision, OfflinePackageManifest[] children) => new(1, "catalog", revision, null,
+            children.Select(c => new OfflinePackageSetChild(c.PackageId, c.Revision, OfflinePackageManager.GetManifestSha256(c))).ToArray());
+        var first = new[] { Child("left", "one", 1), Child("right", "one", 1) };
+        await _manager.StageSetAsync(Root("one", first), first);
+        Assert.Equal(1, (await _manager.GetSetStatusAsync("catalog")).BytesRemaining);
+        Assert.False(await _manager.TryActivateSetAsync("catalog", "one"));
+        await _cache.ImportAsync(new MemoryStream([1]));
+        Assert.True(await _manager.TryActivateSetAsync("catalog", "one"));
+        await using var old = await _manager.OpenActiveSetAsync("catalog");
+        var next = new[] { Child("left", "two", 2), Child("right", "two", 2) };
+        await _manager.StageSetAsync(Root("two", next), next);
+        Assert.False(await _manager.TryActivateSetAsync("catalog", "two"));
+        Assert.Equal("one", (await _manager.GetSetStatusAsync("catalog")).ActiveRevision);
+        var status = await _manager.GetSetStatusAsync("catalog");
+        Assert.Equal(1, status.BytesRemaining);
+        Assert.Equal(300, status.MissingRequired.Length);
+        Assert.Empty(status.ActiveMissingRequired);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _manager.RemoveRetiredAsync("left", "one"));
+        Reconstruct(); // Root and child references, not process memory, govern recovery.
+        await _cache.ImportAsync(new MemoryStream([2]));
+        Assert.True(await _manager.TryActivateSetAsync("catalog", "two"));
+        await _manager.RemoveRetiredSetAsync("catalog", "one");
+        await _manager.RemoveRetiredAsync("left", "one");
+        await _manager.RemoveRetiredAsync("right", "one");
+        await using var oldStream = await old.OpenAsync("left", "149");
+        Assert.Equal(1, oldStream!.ReadByte());
+        await using var current = await _manager.OpenActiveSetAsync("catalog");
+        await using var newStream = await current.OpenAsync("right", "149");
+        Assert.Equal(2, newStream!.ReadByte());
+        Assert.Empty((await _manager.GetSetStatusAsync("catalog")).MissingRequired);
+    }
+
+    [Fact]
+    public async Task PackageSetRefusesSubstitutionAndRootReuseWithoutChangingActiveRoot()
+    {
+        var child = Manifest("one", 1);
+        var root = new OfflinePackageSetManifest(1, "set", "one", null,
+            [new(child.PackageId, child.Revision, OfflinePackageManager.GetManifestSha256(child))]);
+        await _manager.StageSetAsync(root, [child]);
+        await _cache.ImportAsync(new MemoryStream([1]));
+        Assert.True(await _manager.TryActivateSetAsync("set", "one"));
+        await Assert.ThrowsAsync<ArgumentException>(() => _manager.StageSetAsync(root, [Manifest("one", 2)]));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _manager.StageSetAsync(root with { PublishedUtc = DateTimeOffset.UtcNow }, [child]));
+        Assert.Throws<ArgumentException>(() => OfflinePackageManager.ValidateSet(root with { Children = [root.Children[0], root.Children[0]] }));
+        Assert.Equal("one", (await _manager.GetSetStatusAsync("set")).ActiveRevision);
+    }
+
+    [Fact]
     public async Task CandidateIssuesDoNotHideUsableActiveRevisionAndCountSharedBytesOnce()
     {
         Assert.Null(await _manager.GetPreparationAsync("manual"));

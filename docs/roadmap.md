@@ -1,5 +1,9 @@
 # Roadmap
 
+The [26 October implementation audit](review/capabilities-remaining-implementation-2026-10-26.md) reconciles both
+capabilities plans: raw browser streaming, optional package children, isolated CT generations and Apple download-host
+wiring are now implemented within their documented profiles. Device/review/deployment/release qualification remains open.
+
 Phases follow the implementation plan. Each lists its status, the invariants it owns and the next
 concrete work item. Release and verification status: [README](../README.md#status); evidence:
 [support matrix](support-matrix.md). Test ids (T01–T60) refer to the adversarial catalogue; invariants (I01–I20) to
@@ -14,8 +18,10 @@ workloads and targets: ADR-012. Explicit non-goals: see the README.
 
 ## Status
 
-Current development target: **0.5.0 (unreleased)**. Current work: [offline improvement plan](Improvement-Plan.md), release integrity and portable orchestration/content
-implementation. Audited consumers/provenance checks, lifecycle/persistence, transfers/pins/packages, local workflows,
+Published baseline: **0.5.0**; qualification remains open. Unreleased **0.6.0** now has an implementation continuation through B08; see the
+[capabilities implementation plan](../bsync-capabilities-implementation-plan.md), alongside the existing
+[offline improvement plan](Improvement-Plan.md). [B01 evidence](review/capabilities-b01-2026-10-24.md) records
+the first corrections and remaining gates. Audited consumers/provenance checks, lifecycle/persistence, transfers/pins/packages, local workflows,
 portable background dispatch, read-model generations, redacted diagnostics and SQL Server publication recipes are implemented under continuing qualification
 ([ADRs 019–024](architecture/README.md)). Full workstream exit gates remain open.
 The 0.2.0 packages are published, but their source metadata does not establish equivalence to this

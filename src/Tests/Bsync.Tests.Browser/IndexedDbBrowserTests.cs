@@ -27,6 +27,131 @@ public sealed class IndexedDbBrowserTests(BrowserFixture fixture)
 
     [Theory]
     [MemberData(nameof(Browsers))]
+    public async Task RawBlobImportUsesBoundedHashAndSlicesAndSurvivesDeletion(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var owned = context;
+        using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        var chunk = new byte[1024 * 1024]; Array.Fill(chunk, (byte)42);
+        for (var i = 0; i < 17; i++) hash.AppendData(chunk);
+        hash.AppendData(chunk, 0, 11);
+        var expected = Convert.ToHexStringLower(hash.GetHashAndReset());
+        await page.Page.EvaluateAsync("""
+            () => {
+              const digest=crypto.subtle.digest.bind(crypto.subtle), arrayBuffer=Blob.prototype.arrayBuffer, getAll=IDBObjectStore.prototype.getAll;
+              crypto.subtle.digest=(algorithm,data)=>{if(data.byteLength>1048576)throw Error('whole-object hashing');return digest(algorithm,data);};
+              Blob.prototype.arrayBuffer=function(){if(this.size>16*1048576)throw Error('whole-object materialization');return arrayBuffer.call(this);};
+              IDBObjectStore.prototype.getAll=function(...args){if(this.name==='blobs')throw Error('whole payload inventory');return getAll.apply(this,args);};
+            }
+            """);
+        var result = await page.CallAsync("RawStreamingBlob", Unique("raw-streaming"), expected);
+        if (browser == "webkit") Assert.Contains(result, new[] { "ok", "blob-persistence-unavailable" });
+        else Assert.Equal("ok", result);
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task FiniteCapacityLastChunkIsAdmittedByOnlyOneTabAndSurvivesClosingBoth(string browser)
+    {
+        var (context, first) = await NewDeviceAsync(browser);
+        await using var owned = context;
+        var second = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        var name = Unique("last-capacity");
+        Assert.Equal("prepared", await first.CallAsync("FiniteCapacityRace", name, -1));
+        var outcomes = await Task.WhenAll(first.CallAsync("FiniteCapacityRace", name, 1), second.CallAsync("FiniteCapacityRace", name, 2));
+        Assert.Equal(new[] { "admitted", "full" }, outcomes.Order().ToArray());
+        await first.Page.CloseAsync(); await second.Page.CloseAsync();
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("retained", await reopened.CallAsync("FiniteCapacityRace", name, 0));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task PackageSetReloadRetirementRevocationAndStorageLoss(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var owned = context;
+        var name = Unique("package-set");
+        Assert.Equal("ok", await page.CallAsync("PackageSetChecks", name, false));
+        await page.Page.CloseAsync();
+        var reopened = await HarnessPage.OpenAsync(context, fixture.BaseAddress);
+        Assert.Equal("ok", await reopened.CallAsync("PackageSetChecks", name, true));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task CapacityLedgerPreservesReplacementDuringPartialVerification(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var owned = context;
+        Assert.Equal("ok", await page.Page.EvaluateAsync<string>("""
+            async name => {
+              const store=await import('./_content/Bsync.Blazor/bsync-blobs.js');
+              const digest=crypto.subtle.digest.bind(crypto.subtle);
+              const sha=Array.from(new Uint8Array(await digest('SHA-256',new Uint8Array([1]))),b=>b.toString(16).padStart(2,'0')).join('');
+              await store.appendPartial(name,sha,new Uint8Array([1]));
+              let entered, resume;
+              const waiting=new Promise(resolve=>entered=resolve), gate=new Promise(resolve=>resume=resolve);
+              crypto.subtle.digest=async (...args)=>{entered();await gate;return digest(...args);};
+              try {
+                const completing=store.completePartial(name,sha).then(()=>{throw Error('stale completion accepted')},e=>{if(!e.message.includes('conflict'))throw e});
+                await waiting;
+                await store.discardPartial(name,sha);
+                await store.appendPartial(name,sha,new Uint8Array([2]));
+                resume(); await completing;
+                if(await store.partialLength(name,sha)!==1 || await store.storedBytes(name)!==1 || await store.size(name,sha)!==-1)
+                  throw Error('replacement progress lost or stale object published');
+              } finally { resume();crypto.subtle.digest=digest;await store.clear(name); }
+              return 'ok';
+            }
+            """, Unique("capacity-race")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
+    public async Task CapacityLedgerUpgradesResumesReconciliationAndAvoidsInventoryReads(string browser)
+    {
+        var (context, page) = await NewDeviceAsync(browser);
+        await using var owned = context;
+        Assert.Equal("ok", await page.Page.EvaluateAsync<string>("""
+            async name => {
+              const req = r => new Promise((resolve,reject) => { r.onsuccess=()=>resolve(r.result); r.onerror=()=>reject(r.error); });
+              const opening=indexedDB.open('bsync-blobs-'+name,1);
+              opening.onupgradeneeded=()=>opening.result.createObjectStore('blobs');
+              const old=await req(opening);
+              const tx=old.transaction('blobs','readwrite');
+              for(let i=0;i<150;i++) tx.objectStore('blobs').put(new Uint8Array(32).buffer,['object',String(i).padStart(3,'0')]);
+              await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error)}); old.close();
+              const store=await import('./_content/Bsync.Blazor/bsync-blobs.js');
+              if(await store.storedBytes(name)!==4800) throw Error('upgrade lost bytes');
+              let scans=0;
+              const cursor=IDBObjectStore.prototype.openCursor;
+              IDBObjectStore.prototype.openCursor=function(...args){ if(this.name==='blobs')scans++; return cursor.apply(this,args); };
+              try {
+                await Promise.all([store.appendPartial(name,'part',new Uint8Array(28)),store.appendPartial(name,'part',new Uint8Array(29))]);
+                if(await store.storedBytes(name)!==4857) throw Error('racing appends lost accounting');
+                if(scans!==0) throw Error('steady-state payload inventory scan');
+              } finally { IDBObjectStore.prototype.openCursor=cursor; }
+              if(await store.reconcileCapacity(name,1,true)) throw Error('expected pending page');
+              try { await store.appendPartial(name,'blocked',new Uint8Array(1)); throw Error('write admitted during reconciliation'); }
+              catch(e) { if(!e.message.includes('accounting-uncertain'))throw e; }
+              // Import another module instance to model a new realm resuming durable reconciliation.
+              const reopened=await import('./_content/Bsync.Blazor/bsync-blobs.js?reopened='+name);
+              if(await reopened.storedBytes(name)!==4857) throw Error('resume under/double charged');
+              await reopened.discardPartial(name,'part');
+              await reopened.remove(name,'000');
+              if(await reopened.storedBytes(name)!==4768) throw Error('delete accounting');
+              try { const legacy=await req(indexedDB.open('bsync-blobs-'+name,1));legacy.close();throw Error('legacy writer admitted'); }
+              catch(e) { if(e.name!=='VersionError')throw e; }
+              // Close the second connection before deleting through the first module.
+              await reopened.clear(name);
+              return 'ok';
+            }
+            """, Unique("capacity-ledger")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Browsers))]
     public async Task ChunkedEncryptionResumesLargeObjectsAndProtectsAtomicPayloads(string browser)
     {
         var (context, page) = await NewDeviceAsync(browser);

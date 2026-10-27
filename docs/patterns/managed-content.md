@@ -182,3 +182,14 @@ blocks retirement of potentially used keys. Current, partial, retired, reader-he
 listed until collection safely removes them. Also account for v1 sources, protected orchestration, backups and other
 stores: this cache page alone never authorizes key deletion. See
 [ADR-035](../architecture/adr-035-generation-integrity-maintenance.md).
+
+For an atomic set with optional packages, use root schema 2 and set `Optional = true` on those exact child references.
+All child manifests are still immutable, validated and authorized at staging. Optional missing content or later
+revocation does not block required-child activation. Read `OptionalFailures` and `ActiveOptionalFailures` separately
+from required bytes remaining. A set snapshot records `UnavailableOptionalChildren`; their item opens return null,
+and later repair becomes available only through a new snapshot. See [ADR-039](../architecture/adr-039-atomic-package-sets.md).
+
+Browser raw imports now use bounded managed hashing and Blob-backed completion/ranges where the session supports
+IndexedDB Blob persistence. Private WebKit sessions that refuse it keep the 16 MiB ArrayBuffer path; larger partials
+remain stored and completion explicitly fails. Encrypted-v2 physical chunks fit the fallback. Existing legacy raw
+ArrayBuffers remain readable with their original whole-object cost. See [ADR-036](../architecture/adr-036-encryption-admission-and-browser-capacity.md).

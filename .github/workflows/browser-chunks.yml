@@ -16,6 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         aot: ['false', 'true']
+        budget: ['unlimited', 'finite']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -30,7 +31,7 @@ jobs:
             dotnet pack "src/Bsync/$package" -c Release -o artifacts/packages -p:VersionSuffix=$suffix
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Browser -c Release -p:BsyncPackageVersion=0.5.0-$suffix -p:RunAOTCompilation=${{ matrix.aot }} -p:IntermediateOutputPath=obj/qualification/ -p:OutputPath=bin/qualification/ -o artifacts/browser-host
+          dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Browser -c Release -p:BsyncPackageVersion=0.6.0-$suffix -p:RunAOTCompilation=${{ matrix.aot }} -p:IntermediateOutputPath=obj/qualification/ -p:OutputPath=bin/qualification/ -o artifacts/browser-host
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build src/Tools/Bsync.BrowserQualification -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -38,16 +39,18 @@ jobs:
       - name: Qualify declared sizes in fresh engines
         shell: pwsh
         run: |
-          dotnet src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/Bsync.BrowserQualification.dll artifacts/browser-host/wwwroot artifacts/browser-results/chromium-firefox 1,16,17,256,1024 --persistent --engines=chromium,firefox
+          $budgetArgument = @()
+          if ('${{ matrix.budget }}' -eq 'finite') { $budgetArgument += '--finite-budget' }
+          dotnet src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/Bsync.BrowserQualification.dll artifacts/browser-host/wwwroot artifacts/browser-results/chromium-firefox 1,16,17,256,1024 --persistent --engines=chromium,firefox @budgetArgument
           $qualificationFailed = $LASTEXITCODE -ne 0
           $webkitSizes = '1,16,17,256'
           if ('${{ inputs.probe_webkit_1gib }}' -eq 'true') { $webkitSizes += ',1024' }
-          dotnet src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/Bsync.BrowserQualification.dll artifacts/browser-host/wwwroot artifacts/browser-results/webkit $webkitSizes --persistent --engines=webkit
+          dotnet src/Tools/Bsync.BrowserQualification/bin/Release/net10.0/Bsync.BrowserQualification.dll artifacts/browser-host/wwwroot artifacts/browser-results/webkit $webkitSizes --persistent --engines=webkit @budgetArgument
           if ($qualificationFailed -or $LASTEXITCODE -ne 0) { exit 1 }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-chunks-aot-${{ matrix.aot }}
+          name: browser-chunks-aot-${{ matrix.aot }}-${{ matrix.budget }}
           path: |
             artifacts/browser-results/**
             artifacts/packages/**

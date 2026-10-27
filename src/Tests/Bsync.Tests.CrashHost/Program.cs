@@ -11,6 +11,16 @@ using Bsync.Storage.Sqlite;
 // The test process kills this process at an arbitrary point and inspects the database afterwards.
 
 var mode = args[0];
+if (mode == "capture-kill")
+{
+    await CaptureCrashHost.RunAsync(args[1]);
+    return;
+}
+if (mode == "package-set")
+{
+    await PackageSetCrashHost.RunAsync(args[1], args[2], args[3] == "after");
+    return;
+}
 if (mode is "maintenance-checkpoint" or "network-owner")
 {
     await MaintenanceCrashHost.RunAsync(args[1], mode);

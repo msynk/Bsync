@@ -1,6 +1,37 @@
 # Compatibility policy and migration notes
 
-## 0.5.0 (unreleased) - Gap closure
+## 0.6.0 (unreleased) - Capabilities continuation
+
+Public APIs are additive to published 0.5.0; extracted sample classes now live in
+`Bsync.Server.SqlServer.Workflows`. Sample consumers update their namespace and implement a stable receiver `Identity`.
+The new APIs remain experimental pending their [qualification gates](review/capabilities-implementation-2026-10-24.md).
+
+Browser blob databases upgrade from 1/2 to 3 and build a durable capacity ledger before admitting writes when needed. Older schema-1/2
+modules refuse on reopen; close older tabs before upgrading. New raw complete objects use Blob handles; existing ArrayBuffers remain readable.
+The managed provider hashes and reads in bounded slices. Sessions refusing Blob persistence retain a 16 MiB ArrayBuffer
+fallback; larger partials remain recoverable and completion explicitly refuses. Encrypted-v2 bounded records fit this fallback.
+Explicit reconciliation repairs accounting after external interference and blocks writes until all pages finish.
+
+Package-set first use raises orchestration feature version to 3 across SQLite/IndexedDB. Version-1/2 data is retained.
+Stop older processes/tabs under account ownership before enabling sets; published 0.5.0 refuses the new version on reopen.
+Do not downgrade metadata versions manually or drop child-reference records. Single-package manifests retain their cap.
+Set root schema 2 adds optional child membership; schema 1 serialization is unchanged. Older set readers refuse schema 2.
+Every child manifest must be authorized when staged. Missing/revoked optional children do not block activation and are
+reported separately; snapshots fix their available child membership at open time.
+
+Multipart routes are additive. Explicit 501 initiation can fall back to existing uploads; auth/404/conflicting sessions
+cannot. Resume metadata is account scoped and must survive retries. S3 remains an optional sample recipe, not a seventh
+supported package. SQL workflow migrations run explicitly. Command, projection and effect registry versions remain 1;
+Change Tracking migrates to version 2 for isolated generations and failure diagnostics. Stop all old capture workers
+before migration; old runtimes refuse version 2. Existing cursors/batches are retained, and unknown newer versions refuse.
+Change Tracking requires same-database publication, explicit deployment prerequisites and an external restore epoch.
+Generation staging supports up to 1,000,000 durable keys with 1..10,000-key build pages. The final handoff locks source
+writers and applies at most the configured ordinary batch budget before atomically activating the complete scope.
+
+These changed bytes must use 0.6.0 previews/new release identities, never overwrite 0.5.0 archives. Local preview builds
+are not clean tagged release candidates. Published-old-binary migration and the full hosted matrix remain open.
+
+## 0.5.0 (published; observed 2026-10-24) - Gap closure
 
 `ChunkedEncryptedBlobCache.ScrubAsync` and `GetKeyRetentionPageAsync` are additive. Their independently versioned
 `encrypted-scrub/v1/` and `encrypted-generation-key/v1/` journals do not change the v2 chunk or document wire formats.

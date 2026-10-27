@@ -46,3 +46,145 @@ sealed class Bsync.Server.SqlServer.SqlServerSyncAuthority<TDocument> : Bsync.Se
   System.Void NotifyCommitted(Bsync.Server.AuthorityCommit commit)
   public event System.Action<Bsync.Server.AuthorityCommit> Committed
   static System.Threading.Tasks.Task<Bsync.Server.SqlServer.SqlServerSyncAuthority<TDocument>> CreateAsync(Bsync.Server.SqlServer.SqlServerSyncAuthorityOptions<TDocument> options, System.Threading.CancellationToken cancellationToken = default)
+record Bsync.Server.SqlServer.Workflows.ChangeTrackingBatch
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ChangeTrackingBatch other)
+  System.Boolean InitialSnapshot { get; init; }
+  System.Collections.Generic.IReadOnlyList<Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey> Keys { get; init; }
+  System.Guid Id { get; init; }
+  System.Int64 UpperVersion { get; init; }
+  System.Int64? LowerVersion { get; init; }
+  System.Void Deconstruct(out System.Guid Id, out System.Int64? LowerVersion, out System.Int64 UpperVersion, out System.Boolean InitialSnapshot, out System.Collections.Generic.IReadOnlyList<Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey> Keys)
+  ctor(System.Guid Id, System.Int64? LowerVersion, System.Int64 UpperVersion, System.Boolean InitialSnapshot, System.Collections.Generic.IReadOnlyList<Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey> Keys)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Server.SqlServer.Workflows.ChangeTrackingGeneration
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ChangeTrackingGeneration other)
+  System.DateTimeOffset UpdatedUtc { get; init; }
+  System.Guid BatchId { get; init; }
+  System.Guid Id { get; init; }
+  System.Int32 CompletedKeys { get; init; }
+  System.Int32 TotalKeys { get; init; }
+  System.Int64 Boundary { get; init; }
+  System.String Failure { get; init; }
+  System.String Status { get; init; }
+  System.Void Deconstruct(out System.Guid Id, out System.Guid BatchId, out System.Int32 CompletedKeys, out System.Int32 TotalKeys, out System.Int64 Boundary, out System.String Status, out System.DateTimeOffset UpdatedUtc, out System.String Failure)
+  ctor(System.Guid Id, System.Guid BatchId, System.Int32 CompletedKeys, System.Int32 TotalKeys, System.Int64 Boundary, System.String Status, System.DateTimeOffset UpdatedUtc, System.String Failure)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Server.SqlServer.Workflows.ChangeTrackingHealth
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ChangeTrackingHealth other)
+  System.Boolean RequiresResnapshot { get; init; }
+  System.DateTimeOffset ObservedUtc { get; init; }
+  System.DateTimeOffset? PendingSinceUtc { get; init; }
+  System.Guid? PendingBatchId { get; init; }
+  System.Int32 PendingKeys { get; init; }
+  System.Int64? CurrentVersion { get; init; }
+  System.Int64? MinimumValidVersion { get; init; }
+  System.Int64? PublishedVersion { get; init; }
+  System.String PendingFailure { get; init; }
+  System.String Reason { get; init; }
+  System.Void Deconstruct(out System.DateTimeOffset ObservedUtc, out System.Int64? PublishedVersion, out System.Int64? CurrentVersion, out System.Guid? PendingBatchId, out System.Int32 PendingKeys, out System.DateTimeOffset? PendingSinceUtc, out System.Int64? MinimumValidVersion, out System.Boolean RequiresResnapshot, out System.String Reason)
+  ctor(System.DateTimeOffset ObservedUtc, System.Int64? PublishedVersion, System.Int64? CurrentVersion, System.Guid? PendingBatchId, System.Int32 PendingKeys, System.DateTimeOffset? PendingSinceUtc, System.Int64? MinimumValidVersion, System.Boolean RequiresResnapshot, System.String Reason)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey
+  System.Boolean Deleted { get; init; }
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey other)
+  System.String Key { get; init; }
+  System.String Schema { get; init; }
+  System.String Table { get; init; }
+  System.Void Deconstruct(out System.String Schema, out System.String Table, out System.String Key, out System.Boolean Deleted)
+  ctor(System.String Schema, System.String Table, System.String Key, System.Boolean Deleted)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceTable
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceTable other)
+  System.String KeyColumn { get; init; }
+  System.String Schema { get; init; }
+  System.String Table { get; init; }
+  System.Void Deconstruct(out System.String Schema, out System.String Table, out System.String KeyColumn)
+  ctor(System.String Schema, System.String Table, System.String KeyColumn)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Server.SqlServer.Workflows.CommandLedgerResult
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.CommandLedgerResult other)
+  System.Boolean Replayed { get; init; }
+  System.Boolean ResultExpired { get; init; }
+  System.String Result { get; init; }
+  System.Void Deconstruct(out System.Boolean Replayed, out System.Boolean ResultExpired, out System.String Result)
+  ctor(System.Boolean Replayed, System.Boolean ResultExpired, System.String Result)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+record Bsync.Server.SqlServer.Workflows.ExternalEffect
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ExternalEffect other)
+  System.String CommandId { get; init; }
+  System.String IdempotencyKey { get; init; }
+  System.String Payload { get; init; }
+  System.String Scope { get; init; }
+  System.Void Deconstruct(out System.String Scope, out System.String CommandId, out System.String Payload, out System.String IdempotencyKey)
+  ctor(System.String Scope, System.String CommandId, System.String Payload, System.String IdempotencyKey)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+static class Bsync.Server.SqlServer.Workflows.ExternalEffectDelivery
+  static System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ExternalEffectOutcome> DispatchAsync(Bsync.Server.SqlServer.Workflows.IExternalEffectReceiver receiver, Bsync.Server.SqlServer.Workflows.ExternalEffect effect, System.Boolean previouslyAttempted, System.Threading.CancellationToken cancellationToken)
+sealed class Bsync.Server.SqlServer.Workflows.ExternalEffectOutbox
+  System.Threading.Tasks.Task InitializeAsync(System.Threading.CancellationToken ct = default)
+  System.Threading.Tasks.Task<System.Int32> DrainAsync(Bsync.Server.SqlServer.Workflows.IExternalEffectReceiver receiver, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, Bsync.Server.SqlServer.Workflows.ExternalEffect, Bsync.Server.SqlServer.Workflows.ExternalEffectOutcome, System.Threading.CancellationToken, System.Threading.Tasks.Task> publishResult, System.Int32 limit = 32, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> DrainAsync(System.Func<Bsync.Server.SqlServer.Workflows.ExternalEffect, System.Threading.CancellationToken, System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ExternalEffectOutcome>> send, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, Bsync.Server.SqlServer.Workflows.ExternalEffect, Bsync.Server.SqlServer.Workflows.ExternalEffectOutcome, System.Threading.CancellationToken, System.Threading.Tasks.Task> publishResult, System.Int32 limit = 32, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String connectionString)
+  static System.Threading.Tasks.Task EnqueueAsync(Microsoft.Data.SqlClient.SqlConnection connection, Microsoft.Data.SqlClient.SqlTransaction transaction, System.String scope, System.String commandId, System.String payload, System.Threading.CancellationToken ct = default)
+enum Bsync.Server.SqlServer.Workflows.ExternalEffectOutcome
+  CredentialsUnavailable = 4
+  ReconciliationRequired = 3
+  Rejected = 2
+  RetryLater = 1
+  Succeeded = 0
+enum Bsync.Server.SqlServer.Workflows.ExternalEffectStatus
+  NotExecuted = 1
+  Pending = 2
+  Rejected = 4
+  Succeeded = 3
+  Unknown = 0
+record Bsync.Server.SqlServer.Workflows.ExternalReceiverCapabilities
+  System.Boolean Deduplicates { get; init; }
+  System.Boolean Equals(Bsync.Server.SqlServer.Workflows.ExternalReceiverCapabilities other)
+  System.Boolean StatusLookup { get; init; }
+  System.Void Deconstruct(out System.Boolean Deduplicates, out System.Boolean StatusLookup)
+  ctor(System.Boolean Deduplicates, System.Boolean StatusLookup)
+  virtual System.Boolean Equals(System.Object obj)
+  virtual System.Int32 GetHashCode()
+  virtual System.String ToString()
+interface Bsync.Server.SqlServer.Workflows.IExternalEffectReceiver
+  Bsync.Server.SqlServer.Workflows.ExternalReceiverCapabilities Capabilities { get; }
+  System.String Identity { get; }
+  abstract System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ExternalEffectOutcome> SendAsync(Bsync.Server.SqlServer.Workflows.ExternalEffect effect, System.Threading.CancellationToken cancellationToken)
+  abstract System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ExternalEffectStatus> LookupAsync(Bsync.Server.SqlServer.Workflows.ExternalEffect effect, System.Threading.CancellationToken cancellationToken)
+  abstract System.Threading.Tasks.Task<System.Boolean> AuthorizeAsync(Bsync.Server.SqlServer.Workflows.ExternalEffect effect, System.Threading.CancellationToken cancellationToken)
+sealed class Bsync.Server.SqlServer.Workflows.SqlServerChangeTrackingCapture
+  System.Threading.Tasks.Task AbandonGenerationAsync(System.Guid generation, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task BeginResnapshotAsync(System.String expectedPreviousEpoch, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ChangeTrackingBatch> StageAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ChangeTrackingGeneration> BeginGenerationAsync(System.String expectedPreviousEpoch = null, System.Int32 maximumKeys = 1000000, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ChangeTrackingGeneration> BuildGenerationPageAsync(System.Guid generation, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, System.Guid, System.Collections.Generic.IReadOnlyList<Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey>, System.Threading.CancellationToken, System.Threading.Tasks.Task> build, System.Int32 pageSize = 1000, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ChangeTrackingGeneration> CatchUpGenerationAsync(System.Guid generation, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ChangeTrackingGeneration> GetGenerationAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.ChangeTrackingHealth> GetHealthAsync(System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> ActivateGenerationAsync(System.Guid generation, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, System.Threading.CancellationToken, System.Threading.Tasks.Task> acquirePublicationLocks, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, System.Guid, System.Collections.Generic.IReadOnlyList<Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceKey>, System.Threading.CancellationToken, System.Threading.Tasks.Task> apply, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, System.Guid, System.Threading.CancellationToken, System.Threading.Tasks.Task> activate, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Boolean> PublishAsync(System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, Bsync.Server.SqlServer.Workflows.ChangeTrackingBatch, System.Threading.CancellationToken, System.Threading.Tasks.Task> publish, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String connectionString, System.String stream, System.String sourceEpoch, System.String projectionSchema, System.Collections.Generic.IReadOnlyList<Bsync.Server.SqlServer.Workflows.ChangeTrackingSourceTable> tables, System.Int32 maximumKeys = 10000)
+  static System.String MigrationSql { get; }
+static class Bsync.Server.SqlServer.Workflows.SqlServerCommandLedger
+  static System.String MigrationSql { get; }
+  static System.Threading.Tasks.Task<Bsync.Server.SqlServer.Workflows.CommandLedgerResult> ExecuteAsync(Microsoft.Data.SqlClient.SqlConnection connection, Microsoft.Data.SqlClient.SqlTransaction transaction, System.String scope, System.String commandId, System.String actor, System.String canonicalPayload, System.DateTimeOffset resultExpiresUtc, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.String>> execute, System.Threading.CancellationToken cancellationToken = default)
+sealed class Bsync.Server.SqlServer.Workflows.SqlServerProjectionOutbox
+  System.Threading.Tasks.Task RequestAsync(Microsoft.Data.SqlClient.SqlConnection connection, Microsoft.Data.SqlClient.SqlTransaction transaction, System.String scope, System.String documentId, System.Threading.CancellationToken cancellationToken = default)
+  System.Threading.Tasks.Task<System.Int32> DrainAsync(System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task> acquirePublicationLocks, System.Func<Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlClient.SqlTransaction, System.String, System.String, System.Threading.CancellationToken, System.Threading.Tasks.Task> publishCanonical, System.Int32 limit = 100, System.Threading.CancellationToken cancellationToken = default)
+  ctor(System.String connectionString, System.String projection)
+  static System.String MigrationSql { get; }

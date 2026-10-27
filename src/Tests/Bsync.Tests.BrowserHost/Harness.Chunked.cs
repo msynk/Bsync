@@ -10,6 +10,37 @@ namespace Bsync.Tests.BrowserHost;
 
 public static partial class Harness
 {
+    [JSInvokable(nameof(FiniteCapacityRace))]
+    public static async Task<string> FiniteCapacityRace(string name, int value)
+    {
+        var account = new AccountScope("tests", "finite-capacity", name);
+        await using var metadata = await IndexedDbOrchestrationStore.OpenAsync(_js, account);
+        await using var operations = await BrowserBlobCacheLock.OpenAsync(_js, account);
+        await using var lifetimes = await BrowserAccountResourceLock.OpenAsync(_js);
+        await using var crypto = await BrowserBlobEncryption.OpenAsync(_js);
+        var backing = await BrowserBlobStore.OpenAsync(_js, account.StorageKey);
+        const long budget = 1048576 + 28;
+        if (value == -1)
+        {
+            // Format migration requires exclusive account startup before multiple tabs begin using it.
+            await metadata.RequireFeatureVersionAsync(2);
+            return "prepared";
+        }
+        if (value == 0)
+        {
+            var stored = await backing.GetStoredBytesAsync();
+            if (stored != budget) throw new Exception("Last-capacity race lost or overcommitted durable bytes.");
+            await metadata.DeleteAllAsync(); await BrowserBlobStore.DeleteAllAsync(_js, account.StorageKey);
+            return "retained";
+        }
+        var cache = new ChunkedEncryptedBlobCache(new BlobCacheChunkStore(backing), metadata, operations, lifetimes,
+            new BlobTestKeys(), new(account, "capacity", 1), crypto, hardBudgetBytes: budget);
+        var bytes = new byte[1048576]; Array.Fill(bytes, (byte)value);
+        var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        try { await cache.AppendPartialAsync(hash, bytes); return "admitted"; }
+        catch (BlobCapacityException) { return "full"; }
+    }
+
     [JSInvokable(nameof(ChunkScrubReloadChecks))]
     public static async Task<string> ChunkScrubReloadChecks(string name, bool reopened)
     {

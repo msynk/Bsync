@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Playwright;
 
 var engineOptions = args.Where(value => value.StartsWith("--engines=", StringComparison.Ordinal)).ToArray();
+var finite = args.Contains("--finite-budget", StringComparer.Ordinal);
+args = args.Where(value => value != "--finite-budget").ToArray();
 if (engineOptions.Length > 1) return 2;
 var engineNames = (engineOptions.SingleOrDefault()?["--engines=".Length..] ?? "chromium,firefox,webkit").Split(',');
 if (engineNames.Distinct().Count() != engineNames.Length || engineNames.Any(name => name is not ("chromium" or "firefox" or "webkit"))) return 2;
@@ -14,7 +16,7 @@ const int caseTimeoutMinutes = 20;
 if (persistent) args = args[..^1];
 if (args.Length is < 2 or > 3)
 {
-    Console.Error.WriteLine("Usage: <published-wwwroot> <new-output-directory> [comma-separated-MiB=1,16,17,256,1024] [--persistent] [--engines=chromium,firefox,webkit]");
+    Console.Error.WriteLine("Usage: <published-wwwroot> <new-output-directory> [comma-separated-MiB=1,16,17,256,1024] [--persistent] [--finite-budget] [--engines=chromium,firefox,webkit]");
     return 2;
 }
 var root = Path.GetFullPath(args[0]);
@@ -81,8 +83,17 @@ foreach (var size in sizes)
         result.BrowserVersion = (browser ?? context.Browser)?.Version ?? await page.EvaluateAsync<string>("() => navigator.userAgent");
         result.StorageAtStart = await page.EvaluateAsync<JsonElement>("async () => navigator.storage?.estimate ? await navigator.storage.estimate() : null");
         var managedJson = await page.EvaluateAsync<string>("""
-            ([size, hash]) => DotNet.invokeMethodAsync('Bsync.Tests.BrowserHost', 'QualifyChunkBuffers', crypto.randomUUID(), size, hash)
-            """, new object[] { size, referenceHashes[size] }).WaitAsync(TimeSpan.FromMinutes(caseTimeoutMinutes));
+            async ([size, hash, finite]) => {
+              let scans=0;
+              const cursor=IDBObjectStore.prototype.openCursor;
+              IDBObjectStore.prototype.openCursor=function(...args){if(this.name==='blobs')scans++;return cursor.apply(this,args);};
+              try {
+                const result=await DotNet.invokeMethodAsync('Bsync.Tests.BrowserHost', finite ? 'QualifyFiniteChunkBuffers' : 'QualifyChunkBuffers', crypto.randomUUID(), size, hash);
+                if(scans!==0)throw Error('Steady-state workload scanned physical payload inventory');
+                const report=JSON.parse(result);report.FiniteBudget=finite;report.PayloadInventoryScans=scans;return JSON.stringify(report);
+              } finally {IDBObjectStore.prototype.openCursor=cursor;}
+            }
+            """, new object[] { size, referenceHashes[size], finite }).WaitAsync(TimeSpan.FromMinutes(caseTimeoutMinutes));
         var browserMemory = await page.EvaluateAsync<JsonElement>("() => window.bsyncQualificationFinish()");
         if (browserMemory.GetProperty("observedWasmMemories").GetInt32() == 0)
             throw new InvalidDataException("WASM memory observation unavailable.");

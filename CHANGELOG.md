@@ -4,7 +4,37 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
 [docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
 
+## 0.6.0 - 2026-10-27
+
+- Add optional encryption-use admission keyed by actual key material, with a durable monotone invocation ceiling.
+- Add an IndexedDB capacity ledger with atomic accounting, paged crash-resumable reconciliation and stale-part
+  completion/rename refusal. Schema 3 adds bounded managed hashing, Blob-backed raw reads and transactional completion;
+  sessions refusing Blob persistence retain a bounded 16 MiB fallback and preserve larger partials on refusal.
+- Add experimental resumable multipart client/control endpoints and an S3 SDK recipe with scoped durable sessions,
+  service reconciliation, URL refresh, bounded verification, retry-safe publication, abort tombstones and bounded orphan
+  sweeping that preserves verified completion replay.
+- Add immutable flat offline package sets over existing package/cache/transfer infrastructure, one active-root pointer,
+  active/candidate repair status, reader-safe retirement and shared-content I/O deduplication. Schema-2 roots add optional
+  children, failure reporting and fixed snapshot membership. First use raises orchestration feature version to 3.
+- Extract SQL Server command ledger, projection outbox and receiver-aware effect outbox APIs; add explicit versioned
+  migrations, stable receiver binding, committed worker metrics and a scoped DI worker with joined shutdown. Add bounded same-database Change Tracking capture,
+  sealed replay, atomic publication/cursor updates, read-only lag/health observations and explicit epoch/resnapshot recovery.
+  Capture migration 2 adds isolated generation builds, paged catch-up, failed-projection diagnostics and atomic writer handoff.
+  These integrations are experimental.
+- Wire the Apple reference host to durable download receipts, callback relaunch, verified import, explicit spool protection,
+  ticket renewal and joined deletion. Native SDK/device qualification remains pending.
+- Keep SHA-256 round constants in one static array, avoiding per-block allocations in Debug builds as well as Release.
+- Add LocalDB, protocol/fault, browser accounting and package-only workflow coverage. Record outstanding qualification
+  and implementation requirements in the [capabilities hardening record](docs/review/capabilities-closure-2026-10-26.md).
+
+- Isolate the streaming SHA-256 allocation regression from the platform reference digest; preserve the 513 MiB
+  correctness check and existing allocation ceiling. Keep SQLCipher CI execution and its test artifacts after core failures.
+- Reconcile published 0.5.0 status and record the capabilities-plan B01 baseline without claiming release qualification.
+
 ## 0.5.0 - 2026-10-19
+
+Publication confirmed by downloads on 2026-10-24; the heading date is retained from the existing changelog.
+See the [B01 inventory](docs/review/capabilities-b01-2026-10-24.md) for package identities and open qualification gates.
 
 - Bound full-content SHA-256 on WebAssembly instead of using the runtime's whole-input buffering fallback. Keep
   native platform hashing, plaintext identities and formats unchanged; add independent digest and allocation regressions.

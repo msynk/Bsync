@@ -11,6 +11,43 @@ public sealed class NativeBackgroundRuntimeTests
     private readonly InMemoryOrchestrationStore _catalog = new();
 
     [Fact]
+    public async Task ReferenceDownloadHostResumesReceiptsAndDeletionFencesEveryReopen()
+    {
+        var directory = Directory.CreateTempSubdirectory("bsync-native-download-host-").FullName;
+        try
+        {
+            var host = new HeadlessSampleHost(directory);
+            Assert.Null(await host.OpenDownloadsAsync());
+            await host.RequestDemoAsync(new Unsupported());
+            var registration = await host.OpenDownloadsAsync(); Assert.NotNull(registration);
+            var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3 }));
+            var id = await registration.Inbox.PrepareAsync(hash, 3, "example");
+            var downloaded = Path.Combine(directory, "os-temp"); await File.WriteAllBytesAsync(downloaded, [1, 2, 3]);
+            await registration.Inbox.AcceptAsync(id, downloaded, 200);
+            await registration.DisposeAsync();
+            host = new HeadlessSampleHost(directory);
+            registration = await host.OpenDownloadsAsync(); Assert.NotNull(registration);
+            Assert.Equal(1, await registration.Inbox.DrainAsync(host.OpenDownloadScopeAsync));
+            Assert.True((await registration.Inbox.GetAsync(id))!.Imported);
+            var canceled = false;
+            await host.DeleteDemoAsync(async () =>
+            {
+                Assert.Null(await host.OpenDownloadScopeAsync(HeadlessSampleHost.DemoAccount.StorageKey, default));
+                canceled = true; await registration.DisposeAsync();
+            });
+            Assert.True(canceled); Assert.False(Directory.Exists(host.DownloadDirectory));
+            Assert.Null(await new HeadlessSampleHost(directory).OpenDownloadsAsync());
+            Assert.Equal(BackgroundWorkOutcome.DeferredByHost, await host.RequestDemoAsync(new Unsupported()));
+            await host.DeleteDemoAsync(() => Task.CompletedTask);
+        }
+        finally
+        {
+            await Bsync.Storage.Sqlite.SqliteStorePool.DeleteDatabaseAsync(Path.Combine(directory, "catalog.db"));
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public async Task ForegroundFallbackOpensFreshScopesAndCompletesDurableDeferredWorkOnce()
     {
         var dispatcher = new BackgroundWorkDispatcher(_catalog);

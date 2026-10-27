@@ -53,11 +53,15 @@ public sealed class StreamingSha256Tests
     {
         var block = new byte[1048576]; new Random(411).NextBytes(block);
         using var hash = new StreamingSha256(forceManaged: true);
-        using var platform = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         hash.AppendData(block); hash.GetHashAndReset(); // Warm the compression implementation before measuring allocations.
         var allocated = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 513; i++) { hash.AppendData(block); platform.AppendData(block); }
+        for (var i = 0; i < 513; i++) hash.AppendData(block);
         var increase = GC.GetAllocatedBytesForCurrentThread() - allocated;
+
+        // The platform digest is an independent correctness oracle, not part of the managed
+        // compression allocation budget. Its lazy initialization/instrumentation varies by host.
+        using var platform = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        for (var i = 0; i < 513; i++) platform.AppendData(block);
         Assert.Equal(platform.GetHashAndReset(), hash.GetHashAndReset());
         Assert.True(increase < 4096, $"Streaming compression allocated {increase} bytes.");
     }

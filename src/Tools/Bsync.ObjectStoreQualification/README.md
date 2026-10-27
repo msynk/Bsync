@@ -30,7 +30,7 @@ request headers `Content-Type` and `Range`, and expose `Content-Range`. For exam
 
 ```json
 {"CORSRules":[{"AllowedOrigins":["http://127.0.0.1:58991"],"AllowedMethods":["PUT","GET","HEAD"],
-"AllowedHeaders":["Content-Type","Range"],"ExposeHeaders":["Content-Range"],"MaxAgeSeconds":300}]}
+"AllowedHeaders":["Content-Type","Range"],"ExposeHeaders":["Content-Range","ETag"],"MaxAgeSeconds":300}]}
 ```
 
 Browser failures are retained; a native HTTP success cannot substitute for CORS. See AWS's
@@ -38,7 +38,7 @@ Browser failures are retained; a native HTTP success cannot substitute for CORS.
 [presigned URL expiration rules](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
 
 ```powershell
-dotnet build src/Tools/Bsync.ObjectStoreQualification -c Release -p:BsyncPackageVersion=0.4.0-gapclosure.20261019.1
+dotnet build src/Tools/Bsync.ObjectStoreQualification -c Release -p:BsyncPackageVersion=<exact-preview-version>
 # Install the three Playwright engines if this machine does not already have them.
 powershell -File src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/playwright.ps1 install
 dotnet src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/Bsync.ObjectStoreQualification.dll artifacts/objectstore-run-1
@@ -51,7 +51,10 @@ directories must be new. Every check, including cleanup, must pass for process e
 The checks cover a 6 MiB direct upload, acknowledgement loss after durable completion, replay without resending,
 service enforcement of a two-second ticket expiry, a real `HttpBlobTransfer` refresh while resuming a two-MiB partial,
 no bearer/cookies on direct requests, browser PUT/full-hash/range/header exposure in all three engines, and orphan
-removal without deleting completed content. The expiry check waits four seconds and uses a fresh request; synchronize
+removal without deleting completed content. Multipart checks additionally cover a 10 MiB plus 17-byte upload,
+service acceptance before a lost part reply, closing/reopening both client and server SQLite stores, skipping the
+accepted part, lost completion replies, scope isolation, corrupt-content refusal, idempotent abort, and exposed
+ETag receipts in Chromium/Firefox/WebKit. These reopen tests do not claim physical server process-restart coverage. The expiry check waits four seconds and uses a fresh request; synchronize
 the client/server clocks before qualification. The run has a ten-minute cancellation deadline and bounded HTTP/browser
 operations. These are correctness checks, not throughput or mobile performance measurements.
 
@@ -68,8 +71,8 @@ The browser checks also reject persisted `aws-chunked` content encoding, which W
 The [SeaweedFS runner](run-local-seaweed.py) starts a supplied, verified official Windows executable on loopback with
 random credentials and a new data directory/bucket, configures CORS only on that generated bucket, runs qualification,
 checks cleanup and stops the server. It requires `boto3` in the selected Python environment. It never downloads or installs
-the server itself. SeaweedFS 4.48's official `windows_amd64.zip` archive used here has SHA-256
-`fe90c04c0620ad1a1c756f86cd5e1443773f56a446688077a4bb5ec04c3cc874`.
+the server itself. SeaweedFS 4.49's official `windows_amd64.zip` archive used here has SHA-256
+`34f722f32399293721ba5d87f59a2ee9d108f09267f8a6a6bc8b8c84d72ab171`.
 
 ```powershell
 python src/Tools/Bsync.ObjectStoreQualification/run-local-seaweed.py <verified-weed.exe> artifacts/new-local-service-run
@@ -83,3 +86,8 @@ The optional [GitHub workflow](../../../.github/workflows/object-store.yml) pack
 builds this runner against them and retains packages/results. Configure the endpoint/bucket/region repository variables
 and the three `BSYNC_OBJECTSTORE_*` credential secrets named in the workflow before dispatch. The workflow never publishes
 packages. Its existence is not evidence that the service qualification has run.
+
+The same runner accepts a verified MinIO executable with `--minio`. The optional local-service workflow builds
+MinIO from pinned source commit `7aac2a2c5b7c882e68c1ce017d8256be2feea27f` and tests it separately from SeaweedFS.
+A configured workflow is not a passing result or a production support recommendation; retain server identity, hashes
+and every result. Both modes use only a newly generated bucket and ephemeral credentials.

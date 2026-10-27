@@ -17,8 +17,9 @@ Release status and historical provenance: [README](../../README.md#status),
    remaining provider/browser/device qualification evidence.
 
 This workflow never publishes. It does not replace the full support matrix or ten-run qualification gate.
-0.4.0 archives are already published; never repack changed bytes as 0.4.0. The next stable release is 0.5.0 and needs a clean
-matching immutable tag before stable preflight can pass.
+0.4.0 and 0.5.0 archives are already published; never repack changed bytes under either version. The next stable release is 0.6.0
+and requires a clean matching immutable tag before stable preflight can pass.
+The [0.5.0 inventory and B01 diagnosis](../review/capabilities-b01-2026-10-24.md) separate publication from qualification.
 The historical 0.2.0 published-source mismatch remains unresolved.
 
 The latest core gap-closure development checkpoint is `0.4.0-gapclosure.20261019.3`; earlier previews are immutable archives.
@@ -41,14 +42,14 @@ changing a package's bytes without changing its preview version is not a valid t
 python -m unittest discover -s scripts -p 'test_*.py' -v
 # Repeat for each of the six packages listed in scripts/release.py:
 dotnet pack src/Bsync/Bsync -c Release -o artifacts/packages -p:VersionSuffix=local.1 -p:ContinuousIntegrationBuild=true
-python scripts/release.py manifest --version 0.5.0-local.1
+python scripts/release.py manifest --version 0.6.0-local.1
 $packageCommit = git rev-parse HEAD
 dotnet run --project src/Tools/Bsync.PackageVerifier -c Release -- artifacts/packages $packageCommit
 python scripts/verify_symbols_test.py artifacts/packages -v
-dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.5.0-local.1
-dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.5.0-local.1 -o artifacts/consumer-web
+dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.6.0-local.1
+dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.6.0-local.1 -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
-python scripts/check_http_compatibility.py --version 0.5.0-local.1 --packages artifacts/packages
+python scripts/check_http_compatibility.py --version 0.6.0-local.1 --packages artifacts/packages
 ```
 
 The HTTP fixture builds isolated processes against published 0.2.0 and the exact local candidate. It verifies legacy

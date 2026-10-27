@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <DefineConstants Condition="'$(BsyncNewFeatures)' == 'true'">$(DefineConstants);NEW_FEATURES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+</Project>

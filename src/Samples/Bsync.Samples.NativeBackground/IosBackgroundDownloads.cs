@@ -15,14 +15,18 @@ public sealed class IosBackgroundDownloads
     private readonly NSOperationQueue _queue;
     private readonly SemaphoreSlim _scheduling = new(1, 1);
     private readonly Action<Exception> _report;
+    private readonly Action<string>? _protectFile;
+    private readonly Func<Task>? _importCompleted;
     private Action? _completion;
+    private Task _importTask = Task.CompletedTask;
     private bool _invalidated;
     public string Identifier { get; }
 
-    public IosBackgroundDownloads(string applicationPrefix, BackgroundDownloadInbox inbox, Action<Exception> report)
+    public IosBackgroundDownloads(string applicationPrefix, BackgroundDownloadInbox inbox, Action<Exception> report,
+        Action<string>? protectFile = null, Func<Task>? importCompleted = null, Action? completion = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationPrefix);
-        _inbox = inbox; _report = report;
+        _inbox = inbox; _report = report; _protectFile = protectFile; _importCompleted = importCompleted; _completion = completion;
         Identifier = applicationPrefix + ".download." + inbox.Account.StorageKey;
         using var configuration = NSUrlSessionConfiguration.CreateBackgroundSessionConfiguration(Identifier);
         configuration.SessionSendsLaunchEvents = true;
@@ -89,6 +93,7 @@ public sealed class IosBackgroundDownloads
         }
         finally { _scheduling.Release(); }
         await _delegate.Invalidated.Task.ConfigureAwait(false);
+        try { await _importTask.ConfigureAwait(false); } catch (Exception error) { Report(error); }
     }
 
     private void Report(Exception error)
@@ -106,9 +111,11 @@ public sealed class IosBackgroundDownloads
             {
                 var id = downloadTask.TaskDescription ?? throw new InvalidDataException("Missing durable download ID.");
                 var status = downloadTask.Response is NSHttpUrlResponse response ? checked((int)response.StatusCode) : 0;
+                var path = location.Path ?? throw new InvalidDataException("Missing download path.");
+                owner._protectFile?.Invoke(path);
                 // Apple's temporary file ceases to exist when this callback returns. Do not fire-and-forget this move.
                 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                owner._inbox.AcceptAsync(id, location.Path ?? throw new InvalidDataException("Missing download path."), status, deadline.Token)
+                owner._inbox.AcceptAsync(id, path, status, deadline.Token)
                     .GetAwaiter().GetResult();
             }
             catch (Exception error) { owner.Report(error); }
@@ -133,8 +140,23 @@ public sealed class IosBackgroundDownloads
             if (error is not null) owner.Report(new IOException("OS background download failed; its durable receipt remains pending."));
         }
 
-        public override void DidFinishEventsForBackgroundSession(NSUrlSession session) =>
-            BeginInvokeOnMainThread(() => Interlocked.Exchange(ref owner._completion, null)?.Invoke());
+        public override async void DidFinishEventsForBackgroundSession(NSUrlSession session)
+        {
+            try
+            {
+                owner._importTask = owner._importCompleted?.Invoke() ?? Task.CompletedTask;
+                await owner._importTask.ConfigureAwait(false);
+            }
+            catch (Exception error) { owner.Report(error); }
+            finally
+            {
+                BeginInvokeOnMainThread(() =>
+                {
+                    var completion = Interlocked.Exchange(ref owner._completion, null);
+                    completion?.Invoke();
+                });
+            }
+        }
 
         public override void DidBecomeInvalid(NSUrlSession session, NSError? error) => Invalidated.TrySetResult();
     }

@@ -26,9 +26,10 @@ not establish a latency SLO.
 
 Checks cover exact ciphertext write bytes (one chunk write of plaintext length + 28 bytes per aligned append), publication,
 full SHA-256 on sequential read, 100 seeded ranges touching at most two chunks each, and cancellation before read admission.
-The workload uses the default unlimited hard capacity setting and requires zero inventory scans during append. Finite
-configured hard budgets still enforce physical capacity through provider inventory; their browser scan cost is not
-represented by this workload and must not be inferred from these timings.
+The default workload uses unlimited hard capacity. Add `--finite-budget` to set the hard budget to the exact
+ciphertext size. Both modes require zero payload-inventory cursor scans throughout the workload. Finite admission
+reads one capacity-ledger record per append; these reads are counted separately from payload inventory scans.
+Run both modes in separate output directories; the hosted workflow includes both as matrix entries.
 Each stage reports single-managed-thread allocation deltas and nearest-rank p50/p95/p99 operation latency. A probe
 checks that the counter advances; unavailable values are null, never reported as zero allocations. With few observations these are
 descriptive samples, not statistical tail guarantees. Measurements include instrumentation overhead.

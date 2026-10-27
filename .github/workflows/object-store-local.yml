@@ -4,9 +4,13 @@ on:
 permissions:
   contents: read
 jobs:
-  seaweed:
+  s3:
     runs-on: windows-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [seaweed, minio]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -16,14 +20,36 @@ jobs:
         with:
           python-version: '3.13'
       - name: Download and verify the pinned server
+        if: matrix.provider == 'seaweed'
         shell: pwsh
         run: |
           New-Item -ItemType Directory artifacts -Force | Out-Null
-          curl.exe --fail --location --output artifacts/seaweed.zip https://github.com/seaweedfs/seaweedfs/releases/download/4.48/windows_amd64.zip
+          curl.exe --fail --location --output artifacts/seaweed.zip https://github.com/seaweedfs/seaweedfs/releases/download/4.49/windows_amd64.zip
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ((Get-FileHash artifacts/seaweed.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'fe90c04c0620ad1a1c756f86cd5e1443773f56a446688077a4bb5ec04c3cc874') { throw 'Server archive digest mismatch' }
+          if ((Get-FileHash artifacts/seaweed.zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne '34f722f32399293721ba5d87f59a2ee9d108f09267f8a6a6bc8b8c84d72ab171') { throw 'Server archive digest mismatch' }
           Expand-Archive -LiteralPath artifacts/seaweed.zip -DestinationPath artifacts/seaweed
-          python -m pip install boto3==1.43.114
+      - uses: actions/setup-go@v5
+        if: matrix.provider == 'minio'
+        with:
+          go-version: '1.24.8'
+          cache: false
+      - name: Build pinned MinIO source
+        if: matrix.provider == 'minio'
+        shell: pwsh
+        run: |
+          git clone https://github.com/minio/minio.git artifacts/minio-source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C artifacts/minio-source checkout --detach 7aac2a2c5b7c882e68c1ce017d8256be2feea27f
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:GOTOOLCHAIN = 'local'
+          $env:CGO_ENABLED = '0'
+          $binary = Join-Path $PWD 'artifacts/minio.exe'
+          Push-Location artifacts/minio-source
+          go build -trimpath -o $binary .
+          $buildExit = $LASTEXITCODE
+          Pop-Location
+          exit $buildExit
+      - run: python -m pip install boto3==1.43.118
       - name: Build exact package consumer
         shell: pwsh
         run: |
@@ -32,15 +58,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet pack src/Bsync/Bsync.Server.AspNetCore -c Release -o artifacts/packages -p:VersionSuffix=$suffix
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet build src/Tools/Bsync.ObjectStoreQualification -c Release -p:BsyncPackageVersion=0.5.0-$suffix
+          dotnet pack src/Bsync/Bsync.Storage.Sqlite -c Release -o artifacts/packages -p:VersionSuffix=$suffix
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/Tools/Bsync.ObjectStoreQualification -c Release -p:BsyncPackageVersion=0.6.0-$suffix
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pwsh src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/playwright.ps1 install chromium firefox webkit
       - name: Qualify real loopback service
+        if: matrix.provider == 'seaweed'
         run: python src/Tools/Bsync.ObjectStoreQualification/run-local-seaweed.py artifacts/seaweed/weed.exe artifacts/local-object-store
+      - name: Qualify real loopback MinIO
+        if: matrix.provider == 'minio'
+        run: python src/Tools/Bsync.ObjectStoreQualification/run-local-seaweed.py artifacts/minio.exe artifacts/local-object-store --minio
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: local-object-store-evidence
+          name: local-object-store-evidence-${{ matrix.provider }}
           path: |
             artifacts/local-object-store/*.json
             artifacts/local-object-store/*.log

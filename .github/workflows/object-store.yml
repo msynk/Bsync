@@ -19,7 +19,7 @@ jobs:
         shell: pwsh
         run: |
           $suffix = "objectstore.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT"
-          foreach ($package in @('Bsync', 'Bsync.Server.AspNetCore')) {
+          foreach ($package in @('Bsync', 'Bsync.Server.AspNetCore', 'Bsync.Storage.Sqlite')) {
             dotnet pack "src/Bsync/$package" -c Release -o artifacts/packages "-p:VersionSuffix=$suffix"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }

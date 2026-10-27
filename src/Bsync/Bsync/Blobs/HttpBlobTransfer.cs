@@ -42,6 +42,9 @@ public sealed class HttpBlobTransferOptions
     /// Default a shared client without application handlers. Used for presigned uploads and opted-in download tickets.
     /// </summary>
     public HttpClient? DirectClient { get; init; }
+
+    /// <summary>Optional durable multipart transport over the same account's metadata/ownership. Unsupported authorities fall back to the existing path.</summary>
+    public ResumableMultipartUpload? MultipartUploads { get; init; }
 }
 
 /// <summary>
@@ -100,6 +103,12 @@ public sealed class HttpBlobTransfer
         var result = "failed";
         try
         {
+            if (_options.MultipartUploads is { } multipart)
+            {
+                var multipartBytes = await multipart.UploadAsync(sha256, source,
+                    (available, verified) => Report(sha256, BlobTransferDirection.Upload, available, source.Length, verified), cancellationToken).ConfigureAwait(false);
+                if (multipartBytes is { } uploaded) { Bytes.Add(uploaded, Up); result = "complete"; return uploaded; }
+            }
             var status = await StatusAsync(await _http.PostAsync($"{_base}/{sha256}/uploads?size={source.Length}", null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
             var buffer = new byte[(int)Math.Min(_options.ChunkSize, Math.Max(source.Length, 1))];
             while (!status.Complete)

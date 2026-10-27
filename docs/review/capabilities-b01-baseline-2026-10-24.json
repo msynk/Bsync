@@ -1,0 +1,794 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-10-24",
+  "sourceCommit": "7a5169b3df212a99f128f4d55ecb80bc483ababc",
+  "sourceDirty": true,
+  "qualificationComplete": false,
+  "packages": [
+    {
+      "file": "Bsync.0.5.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/bsync/0.5.0/bsync.0.5.0.nupkg",
+      "sha256": "f454fe2de3b0ea653410ba3ba1b20a1180c46e7737ce8736a0a31c834c96076d",
+      "bytes": 643618,
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "7a5169b3df212a99f128f4d55ecb80bc483ababc"
+      },
+      "dependencies": [
+        {
+          "id": "Microsoft.Extensions.DependencyInjection.Abstractions",
+          "version": "10.0.12",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "Microsoft.Extensions.Logging.Abstractions",
+          "version": "10.0.12",
+          "exclude": "Build,Analyzers"
+        }
+      ],
+      "assets": [
+        {
+          "path": "lib/net10.0/Bsync.dll",
+          "sha256": "7c496debe3ad07da627e8e1aa8a69fd7390f70bc1957ee67ec183ab903e5726b"
+        }
+      ]
+    },
+    {
+      "file": "Bsync.0.5.0.snupkg",
+      "url": "https://www.nuget.org/api/v2/symbolpackage/Bsync/0.5.0",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "file": "Bsync.Blazor.0.5.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/bsync.blazor/0.5.0/bsync.blazor.0.5.0.nupkg",
+      "sha256": "8e6c74e1103bfab5ada69764b0685fd1bd87fd57bd0bc9eb232891e702d888a4",
+      "bytes": 139584,
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "7a5169b3df212a99f128f4d55ecb80bc483ababc"
+      },
+      "dependencies": [
+        {
+          "id": "Bsync",
+          "version": "0.5.0",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "Microsoft.AspNetCore.Components.Authorization",
+          "version": "10.0.12",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "Microsoft.JSInterop",
+          "version": "10.0.12",
+          "exclude": "Build,Analyzers"
+        }
+      ],
+      "assets": [
+        {
+          "path": "lib/net10.0/Bsync.Blazor.dll",
+          "sha256": "3f06b8ebc6d4ee192a915c847ee597fe7243b084c8bfb8fa130fafd1209f575f"
+        },
+        {
+          "path": "staticwebassets/bsync-blob-encryption.js",
+          "sha256": "de8cca40175759083de5b036c0bf0cd0cdff8ca08b0f78638dd08807f6bf556e"
+        },
+        {
+          "path": "staticwebassets/bsync-blobs.js",
+          "sha256": "f0e7af6ca07ab974487545d738b3b1a64e2e9553e9c992fc543db4cff16e465f"
+        },
+        {
+          "path": "staticwebassets/bsync-cache-locks.js",
+          "sha256": "9a79a07e269f75c739025f89f48a553c185d8e6a760905707309aa44b099ee74"
+        },
+        {
+          "path": "staticwebassets/bsync-indexeddb.js",
+          "sha256": "e3c22b2f8e7c835b19d2b9a2e92414443ad9d486440fa4cb7afad7caf721d705"
+        },
+        {
+          "path": "staticwebassets/bsync-orchestration.js",
+          "sha256": "0aa5a483cabccfb8f739553c7b048e691341e159761e4e858fa323ed17ba467e"
+        }
+      ]
+    },
+    {
+      "file": "Bsync.Blazor.0.5.0.snupkg",
+      "url": "https://www.nuget.org/api/v2/symbolpackage/Bsync.Blazor/0.5.0",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "file": "Bsync.Server.AspNetCore.0.5.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/bsync.server.aspnetcore/0.5.0/bsync.server.aspnetcore.0.5.0.nupkg",
+      "sha256": "b357f5943ce3ccc267ff950fbe7bc9f64b52c3071695d306dc343ba5b9a04762",
+      "bytes": 77796,
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "7a5169b3df212a99f128f4d55ecb80bc483ababc"
+      },
+      "dependencies": [
+        {
+          "id": "Bsync",
+          "version": "0.5.0",
+          "exclude": "Build,Analyzers"
+        }
+      ],
+      "assets": [
+        {
+          "path": "lib/net10.0/Bsync.Server.AspNetCore.dll",
+          "sha256": "a1c8cc56d7ec22fd2e50fad27a206b7eeb21d1a5f60475e823bbfa9cf1987017"
+        }
+      ]
+    },
+    {
+      "file": "Bsync.Server.AspNetCore.0.5.0.snupkg",
+      "url": "https://www.nuget.org/api/v2/symbolpackage/Bsync.Server.AspNetCore/0.5.0",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "file": "Bsync.Server.PostgreSql.0.5.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/bsync.server.postgresql/0.5.0/bsync.server.postgresql.0.5.0.nupkg",
+      "sha256": "26172ba9468f64071f6d1984a5219e4f58a5f0aa0b9c6455dfe85b5094e75ef5",
+      "bytes": 80434,
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "7a5169b3df212a99f128f4d55ecb80bc483ababc"
+      },
+      "dependencies": [
+        {
+          "id": "Bsync",
+          "version": "0.5.0",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "Npgsql",
+          "version": "10.0.3",
+          "exclude": "Build,Analyzers"
+        }
+      ],
+      "assets": [
+        {
+          "path": "lib/net10.0/Bsync.Server.PostgreSql.dll",
+          "sha256": "d44709e385a3859f42c6e552eaa97c132e027773ef374c0d6d6cfb4d9b22b933"
+        }
+      ]
+    },
+    {
+      "file": "Bsync.Server.PostgreSql.0.5.0.snupkg",
+      "url": "https://www.nuget.org/api/v2/symbolpackage/Bsync.Server.PostgreSql/0.5.0",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "file": "Bsync.Server.SqlServer.0.5.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/bsync.server.sqlserver/0.5.0/bsync.server.sqlserver.0.5.0.nupkg",
+      "sha256": "f37835c34a8e69f4a2f89bfd3b5a8810f5b78811647e5e2e1566236bd343e7bc",
+      "bytes": 97882,
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "7a5169b3df212a99f128f4d55ecb80bc483ababc"
+      },
+      "dependencies": [
+        {
+          "id": "Bsync",
+          "version": "0.5.0",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "Microsoft.Data.SqlClient",
+          "version": "7.1.1",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "System.Security.Cryptography.Pkcs",
+          "version": "9.0.21",
+          "exclude": "Build,Analyzers"
+        }
+      ],
+      "assets": [
+        {
+          "path": "lib/net10.0/Bsync.Server.SqlServer.dll",
+          "sha256": "cab58f6e06c15676d75bf1da26d55c2f1b82d06209982d38471e422ae8941269"
+        }
+      ]
+    },
+    {
+      "file": "Bsync.Server.SqlServer.0.5.0.snupkg",
+      "url": "https://www.nuget.org/api/v2/symbolpackage/Bsync.Server.SqlServer/0.5.0",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "file": "Bsync.Storage.Sqlite.0.5.0.nupkg",
+      "url": "https://api.nuget.org/v3-flatcontainer/bsync.storage.sqlite/0.5.0/bsync.storage.sqlite.0.5.0.nupkg",
+      "sha256": "8fc525b2aaa23ab39e8281cc9635c0cf8a6f25a016aae46baebaf952b0793107",
+      "bytes": 100745,
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/msynk/Bsync",
+        "branch": "refs/heads/main",
+        "commit": "7a5169b3df212a99f128f4d55ecb80bc483ababc"
+      },
+      "dependencies": [
+        {
+          "id": "Bsync",
+          "version": "0.5.0",
+          "exclude": "Build,Analyzers"
+        },
+        {
+          "id": "Microsoft.Data.Sqlite.Core",
+          "version": "10.0.12",
+          "exclude": "Build,Analyzers"
+        }
+      ],
+      "assets": [
+        {
+          "path": "lib/net10.0/Bsync.Storage.Sqlite.dll",
+          "sha256": "94c5eb0bb99e10622c38ef4c68eaf7e59b97dc235290d4588b7cd1b967d45442"
+        }
+      ]
+    },
+    {
+      "file": "Bsync.Storage.Sqlite.0.5.0.snupkg",
+      "url": "https://www.nuget.org/api/v2/symbolpackage/Bsync.Storage.Sqlite/0.5.0",
+      "error": "HTTP Error 404: Not Found"
+    }
+  ],
+  "baselineFiles": [
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-request.checkpoint-number.json",
+      "gitBlob": "743d1bacb942f2e6be913233140b71dc2317ce5b",
+      "sha256": "7eb3b182fd62d1423766ed57af4e616ffa57b802267700f62239428ff85db06a"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-request.limit-missing.json",
+      "gitBlob": "d06a1d8e42a390a261d7f9ee97b5d891c9d29fc7",
+      "sha256": "fca9ae67136645f8d6082cdcb73d1f30b439cc5af83859112bff4f45fd2db1f1"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-response.hasmore-missing.json",
+      "gitBlob": "553d4cb2af21032c3a8e6fb2f9d0958ec450288e",
+      "sha256": "138759dd1cb54159f1d9f1d724003b58ec498c3c1b50ceaaf951e1022833bda2"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-response.malformed-hlc.json",
+      "gitBlob": "41ecf32d89d5c7ead2d8250c2bfcfe8c595cbdfd",
+      "sha256": "74ba7b9d82b6ed10d594bf3106a964259a1a8761e345e2199f0f679837f17b82"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-response.version-leading-zero.json",
+      "gitBlob": "fc16c73b8fcf0603029d5ed9e77470a637c239a2",
+      "sha256": "774f1e8f35b79ba518f8d5f321075b5abebbcd44c6a66384e52c30df95aebbbb"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-response.version-negative.json",
+      "gitBlob": "9f218f73a43e0c50202d18ff3da2d3d5993285a0",
+      "sha256": "b9c153e3f2c717d9e7d9501e8b0f4ebc4168b655b8bdd34efac3273ee77e540c"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-response.version-number.json",
+      "gitBlob": "46b953f26b780c57dcf2e7751ab22c6522613f3b",
+      "sha256": "5189ef2c55b791ba07e7c15fbce472cc3a21f8b11022bc914ec7e7d41d58425e"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/pull-response.version-overflow.json",
+      "gitBlob": "8575256257ffff4a9999402fa2870386da35ae01",
+      "sha256": "72fce4378efee984db1f947c5ec5b27ebbd85d09414c7274dba9e91fffbec745"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/push-request.base-version-absent.json",
+      "gitBlob": "44a14258e4ff1bdc5fe95969a747030cec0948d2",
+      "sha256": "046db86dcb9169e9cc7a8f82e47ab0e0844ec0eb42d0940a950a8006919ee721"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/push-request.operation-id-missing.json",
+      "gitBlob": "aca4c1ab7c90a9bab3c43f19a13644d3b8c564cf",
+      "sha256": "6e52aedbd080f1e55a3d36264b30cf84d6f784aaf00cc9de06d1ca84554c797f"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/push-response.kind-number.json",
+      "gitBlob": "10de6dab38224720d6c14d978b3954178b5a45e7",
+      "sha256": "f97a82bb05354f1e10cc432b6c448aa5571a8c500b028a3e17c4abd67878ec0e"
+    },
+    {
+      "path": "docs/protocol/fixtures/invalid/push-response.unknown-kind.json",
+      "gitBlob": "c0e2d9f43a3f852ac209ffb68b7b87f970d85f39",
+      "sha256": "95863af4b5ae39b26d89c1bd8c596847da9fd9391ab8bdccf6ccb5bbe9eaf16f"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-request.features.json",
+      "gitBlob": "54856baa8f5896b817a0f18d5b36dc6d481c3b5c",
+      "sha256": "79a18b727b0d37119fdc7628e9b1ce57ef1c5c20d7d51bc3600d2c764f55254e"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-request.replica.json",
+      "gitBlob": "f1fb200ad17b4ac7fcf1b2f5afcf9edaa00746f2",
+      "sha256": "82098372b825c99785ed14b6e1e76a403307666fc1c6885e41a26813fdaa0203"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-request.resume.json",
+      "gitBlob": "52f618eadd379662827d3aa141230b085ef8a4aa",
+      "sha256": "aa1b72437c57aeb8a28bc6ec524b22c168f047ffa989f99ca426dd449b5ff979"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-request.start.json",
+      "gitBlob": "a259758a68e169218a513414d6f31c01b3213fe8",
+      "sha256": "be327542bb8ae7bfe6d1b4b5b757f5b5bc9b5c1d78d3b85037f6e22945356a63"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.empty.json",
+      "gitBlob": "7a318be488f1f1dd0e5955a88af70bf8d13cfce3",
+      "sha256": "ba3c041ba05630ef4ab21e006f54a68339034416d1284febeeef11bba53bd201"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.features.json",
+      "gitBlob": "a898f7f84f0965982ad5d9717ae4fb32eebb9c7f",
+      "sha256": "71c55c29d58266e783d03f08672a36c64f807d1b838e358bf49c8d821887009e"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.limits.json",
+      "gitBlob": "d8356adb3d2e941431f709a32d5a59e57824eabb",
+      "sha256": "2526da5f334380e2ccc57d02ceb817db524488a6d4eec39e4543c29c0e2b8bab"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.page.json",
+      "gitBlob": "7287757a894f2e24785631e5168ad26da9be21c0",
+      "sha256": "9feae6c87c84667e12e59f7e140b0de2ab913d80253c6c7810446a82dffabbf9"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.removals.json",
+      "gitBlob": "7cd465ce950f1584d8a6d29535faa472196a9fac",
+      "sha256": "88017258e497b5fe4593d315a7716f6ad4fb3a21cdd3ab6cdf03070a6e07acdb"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.retention.json",
+      "gitBlob": "cd9056abbd00ce0fac9856e3b1892aace8cd5cc5",
+      "sha256": "374f12da64cccaa6592b4174d7be1398bf22a3ff84cefd140009f855380ef5e7"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/pull-response.server-time.json",
+      "gitBlob": "b6d6cb6586d97561526b632d740420a1b10b0342",
+      "sha256": "32cf832f44cd32c19335b7848f18dcd2cccdb26c97eff21def33247929f5d4b2"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/push-request.group.json",
+      "gitBlob": "53da9d2e75f79a23c2fe5fe23e39af88ed7ba5b2",
+      "sha256": "99e33cefbaefbe3eda2d96ef5713eec3f4fe5b04052657a23660a8fddb90edb6"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/push-request.json",
+      "gitBlob": "04b7b9905e233ab4d1661af442b7844fade39756",
+      "sha256": "2823d0003690422433513c8776ee18cbb3d0846308a30cb4347b0033bd4db2dd"
+    },
+    {
+      "path": "docs/protocol/fixtures/valid/push-response.json",
+      "gitBlob": "da6e4a22b6fbe5cf5ffa6bf3a918200019ae59d7",
+      "sha256": "e00272454cfa7ba12ac2ab978d0fbb0612b3f8cc94aeaab6194d4e1ae8b30725"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests.Browser/Fixtures/indexeddb-0.2.0.json",
+      "gitBlob": "da58ef6a13c22b00457575111c2ee795065de3c5",
+      "sha256": "337df863ed399b96ddc9b72b4fffebc3ebfdaa7f22207ca19f4de93b7cd581ba"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests.Browser/Fixtures/orchestration-0.4.0.js",
+      "gitBlob": "9ac95b0c08f0d28d109a7e4321ba92bdbaafec31",
+      "sha256": "95f28f6ddf0024179d05629a6c09ce9960988b391bcb6cafe01fb0005ddf402e"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/chunked-v2-vector.json",
+      "gitBlob": "25d47e83674c1dc419d83d0400274cc7c3316c5b",
+      "sha256": "61d23a626e7b4386b82974752088c678b938938c590d755328731aa719b87549"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/published040.zip",
+      "gitBlob": "c2dfe1c4ac625ccec60eaf197737e55b4bda21db",
+      "sha256": "3b0f95e1571ef52d6cf307f64cf94c362774f3fd741e84cdbce2bbfcfb77475a"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/replica-0.1.0.db",
+      "gitBlob": "4b58c4f657a3ad965253fbf77cca1c939c5ac038",
+      "sha256": "f9f02c97a714b97f2b8921d80f48480f6aa700de72c54252391317b40f89e387"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/replica-0.2.0.db",
+      "gitBlob": "10d98e68cd189adf58e5c8c8832407a67d04e066",
+      "sha256": "c22928942895d8d9aea4eec9fb48f1ecdded1f92c1f2b99fadc825b2e3c740f6"
+    },
+    {
+      "path": "src/Tests/Bsync.Tests/Fixtures/replica-0.4.0.db",
+      "gitBlob": "10a7db7d2d1657d34335d198940bc7fa1b3f1a6b",
+      "sha256": "fed5125552b97f4b175e41d655d2e026e49e372c56f9fd5eb01c4383f5e7a6ea"
+    },
+    {
+      "path": "src/Tests/api/Bsync.Blazor.txt",
+      "gitBlob": "8324cb405c10b9c8893763c9116828a94010b0d5",
+      "sha256": "1c669867e3e571b5a6c6f2e4eede2109127ff3689f145d642d0c747434c0f0dc"
+    },
+    {
+      "path": "src/Tests/api/Bsync.Server.AspNetCore.txt",
+      "gitBlob": "33549b6b73886cfdc5a99b2feb030e631fb5d717",
+      "sha256": "2459a0232fd778972add4aacda8895fcf8f6022fe0b2aa3fe0712a77aaf134b6"
+    },
+    {
+      "path": "src/Tests/api/Bsync.Server.PostgreSql.txt",
+      "gitBlob": "3cb40afe466bad35caf7eedccb5d4dd883961291",
+      "sha256": "584ab8dc287454f57b83fe0d1d717e6e51bf53f19adba88782aa0fb0d26bd2f5"
+    },
+    {
+      "path": "src/Tests/api/Bsync.Server.SqlServer.txt",
+      "gitBlob": "771713c16dbfd4673f3f64ba1112a456b8003e97",
+      "sha256": "ff4f94215db74b63b3e66d69c49edc239f9b24d798494e37fc4f30934444d268"
+    },
+    {
+      "path": "src/Tests/api/Bsync.Storage.Sqlite.txt",
+      "gitBlob": "d0f37c52c0569eb3129bca2027c320d1489750bb",
+      "sha256": "39ba663b4d65d3234057a0f117d15dfb0cf7fbeaa1f963e6b0ed445bb1034435"
+    },
+    {
+      "path": "src/Tests/api/Bsync.txt",
+      "gitBlob": "82aef5761982abf7bfc20068eae968d969130c8f",
+      "sha256": "bb04b6a5da7a8cb45162c7cc3116c2f11d268ead5ed1534aa506fa97ac330761"
+    }
+  ],
+  "ci": {
+    "runId": 39261201009,
+    "url": "https://github.com/msynk/Bsync/actions/runs/39261201009",
+    "jobs": [
+      {
+        "id": 118088990548,
+        "name": "Browser and WPF tests (Chromium, Firefox, WebKit)",
+        "conclusion": "failure",
+        "failedSteps": [
+          "Run dotnet test src/Tests/Bsync.Tests.Browser -c Release --no-build --logger \"trx;LogFileName=browser.trx\""
+        ]
+      },
+      {
+        "id": 118088990683,
+        "name": "Unit, conformance, process-kill and HTTP tests (ubuntu-latest)",
+        "conclusion": "failure",
+        "failedSteps": [
+          "Run dotnet test src/Tests/Bsync.Tests -c Release --no-build --logger \"trx;LogFileName=unit.trx\""
+        ]
+      },
+      {
+        "id": 118088990722,
+        "name": "Unit, conformance, process-kill and HTTP tests (macos-latest)",
+        "conclusion": "failure",
+        "failedSteps": [
+          "Run dotnet test src/Tests/Bsync.Tests -c Release --no-build --logger \"trx;LogFileName=unit.trx\""
+        ]
+      },
+      {
+        "id": 118088990760,
+        "name": "SQL Server authority tests",
+        "conclusion": "success",
+        "failedSteps": []
+      },
+      {
+        "id": 118088990803,
+        "name": "Release provenance and browser lock failure tests",
+        "conclusion": "success",
+        "failedSteps": []
+      },
+      {
+        "id": 118088990822,
+        "name": "Pack (not published) and consume the packages",
+        "conclusion": "success",
+        "failedSteps": []
+      },
+      {
+        "id": 118088990859,
+        "name": "Unit, conformance, process-kill and HTTP tests (windows-latest)",
+        "conclusion": "failure",
+        "failedSteps": [
+          "Run dotnet test src/Tests/Bsync.Tests -c Release --no-build --logger \"trx;LogFileName=unit.trx\""
+        ]
+      },
+      {
+        "id": 118088991084,
+        "name": "PostgreSQL authority tests",
+        "conclusion": "success",
+        "failedSteps": []
+      },
+      {
+        "id": 118089718246,
+        "name": "Packaged WebAssembly conformance (Chromium, Firefox, WebKit)",
+        "conclusion": "failure",
+        "failedSteps": [
+          "Execute packaged client assets in all three engines"
+        ]
+      }
+    ],
+    "logsDownload": "HTTP 403 without GitHub authentication",
+    "artifactDownload": "HTTP 401 without GitHub authentication",
+    "openIssuesObserved": 0
+  },
+  "localValidation": {
+    "os": "Windows 10.0.19045 x64",
+    "sdk": "10.0.402",
+    "runtime": "10.0.13",
+    "results": [
+      {
+        "file": "artifacts/capabilities-b01/tests/browser-baseline.trx",
+        "sha256": "7f4c2f10e55d52f4328d1716eb3af97733ed70c583187355a6db5d3fafdecadf",
+        "times": {
+          "creation": "2026-10-24T15:19:16.0681828+03:30",
+          "queuing": "2026-10-24T15:19:16.0681836+03:30",
+          "start": "2026-10-24T15:19:07.8671967+03:30",
+          "finish": "2026-10-24T15:27:56.4057916+03:30"
+        },
+        "counters": {
+          "total": "131",
+          "executed": "126",
+          "passed": "126",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [],
+        "skippedTests": [
+          "F1 I01 I13: an attachment added while the server is unreachable waits with its task, is uploaded on reconnect, and opens verified on another device after a reload",
+          "T24 I06 I13: devices on different server processes share notes through PostgreSQL; a server restart loses nothing",
+          "Bsync.Tests.Browser.TasksSampleTests.SwitchingBrowserSessionsPreservesPendingWorkUnderItsOriginalActor",
+          "Bsync.Tests.Browser.TasksSampleTests.ExpiredBlobCredentialsPreserveAttachmentAndResumeAfterSignIn",
+          "Bsync.Tests.Browser.TasksSampleTests.OfflineActionShowsLocalTransportAndServerExecutionSeparately"
+        ]
+      },
+      {
+        "file": "artifacts/capabilities-b01/tests/core-baseline.trx",
+        "sha256": "e0063e2ef6f2ddfb04fa2b75c18274738f442522e144cb9f84e819adad2474fc",
+        "times": {
+          "creation": "2026-10-24T15:15:23.3067313+03:30",
+          "queuing": "2026-10-24T15:15:23.3067314+03:30",
+          "start": "2026-10-24T15:15:21.7356056+03:30",
+          "finish": "2026-10-24T15:16:13.2001164+03:30"
+        },
+        "counters": {
+          "total": "928",
+          "executed": "928",
+          "passed": "928",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [],
+        "skippedTests": []
+      },
+      {
+        "file": "artifacts/capabilities-b01/tests/core-cpu1-corrected.trx",
+        "sha256": "de2fa3b10d42c7b135116ebf4d256aec0d9f057b4ae1a338820682e0dbbe7566",
+        "times": {
+          "creation": "2026-10-24T15:21:04.6867932+03:30",
+          "queuing": "2026-10-24T15:21:04.6867933+03:30",
+          "start": "2026-10-24T15:21:02.8830210+03:30",
+          "finish": "2026-10-24T15:22:10.3144612+03:30"
+        },
+        "counters": {
+          "total": "928",
+          "executed": "928",
+          "passed": "928",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [],
+        "skippedTests": []
+      },
+      {
+        "file": "artifacts/capabilities-b01/tests/core-cpu2-corrected.trx",
+        "sha256": "afc5cb5bc40f8082314eeb8e73bb83e35aa3249317d5941378cb3a24178af191",
+        "times": {
+          "creation": "2026-10-24T15:17:46.1179026+03:30",
+          "queuing": "2026-10-24T15:17:46.1179031+03:30",
+          "start": "2026-10-24T15:17:44.1602032+03:30",
+          "finish": "2026-10-24T15:18:40.0022678+03:30"
+        },
+        "counters": {
+          "total": "928",
+          "executed": "928",
+          "passed": "928",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [],
+        "skippedTests": []
+      },
+      {
+        "file": "artifacts/capabilities-b01/tests/core-cpu2.trx",
+        "sha256": "06dc1f01226867b69e87a09b2c396dff025b71171fe45466e13ac8ed7cd7c771",
+        "times": {
+          "creation": "2026-10-24T15:16:28.3928876+03:30",
+          "queuing": "2026-10-24T15:16:28.3928879+03:30",
+          "start": "2026-10-24T15:16:27.6969278+03:30",
+          "finish": "2026-10-24T15:17:26.5962146+03:30"
+        },
+        "counters": {
+          "total": "928",
+          "executed": "928",
+          "passed": "927",
+          "failed": "1",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [
+          {
+            "name": "Bsync.Tests.StreamingSha256Tests.LengthBeyond32BitBitCountHasBoundedAllocationsAndMatchesPlatform",
+            "outcome": "Failed",
+            "message": "Streaming compression allocated 8144 bytes."
+          }
+        ],
+        "skippedTests": []
+      },
+      {
+        "file": "artifacts/capabilities-b01/tests/sha-baseline.trx",
+        "sha256": "743495546a5fb460f382764d1642f3becc150933455cb64c92c0cc014c586e90",
+        "times": {
+          "creation": "2026-10-24T15:17:01.8471087+03:30",
+          "queuing": "2026-10-24T15:17:01.8471090+03:30",
+          "start": "2026-10-24T15:16:57.5001052+03:30",
+          "finish": "2026-10-24T15:17:01.8527421+03:30"
+        },
+        "counters": {
+          "total": "1",
+          "executed": "1",
+          "passed": "1",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [],
+        "skippedTests": []
+      },
+      {
+        "file": "artifacts/capabilities-b01/tests/sqlite-encrypted.trx",
+        "sha256": "3b99344da1072c88442859a4a53e3c83183b78d223accb82c5008e38eeb3f971",
+        "times": {
+          "creation": "2026-10-24T15:19:01.5868881+03:30",
+          "queuing": "2026-10-24T15:19:01.5868883+03:30",
+          "start": "2026-10-24T15:18:58.8412854+03:30",
+          "finish": "2026-10-24T15:19:03.2144271+03:30"
+        },
+        "counters": {
+          "total": "31",
+          "executed": "31",
+          "passed": "31",
+          "failed": "0",
+          "error": "0",
+          "timeout": "0",
+          "aborted": "0",
+          "inconclusive": "0",
+          "passedButRunAborted": "0",
+          "notRunnable": "0",
+          "notExecuted": "0",
+          "disconnected": "0",
+          "warning": "0",
+          "completed": "0",
+          "inProgress": "0",
+          "pending": "0"
+        },
+        "failures": [],
+        "skippedTests": []
+      }
+    ],
+    "otherChecks": [
+      {
+        "command": "python -m unittest discover -s scripts -p 'test_*.py' -v",
+        "passed": 9
+      },
+      {
+        "command": "node scripts/test_browser_lock_release.mjs",
+        "outcome": "passed"
+      },
+      {
+        "command": "git diff --check",
+        "outcome": "passed"
+      }
+    ]
+  },
+  "browserAssetSourceChecks": [
+    {
+      "package": "Bsync.Blazor.0.5.0.nupkg",
+      "asset": "staticwebassets/bsync-blob-encryption.js",
+      "sourcePath": "src/Bsync/Bsync.Blazor/wwwroot/bsync-blob-encryption.js",
+      "exactGitBlobMatch": true,
+      "sourceSha256": "de8cca40175759083de5b036c0bf0cd0cdff8ca08b0f78638dd08807f6bf556e"
+    },
+    {
+      "package": "Bsync.Blazor.0.5.0.nupkg",
+      "asset": "staticwebassets/bsync-blobs.js",
+      "sourcePath": "src/Bsync/Bsync.Blazor/wwwroot/bsync-blobs.js",
+      "exactGitBlobMatch": true,
+      "sourceSha256": "f0e7af6ca07ab974487545d738b3b1a64e2e9553e9c992fc543db4cff16e465f"
+    },
+    {
+      "package": "Bsync.Blazor.0.5.0.nupkg",
+      "asset": "staticwebassets/bsync-cache-locks.js",
+      "sourcePath": "src/Bsync/Bsync.Blazor/wwwroot/bsync-cache-locks.js",
+      "exactGitBlobMatch": true,
+      "sourceSha256": "9a79a07e269f75c739025f89f48a553c185d8e6a760905707309aa44b099ee74"
+    },
+    {
+      "package": "Bsync.Blazor.0.5.0.nupkg",
+      "asset": "staticwebassets/bsync-indexeddb.js",
+      "sourcePath": "src/Bsync/Bsync.Blazor/wwwroot/bsync-indexeddb.js",
+      "exactGitBlobMatch": true,
+      "sourceSha256": "e3c22b2f8e7c835b19d2b9a2e92414443ad9d486440fa4cb7afad7caf721d705"
+    },
+    {
+      "package": "Bsync.Blazor.0.5.0.nupkg",
+      "asset": "staticwebassets/bsync-orchestration.js",
+      "sourcePath": "src/Bsync/Bsync.Blazor/wwwroot/bsync-orchestration.js",
+      "exactGitBlobMatch": true,
+      "sourceSha256": "0aa5a483cabccfb8f739553c7b048e691341e159761e4e858fa323ed17ba467e"
+    }
+  ]
+}

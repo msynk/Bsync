@@ -1,7 +1,10 @@
 # Bsync 0.4.0 gap-closure implementation plan
 
+Implementation reconciliation (2026-10-26): [audit of both plans and completed remaining code](docs/review/capabilities-remaining-implementation-2026-10-26.md).
+Unchecked build/device/performance/release gates below remain qualification work; they are not evidence of missing portable implementation.
+
 Prepared: 2026-10-17  
-Status: Core/provider implementation and reference integrations implemented; external qualification and scoped follow-ups remain open  
+Status: Core/provider implementation and reference integrations implemented; external qualification and release gates remain open
 Baseline: Published Bsync 0.4.0; source commit `e4286fe2141d0d1e836cfc88dbfa5dfd82154d37`  
 Execution destination: the Bsync repository  
 Scope: reusable library features, provider adapters, reference hosts, tests and release qualification
@@ -267,7 +270,7 @@ Local metadata authentication cannot independently detect an attacker restoring 
 - [x] Integrate capacity reservation with physical ciphertext overhead, staging, retired generations, partial tails and garbage journals. Keep reservations conservative across interruption.
 - [x] Implement verified B1 repair through a new generation. Repair never changes logical plaintext identity.
 - [x] Implement resumable key rotation using new chunk generations, then a manifest switch. Avoid mixing old/new chunk keys through an ambiguous manifest.
-- [ ] Retain old keys until all complete/partial/retired live-reader generations have migrated or been explicitly retired. Host key deletion must also account for v1, protected metadata and backups.
+- [x] Retain old keys until all complete/partial/retired live-reader generations have migrated or been explicitly retired. The supported host contract requires exclusive ownership, complete retention-journal scanning and accounting for v1, protected metadata and backups; the library key provider exposes no deletion operation.
 - [x] Persist and page generation key obligations through partials, rotation, retirement, readers and quarantine; legacy unknown references conservatively block retirement. Collection removes journals only after physical cleanup and reader release.
 - [x] Migrate v1 to v2 with a durable journal and preserved original bytes. Unknown/newer formats must fail without mutation. Do not silently migrate on ordinary reads.
 - [x] Reuse the existing plaintext HTTP blob protocol. If native encrypted-transfer features require a wire extension later, negotiate them separately.
@@ -306,18 +309,22 @@ The existing common runner, Android WorkManager, iOS processing-task and durable
 ### Android
 
 - [ ] Complete a real MAUI/native test host build with declared SDK/workload/AndroidX dependencies, permissions, initializer and worker registration.
-- [ ] Preserve unique work names and Java worker identities across upgrades. Test coexistence with a host-supplied WorkManager factory/configuration.
-- [ ] Wire stop/cancellation into the same runtime token and join account resources before release. Verify retry/backoff does not spin on locked keys or invalid credentials.
+- [x] Preserve unique work names and Java worker identities across upgrades.
+- [ ] Test coexistence with a host-supplied WorkManager factory/configuration.
+- [x] Wire stop/cancellation into the same runtime token and join account resources before release; configure exponential retry backoff.
+- [ ] Verify OS retry/backoff does not spin on locked keys or invalid credentials on the declared devices.
 - [ ] Test process termination, reboot, OS constraint changes, foreground overlap, task replacement/coalescing and account deletion.
 - [ ] Record physical-device behavior under battery restrictions and force-stop separately. Do not imply that these conditions guarantee execution.
 
 ### iOS/iPadOS
 
-- [ ] Provide complete AppDelegate/bootstrap, allowed-identifier and background-mode configuration in a real host; verify registration during all relevant launch paths.
-- [ ] Wire expiration, completion reporting and rescheduling exactly once per callback. Return deferred outcomes if protected keys are inaccessible.
-- [ ] Integrate stable background URLSession identifiers and durable download receipts at relaunch. Import only account-authorized, hash/length-verified files and keep receipts until durable acknowledgement.
-- [ ] Make deleted-account and stale-callback handling idempotent. An OS callback must not recreate a removed account or key.
-- [ ] Specify the OS plaintext spool boundary, file-protection settings and cleanup behavior. Test it on device; encrypted destination storage alone is not evidence of end-to-end at-rest encryption.
+- [x] Provide AppDelegate/bootstrap, allowed-identifier and background-mode configuration in the native reference host, including download-session callback routing.
+- [ ] Verify registration during all relevant OS launch paths.
+- [x] Wire expiration, completion reporting and rescheduling exactly once per callback. Return deferred outcomes if protected keys are inaccessible.
+- [x] Integrate stable background URLSession identifiers and durable download receipts at relaunch. Import only account-authorized, hash/length-verified files and keep receipts until durable acknowledgement.
+- [x] Make deleted-account and stale-callback handling idempotent. An OS callback must not recreate a removed account or key.
+- [x] Specify the OS plaintext spool boundary, file-protection settings and cleanup behavior; the reference host applies protection and backup exclusion.
+- [ ] Test that file-protection policy on device; encrypted destination storage alone is not evidence of end-to-end at-rest encryption.
 - [x] Either implement a separate durable background-upload recipe with file-based staging, completion reconciliation and idempotency, or explicitly declare it unsupported. Download callbacks do not prove upload support.
 - [ ] Test locked-device behavior, process relaunch, cancellation, ticket expiry, callback duplication, account switch and interrupted verified import on physical devices.
 
@@ -449,13 +456,13 @@ Acceptance: an independent sample consumer can wire an application transaction, 
 
 Implement only if supported workloads need an atomic usable set spanning more than one bounded package. Preserve the 256-item individual manifest limit unless a separate scalability design justifies changing it.
 
-- [ ] Define a versioned group manifest that references immutable child package IDs/revisions and required/optional membership, with strict count/depth/cycle limits.
-- [ ] Stage child revisions independently, with durable group ownership pins acquired before reporting them protected.
-- [ ] Verify all required child revisions and publish one group active pointer under a documented ownership boundary. Do not modify each child active pointer and call that a transaction.
-- [ ] Return a group snapshot whose reads resolve through its recorded child revisions, never through independently changing child “latest” pointers.
-- [ ] Hold child generations and group reader lifetimes until snapshot disposal; integrate retirement and dead-reader reclamation with B5.
-- [ ] Expose group candidate progress separately from the existing usable revision, including optional failures, missing required bytes and observed verification age.
-- [ ] Recover interruption between child pin creation, pointer commit and retired-group cleanup. Release only the group's ownership when a child is shared elsewhere.
+- [x] Define a versioned group manifest that references immutable child package IDs/revisions and required/optional membership, with strict count/depth/cycle limits. Schema 2 adds optional children; nesting is bounded to one root-to-package level.
+- [x] Stage child revisions independently, with durable group ownership pins acquired before reporting them protected.
+- [x] Verify all required child revisions and publish one group active pointer under a documented ownership boundary. Do not modify each child active pointer and call that a transaction.
+- [x] Return a group snapshot whose reads resolve through its recorded child revisions, never through independently changing child “latest” pointers.
+- [x] Hold child generations and group reader lifetimes until snapshot disposal; integrate retirement and dead-reader reclamation with B5.
+- [x] Expose group candidate progress separately from the existing usable revision, including optional failures, missing required bytes and observed verification age.
+- [x] Recover interruption between child pin creation, pointer commit and retired-group cleanup. Release only the group's ownership when a child is shared elsewhere.
 
 Acceptance: interruption or one failed child never exposes a partially prepared group. Old readers keep the prior complete group. A group adds local composition semantics; it does not promise global server transactions or automatically consistent live collections.
 

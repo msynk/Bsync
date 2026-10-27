@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Bsync.Server.SqlServer" Version="$(BsyncPackageVersion)" />
+    <PackageReference Include="Bsync.Server.AspNetCore" Version="$(BsyncPackageVersion)" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

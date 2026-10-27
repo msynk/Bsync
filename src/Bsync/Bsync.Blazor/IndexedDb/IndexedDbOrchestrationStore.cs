@@ -45,8 +45,8 @@ public sealed class IndexedDbOrchestrationStore : IOrchestrationFeatureStore
     /// <summary>Requires a permanent feature-format barrier. Close older tabs under exclusive account ownership first; published 0.4.0 subsequently fails with VersionError.</summary>
     public async Task RequireFeatureVersionAsync(int version, CancellationToken cancellationToken = default)
     {
-        if (version is < 1 or > 2) throw new LocalStoreUnavailableException("outdated", "Unsupported feature version; data retained.");
-        if (version == 2) await CallAsync("requireFeatureVersion", cancellationToken).ConfigureAwait(false);
+        if (version is < 1 or > 3) throw new LocalStoreUnavailableException("outdated", "Unsupported feature version; data retained.");
+        if (version >= 2) await CallAsync("requireFeatureVersion", cancellationToken, version).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

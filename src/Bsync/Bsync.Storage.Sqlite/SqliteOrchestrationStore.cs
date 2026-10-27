@@ -39,7 +39,7 @@ public sealed class SqliteOrchestrationStore : IOrchestrationFeatureStore
             if (Convert.ToInt64(exists) != 0)
             {
                 var version = Convert.ToInt64(await ScalarAsync(connection, transaction, "SELECT version FROM bs_orchestration_schema WHERE id=1", cancellationToken).ConfigureAwait(false));
-                if (version is < 1 or > 2) throw new LocalStoreUnavailableException("outdated", "Unsupported orchestration schema; nothing was changed.");
+                if (version is < 1 or > 3) throw new LocalStoreUnavailableException("outdated", "Unsupported orchestration schema; nothing was changed.");
             }
             else
             {
@@ -61,12 +61,12 @@ public sealed class SqliteOrchestrationStore : IOrchestrationFeatureStore
     /// <summary>Sets a permanent feature-format barrier. Quiesce older binaries under exclusive account ownership first; 0.4.0 rejects subsequent opens of version 2.</summary>
     public async Task RequireFeatureVersionAsync(int version, CancellationToken cancellationToken = default)
     {
-        if (version is < 1 or > 2) throw new LocalStoreUnavailableException("outdated", "Unsupported feature version; nothing was changed.");
+        if (version is < 1 or > 3) throw new LocalStoreUnavailableException("outdated", "Unsupported feature version; nothing was changed.");
         await using var connection = await ConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = connection.BeginTransaction(deferred: false);
         var existing = Convert.ToInt64(await ScalarAsync(connection, transaction, "SELECT version FROM bs_orchestration_schema WHERE id=1", cancellationToken).ConfigureAwait(false));
-        if (existing is < 1 or > 2) throw new LocalStoreUnavailableException("outdated", "Unsupported feature schema; nothing was changed.");
-        if (version > existing) await ExecuteAsync(connection, transaction, "UPDATE bs_orchestration_schema SET version=2 WHERE id=1", cancellationToken).ConfigureAwait(false);
+        if (existing is < 1 or > 3) throw new LocalStoreUnavailableException("outdated", "Unsupported feature schema; nothing was changed.");
+        if (version > existing) await ExecuteAsync(connection, transaction, version == 3 ? "UPDATE bs_orchestration_schema SET version=3 WHERE id=1" : "UPDATE bs_orchestration_schema SET version=2 WHERE id=1", cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested(); transaction.Commit();
     }
 

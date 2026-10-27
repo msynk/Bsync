@@ -102,7 +102,7 @@ an application-transaction outbox and receiver idempotency. The request contract
 
 ## External-effect outbox recipe
 
-[`ExternalEffectOutbox`](../../src/Samples/Bsync.Samples.Tasks.Server/ExternalEffectOutbox.cs) is an optional, separate
+[`ExternalEffectOutbox`](../../src/Bsync/Bsync.Server.SqlServer/Workflows/ExternalEffectOutbox.cs) is an optional, separate
 SQL Server recipe. Call `EnqueueAsync` in the same transaction as domain changes, command-ledger identity and the
 published queued result. It retains an immutable payload under a hash of length-framed scope/command identities;
 case/trailing-space differences do not collapse under SQL collation. Derive scope from authenticated context and
@@ -136,7 +136,7 @@ qualification of a particular external service remains the consuming application
 ### Receivers with different retry guarantees
 
 The new `DrainAsync(IExternalEffectReceiver, ...)` overload uses
-[`ExternalEffectDelivery`](../../src/Samples/Bsync.Samples.Tasks.Server/ExternalEffectReceiver.cs). Declare deduplication
+[`ExternalEffectDelivery`](../../src/Bsync/Bsync.Server.SqlServer/Workflows/ExternalEffectReceiver.cs). Declare deduplication
 and status-lookup capabilities explicitly. The existing delegate overload retains its caller-supplied deduplication
 contract. The capability-aware overload persists the attempt before sending and applies this policy on replay:
 

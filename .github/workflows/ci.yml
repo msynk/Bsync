@@ -46,14 +46,19 @@ jobs:
       - run: dotnet build src/Bsync.slnx -c Release
         if: runner.os == 'Windows'
       - run: dotnet build src/Tests/Bsync.Tests -c Release
-      - run: dotnet test src/Tests/Bsync.Tests -c Release --no-build --logger "trx;LogFileName=unit.trx"
+      - id: core-tests
+        run: dotnet test src/Tests/Bsync.Tests -c Release --no-build --logger "trx;LogFileName=unit.trx"
       # The encrypted SQLite store (SQLCipher) cannot share a process with the plain one: its own test project.
-      - run: dotnet test src/Tests/Bsync.Tests.SqliteEncrypted -c Release --logger "trx;LogFileName=sqlite-encrypted.trx"
+      # Preserve its independent result even when the core suite fails; neither failure is suppressed.
+      - if: ${{ !cancelled() && steps.core-tests.outcome != 'skipped' }}
+        run: dotnet test src/Tests/Bsync.Tests.SqliteEncrypted -c Release --logger "trx;LogFileName=sqlite-encrypted.trx"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit-results-${{ matrix.os }}
-          path: src/Tests/Bsync.Tests/TestResults
+          path: |
+            src/Tests/Bsync.Tests/TestResults
+            src/Tests/Bsync.Tests.SqliteEncrypted/TestResults
 
   postgres:
     name: PostgreSQL authority tests
@@ -178,7 +183,7 @@ jobs:
         run: python scripts/check_http_compatibility.py --version "$BSYNC_PACKAGE_VERSION" --packages artifacts/packages
       # Only PackageReference from artifacts/packages (src/Tests/PackageConsumers/nuget.config maps Bsync.* to that feed).
       - name: Public conformance suites from the Bsync package (namespace Bsync.Testing)
-        run: dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION --logger "trx;LogFileName=package-consumer.trx"
+        run: dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION -p:BsyncCapabilitiesTests=true --logger "trx;LogFileName=package-consumer.trx"
       - name: ASP.NET Core host, browser assets and SQLite replica from the packages
         run: |
           dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=$BSYNC_PACKAGE_VERSION -o artifacts/consumer-web
@@ -188,6 +193,9 @@ jobs:
         with:
           name: packages
           path: artifacts/packages
+      # After archiving the six candidate packages: published fixtures add older archives to the local-only feed.
+      - name: Published 0.5.0 metadata upgrade and downgrade refusal
+        run: python scripts/check_capabilities_migration.py --version "$BSYNC_PACKAGE_VERSION" --output artifacts/capabilities-migration
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -196,6 +204,46 @@ jobs:
             src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests/TestResults
             artifacts/http-compatibility-*/*.log
             artifacts/http-compatibility-*/results.json
+            artifacts/capabilities-migration/*.log
+            artifacts/capabilities-migration/result.json
+            artifacts/capabilities-migration/published-fixture/**
+
+  package-workflows:
+    name: Packaged SQL workflow and host integration
+    needs: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Bsync-Ci-Passw0rd
+        ports: ["1433:1433"]
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Bsync-Ci-Passw0rd -Q 'SELECT 1' || exit 1"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      BSYNC_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Bsync-Ci-Passw0rd;TrustServerCertificate=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages
+      - name: Execute exact package consumer
+        shell: bash
+        run: |
+          version=$(python -c 'import json; print(json.load(open("artifacts/packages/provenance.json"))["packageVersion"])')
+          dotnet run --project src/Tests/PackageConsumers/Bsync.PackageConsumer.Workflows -c Release "-p:BsyncPackageVersion=$version" > artifacts/package-workflows.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-workflows-results
+          path: artifacts/package-workflows.log
 
   package-browser:
     name: Packaged WebAssembly conformance (Chromium, Firefox, WebKit)

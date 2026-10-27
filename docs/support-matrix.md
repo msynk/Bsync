@@ -3,8 +3,20 @@
 Tiers (ADR-012): **Verified** = executed tests or a recorded run; **Build-only** = compiles or publishes,
 not executed; **Planned** = not implemented. Nothing here is Verified unless the evidence column says how.
 
-Release status: [README](../README.md#status). **0.4.0 is published**; the next release targets **0.5.0 (not yet published)**.
-The source uses the 0.5.0 prefix; local candidate packs must use unique preview suffixes.
+Release status: [README](../README.md#status). **0.5.0 is published**, observed by downloading all six packages on 2026-10-24.
+The source targets unreleased 0.6.0; local candidate packs must use unique preview suffixes. Changed bytes require a new
+stable version. [B01 baseline diagnosis](review/capabilities-b01-2026-10-24.md) records archive identities and the failing
+full CI run; successful pack-only nightlies do not satisfy the ten-run qualification gate.
+
+The [B01–B08 continuation](review/capabilities-implementation-2026-10-24.md) adds local evidence for encryption-use
+budgets, capacity-ledger migration, multipart control/recovery, atomic package roots and SQL relational/capture helpers.
+These are experimental profiles, not new production support tiers. S3 multipart has local SeaweedFS evidence recorded
+in the [hardening continuation](review/capabilities-closure-2026-10-26.md); external TLS/IAM and MinIO qualification remain open.
+Change Tracking has bounded same-database LocalDB evidence, with local backup/restore and process-kill drills, not CDC/cloud certification.
+The [implementation audit](review/capabilities-remaining-implementation-2026-10-26.md) adds optional set children,
+raw browser streaming, isolated capture generations and Apple download-host wiring. Raw content above 16 MiB requires
+a browser session accepting IndexedDB Blob persistence; private WebKit refusal preserves partials. Native host changes
+are source implementation, not a claim of successful Apple/Android SDK or physical-device qualification.
 
 Physical-device testing is deferred by user instruction as of 2026-10-19; those targets are not newly verified.
 The [local qualification continuation](review/gap-closure-local-qualification-2026-10-19.md) adds bounded browser
@@ -52,7 +64,8 @@ internal encrypted Base64 envelopes, preserves old escaped records and records f
 31 MiB workloads (three each at 1/16/17/256/1024 MiB, all ten stages).
 Its native workload evidence does not qualify browser memory duplication, physical devices or aggregate concurrent streams.
 
-No new stable package version, clean tagged provenance, remote source verification or ten-run qualification is claimed.
+The historical local runs below do not establish clean tagged provenance, remote source verification or ten-run
+qualification for the subsequently published 0.5.0 packages.
 
 Gap-closure repair checkpoint (2026-10-17, dirty working tree): core 753 plus one separately executed cancellation
 case, 78 source browser cases, 58 exact-preview package cases, three packaged browser repair cases and web smoke passed.

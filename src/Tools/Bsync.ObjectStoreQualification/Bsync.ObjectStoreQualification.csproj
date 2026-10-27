@@ -10,5 +10,9 @@
     <ProjectReference Include="../../Bsync/Bsync.Server.AspNetCore/Bsync.Server.AspNetCore.csproj" Condition="'$(BsyncPackageVersion)' == ''" />
     <PackageReference Include="Bsync.Server.AspNetCore" Version="$(BsyncPackageVersion)" Condition="'$(BsyncPackageVersion)' != ''" />
     <Compile Include="../../Samples/Bsync.Samples.Tasks.Server/S3BlobStore.cs" Link="S3BlobStore.cs" />
+    <Compile Include="../../Samples/Bsync.Samples.Tasks.Server/S3MultipartProtocol.cs" Link="S3MultipartProtocol.cs" />
+    <ProjectReference Include="../../Bsync/Bsync.Storage.Sqlite/Bsync.Storage.Sqlite.csproj" Condition="'$(BsyncPackageVersion)' == ''" />
+    <PackageReference Include="Bsync.Storage.Sqlite" Version="$(BsyncPackageVersion)" Condition="'$(BsyncPackageVersion)' != ''" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
   </ItemGroup>
 </Project>

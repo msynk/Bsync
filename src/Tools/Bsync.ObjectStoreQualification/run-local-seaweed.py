@@ -1,4 +1,4 @@
-"""Run an isolated real SeaweedFS S3 service on loopback. Requires boto3 and a verified official weed.exe."""
+"""Run isolated real SeaweedFS or MinIO on loopback. Requires boto3 and a verified server executable."""
 import hashlib
 import json
 import os
@@ -15,8 +15,9 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def main():
-    if len(sys.argv) != 3:
-        raise SystemExit("Usage: run-local-seaweed.py <verified-weed-executable> <new-output-directory>")
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--minio"):
+        raise SystemExit("Usage: run-local-seaweed.py <verified-server-executable> <new-output-directory> [--minio]")
+    minio = len(sys.argv) == 4
     executable = Path(sys.argv[1]).resolve(strict=True)
     output = Path(sys.argv[2]).resolve()
     output.mkdir(exist_ok=False)
@@ -30,17 +31,20 @@ def main():
                S3_BUCKET=bucket, BSYNC_OBJECTSTORE_ENDPOINT=endpoint, BSYNC_OBJECTSTORE_BUCKET=bucket,
                BSYNC_OBJECTSTORE_ORIGIN_PORT="58991")
     env.pop("AWS_SESSION_TOKEN", None)
+    env.update(MINIO_ROOT_USER=access, MINIO_ROOT_PASSWORD=secret)
     command = [str(executable), "mini", "-dir=" + str(data), "-ip=127.0.0.1", "-ip.bind=127.0.0.1",
                "-s3.port=59005", "-s3.allowedOrigins=http://127.0.0.1:58991", "-s3.allowDeleteBucketNotEmpty=false",
                "-admin.ui=false", "-volume.max=2", "-master.volumeSizeLimitMB=64"]
-    version = subprocess.run([str(executable), "version"], capture_output=True, text=True, check=True).stdout.strip()
+    if minio:
+        command = [str(executable), "server", "--address", "127.0.0.1:59005", "--console-address", "127.0.0.1:59006", str(data)]
+    version = subprocess.run([str(executable), "--version" if minio else "version"], capture_output=True, text=True, check=True).stdout.strip()
     (output / "server.json").write_text(json.dumps(dict(version=version,
         executableSha256=hashlib.sha256(executable.read_bytes()).hexdigest(), command=command,
         endpoint=endpoint, credentials="random ephemeral test credentials; omitted"), indent=2))
     # SeaweedFS accepts generic environment names as flags (e.g. DEBUG). Isolate inherited developer settings.
     server_env = {key: value for key, value in env.items() if key.upper() in {
         "SYSTEMROOT", "WINDIR", "PATH", "TEMP", "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
-        "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_BUCKET"}}
+        "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_BUCKET", "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD"}}
     server = subprocess.Popen(command, env=server_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                               text=True, encoding="utf-8", errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
@@ -60,21 +64,27 @@ def main():
             if server.poll() is not None:
                 raise RuntimeError("Local service exited during startup; see redacted server log")
             try:
-                s3.head_bucket(Bucket=bucket)
+                if minio:
+                    s3.list_buckets()
+                else:
+                    s3.head_bucket(Bucket=bucket)
                 break
             except Exception:
                 time.sleep(.5)
         else:
             raise RuntimeError("Local service did not become ready")
+        if minio:
+            s3.create_bucket(Bucket=bucket)
         s3.put_bucket_cors(Bucket=bucket, CORSConfiguration={"CORSRules": [dict(
             AllowedOrigins=["http://127.0.0.1:58991"], AllowedMethods=["PUT", "GET", "HEAD"],
-            AllowedHeaders=["Content-Type", "Range"], ExposeHeaders=["Content-Range"])]})
+            AllowedHeaders=["Content-Type", "Range"], ExposeHeaders=["Content-Range", "ETag"])]})
         with (output / "qualification.log").open("w") as log:
             completed = subprocess.run(["dotnet", str(ROOT / "src/Tools/Bsync.ObjectStoreQualification/bin/Release/net10.0/Bsync.ObjectStoreQualification.dll"),
                 str(output / "qualification"), "--local-service"], env=env, stdout=log, stderr=subprocess.STDOUT, timeout=660)
         result = json.loads((output / "qualification/result.json").read_text())
         assert result["ExternalServiceQualified"] is False and result["Emulator"] is False
         assert not s3.list_objects_v2(Bucket=bucket).get("Contents"), "Generated objects were not cleaned up"
+        assert not s3.list_multipart_uploads(Bucket=bucket).get("Uploads"), "Generated multipart uploads were not cleaned up"
         s3.delete_bucket(Bucket=bucket)
         print(json.dumps(dict(exitCode=completed.returncode, checks=[(item["Name"], item["Passed"]) for item in result["Checks"]])))
         return completed.returncode

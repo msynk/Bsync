@@ -9,7 +9,7 @@ namespace Bsync.Samples.NativeBackground;
 /// results. Replace that workload with application sync/transfer work; it is not a demonstration of remote delivery.
 /// Account registration is explicit. Background callbacks never create an account registration or replacement key.
 /// </summary>
-public sealed class HeadlessSampleHost(string directory)
+public sealed partial class HeadlessSampleHost(string directory)
 {
     public static readonly AccountScope DemoAccount = new("Bsync.HeadlessSample", "local", "demo");
     private static readonly AccountScope CatalogAccount = new("Bsync.HeadlessSample", "local", "catalog");

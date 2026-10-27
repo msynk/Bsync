@@ -28,7 +28,7 @@
 | [021](adr-021-managed-content.md) | Managed transfers, pins and immutable package activation | Implementation in progress |
 | [022](adr-022-workflow-publication.md) | Recoverable workflows, command identity and controlled publication | Implementation in progress |
 | [023](adr-023-local-read-model-generations.md) | Full-reconciliation local read-model generations | Implemented primitive; host snapshot required |
-| [024](adr-024-sql-server-capture-gate.md) | Controlled publication after a bounded capture spike | Automatic capture deferred |
+| [024](adr-024-sql-server-capture-gate.md) | Controlled publication after a bounded capture spike | Historical decision; experimental successor in ADR-041 |
 | [025](adr-025-encrypted-blob-envelopes.md) | Bounded authenticated blob envelopes, migration and rotation | Implemented; native/browser and process recovery tests |
 | [026](adr-026-verified-content-repair.md) | Verified content repair and interruption recovery | Implemented, unreleased |
 | [027](adr-027-account-ownership-and-protected-metadata.md) | Account ownership and protected metadata | Implemented, unreleased |
@@ -40,6 +40,12 @@
 | [033](adr-033-idle-lease-observation.md) | Admitted lease loss between session runs | Implemented; pause and server backoff preserved |
 | [034](adr-034-nested-stop-causes.md) | Nested execution stop causes | Implemented for deadlines, session lifetimes and transport aliases |
 | [035](adr-035-generation-integrity-maintenance.md) | Durable chunk scrubbing and key-retention observations | Implemented; crypto/device qualification remains open |
+| [036](adr-036-encryption-admission-and-browser-capacity.md) | Durable encryption admission and browser capacity ledger | Implemented; qualification open |
+| [037](adr-037-maintained-native-background-recipes.md) | Maintained native background recipes | Platform build/device gates open |
+| [038](adr-038-durable-multipart-upload.md) | Resumable multipart transport and S3 recipe | Experimental; real-provider gates open |
+| [039](adr-039-atomic-package-sets.md) | Atomic roots over immutable child packages | Experimental; migration/kill qualification open |
+| [040](adr-040-relational-workflow-infrastructure.md) | Public relational ledger and outbox helpers | Experimental; LocalDB/package-only evidence |
+| [041](adr-041-bounded-change-tracking-capture.md) | Bounded SQL Server Change Tracking capture | Experimental; LocalDB evidence, broader qualification open |
 | [014](adr-014-sql-server-authority.md) | SQL Server authority on the application's database: feed lock, transaction enlistment, write handler, publisher | Accepted; implemented (0.2.0, unreleased) |
 
 Operations: [disaster recovery and stuck replicas](../operations/disaster-recovery.md).

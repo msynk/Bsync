@@ -43,7 +43,7 @@ public interface IOrchestrationStore : IAsyncDisposable
 /// </summary>
 public interface IOrchestrationFeatureStore : IOrchestrationStore
 {
-    /// <summary>Durably requires feature version 2 for protected payloads/chunked encryption, or refuses without mutation.</summary>
+    /// <summary>Durably requires feature version 2 for protected payloads/chunked encryption or 3 for package-set references; refuses unsupported versions without mutation.</summary>
     Task RequireFeatureVersionAsync(int version, CancellationToken cancellationToken = default);
 }
 

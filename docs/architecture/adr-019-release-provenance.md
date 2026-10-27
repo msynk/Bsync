@@ -44,6 +44,19 @@ establish those support claims.
 
 ## Consequences
 
+### Capabilities-plan B01 continuation (2026-10-24)
+
+Published 0.5.0 is an immutable upgrade input, even though its full CI run failed. Preserve downloaded archive,
+DLL and browser-asset hashes, dependency minimums and exact-commit API/protocol/store fixture hashes in the
+[B01 baseline inventory](../review/capabilities-b01-baseline-2026-10-24.json). Publication and nuspec metadata
+do not prove symbol/source correspondence or satisfy the qualification gate. Failed authenticated artifact
+downloads remain explicit missing evidence; they must not be replaced by an inference from local passing tests.
+
+Core and SQLCipher retain independent execution outcomes and both TRX directories in CI artifacts. A core
+test failure must not suppress the SQLCipher run, and preserving its results must not turn the job green.
+The [B01 execution record](../review/capabilities-b01-2026-10-24.md) tracks the first test-measurement correction
+and remaining diagnosis. No public contract or persistence change is introduced by this continuation.
+
 Python 3.11 or later is required for the release tooling; it uses only the standard library.
 Failure tests create disposable Git repositories and synthetic package archives. Normal .NET
 builds do not require Python. No runtime dependencies, public API baselines or persistence formats

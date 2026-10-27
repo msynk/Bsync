@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Bsync.Blazor.IndexedDb;
 using Bsync.Blobs;
 using Microsoft.JSInterop;
@@ -34,6 +33,20 @@ public sealed class BrowserBlobStore : IBlobCacheReplacement, IBlobCacheInventor
     public Task<long> GetStoredBytesAsync(CancellationToken cancellationToken = default) =>
         IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<long>("storedBytes", cancellationToken, Name));
 
+    /// <summary>
+    /// Reconciles a bounded page of physical payloads after external modification. Start with restart=true once,
+    /// then continue with false until true is returned. Writes refuse while reconciliation is pending; reads remain
+    /// available. Payload accounting excludes metadata, indexes and materialized reader snapshots/origin overhead.
+    /// Admitted transactions are joined even when cancellation arrives. Schema v3 refuses legacy v1/v2 writers.
+    /// </summary>
+    public async Task<bool> ReconcileCapacityAsync(int pageSize = 64, bool restart = false, CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 1000) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        cancellationToken.ThrowIfCancellationRequested();
+        return await IndexedDbLocalStore<NoDocument>.Call(() =>
+            _module.InvokeAsync<bool>("reconcileCapacity", Name, pageSize, restart)).ConfigureAwait(false);
+    }
+
     /// <summary>Origin-wide approximate usage/quota hints. Null means unavailable; estimates never guarantee a write will fit.</summary>
     public async Task<BrowserStorageEstimate> EstimateStorageAsync(CancellationToken cancellationToken = default)
     {
@@ -59,7 +72,8 @@ public sealed class BrowserBlobStore : IBlobCacheReplacement, IBlobCacheInventor
     {
         ArgumentNullException.ThrowIfNull(js);
         var module = await js.InvokeAsync<IJSObjectReference>("import", cancellationToken, ModulePath).ConfigureAwait(false);
-        await IndexedDbLocalStore<NoDocument>.Call(() => module.InvokeVoidAsync("clear", cancellationToken, name)).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await IndexedDbLocalStore<NoDocument>.Call(() => module.InvokeVoidAsync("clear", CancellationToken.None, name)).ConfigureAwait(false);
     }
 
     /// <summary>The size of the verified content, or <see langword="null"/> when it is not on this device.</summary>
@@ -74,7 +88,8 @@ public sealed class BrowserBlobStore : IBlobCacheReplacement, IBlobCacheInventor
     public Task AppendPartialAsync(string sha256, byte[] chunk, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(chunk);
-        return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("appendPartial", cancellationToken, Name, sha256, chunk));
+        cancellationToken.ThrowIfCancellationRequested();
+        return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("appendPartial", CancellationToken.None, Name, sha256, chunk));
     }
 
     /// <inheritdoc />
@@ -98,16 +113,34 @@ public sealed class BrowserBlobStore : IBlobCacheReplacement, IBlobCacheInventor
     /// Verifies the unfinished transfer against <paramref name="sha256"/> and makes it the content. Returns
     /// <see langword="false"/> (and discards it) on a mismatch.
     /// </summary>
-    public Task<bool> CompletePartialAsync(string sha256, CancellationToken cancellationToken = default)
+    public async Task<bool> CompletePartialAsync(string sha256, CancellationToken cancellationToken = default)
     {
-        // Cancellation of an interop await does not stop JavaScript. Join hash/transaction before releasing ownership.
+        // Admission and commits are joined; cancellation between bounded reads leaves the partial resumable.
         cancellationToken.ThrowIfCancellationRequested();
-        return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<bool>("completePartial", CancellationToken.None, Name, sha256));
+        var snapshot = await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<string[]>("beginPartialVerification", CancellationToken.None, Name, sha256)).ConfigureAwait(false);
+        try
+        {
+            using var hash = new StreamingSha256();
+            var length = long.Parse(snapshot[1], System.Globalization.CultureInfo.InvariantCulture);
+            for (long offset = 0; offset < length; offset += ReadChunk)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var bytes = await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<byte[]>("readSnapshot", CancellationToken.None, snapshot[0], offset, (int)Math.Min(ReadChunk, length - offset))).ConfigureAwait(false);
+                hash.AppendData(bytes);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            var verified = Convert.ToHexStringLower(hash.GetHashAndReset()) == sha256;
+            return await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeAsync<bool>("commitPartialVerification", CancellationToken.None, Name, sha256, snapshot[0], verified)).ConfigureAwait(false);
+        }
+        finally { await _module.InvokeVoidAsync("releaseSnapshot", snapshot[0]).ConfigureAwait(false); }
     }
 
     /// <summary>Discards the unfinished transfer of <paramref name="sha256"/>.</summary>
-    public Task DiscardPartialAsync(string sha256, CancellationToken cancellationToken = default) =>
-        IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("discardPartial", cancellationToken, Name, sha256));
+    public Task DiscardPartialAsync(string sha256, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("discardPartial", CancellationToken.None, Name, sha256));
+    }
 
     /// <summary>
     /// Stores <paramref name="content"/> (for example a file the user picked), verified like a download, and returns its
@@ -116,39 +149,47 @@ public sealed class BrowserBlobStore : IBlobCacheReplacement, IBlobCacheInventor
     public async Task<(string Sha256, long Size)> ImportAsync(Stream content, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
+        cancellationToken.ThrowIfCancellationRequested();
         var staging = $"import-{Guid.NewGuid():N}";
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        var buffer = new byte[ReadChunk];
-        long size = 0;
-        int read;
-        while ((read = await content.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false)) > 0)
+        try
         {
-            hash.AppendData(buffer, 0, read);
-            await AppendPartialAsync(staging, buffer[..read], cancellationToken).ConfigureAwait(false);
-            size += read;
-            if (read < buffer.Length)
+            using var hash = new StreamingSha256();
+            var buffer = new byte[ReadChunk];
+            long size = 0;
+            int read;
+            while ((read = await content.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false)) > 0)
             {
-                break;
+                hash.AppendData(buffer, 0, read);
+                await AppendPartialAsync(staging, buffer[..read], cancellationToken).ConfigureAwait(false);
+                size += read;
+                if (read < buffer.Length)
+                {
+                    break;
+                }
             }
-        }
 
-        var sha256 = Convert.ToHexStringLower(hash.GetHashAndReset());
-        await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("discardPartial", cancellationToken, Name, sha256)).ConfigureAwait(false);
-        await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("renamePartial", cancellationToken, Name, staging, sha256)).ConfigureAwait(false);
-        if (!await CompletePartialAsync(sha256, cancellationToken).ConfigureAwait(false))
-        {
-            throw new IOException("The imported content changed while it was stored.");
-        }
+            var sha256 = Convert.ToHexStringLower(hash.GetHashAndReset());
+            cancellationToken.ThrowIfCancellationRequested();
+            await IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("renamePartial", CancellationToken.None, Name, staging, sha256)).ConfigureAwait(false);
+            if (!await CompletePartialAsync(sha256, cancellationToken).ConfigureAwait(false))
+            {
+                throw new IOException("The imported content changed while it was stored.");
+            }
 
-        return (sha256, size);
+            return (sha256, size);
+        }
+        finally { await DiscardPartialAsync(staging, CancellationToken.None).ConfigureAwait(false); }
     }
 
     /// <summary>Legacy live range view. Use OpenReadAsync and asynchronous disposal for a reader stable across replacement.</summary>
     public Stream OpenRead(string sha256, long size) => new RangeStream(this, sha256, size);
 
     /// <summary>Removes verified content (eviction; never content that a pending document still has to upload).</summary>
-    public Task DeleteAsync(string sha256, CancellationToken cancellationToken = default) =>
-        IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("remove", cancellationToken, Name, sha256));
+    public Task DeleteAsync(string sha256, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return IndexedDbLocalStore<NoDocument>.Call(() => _module.InvokeVoidAsync("remove", CancellationToken.None, Name, sha256));
+    }
 
     /// <summary>The hashes of the content on this device.</summary>
     public async Task<IReadOnlyList<string>> ListAsync(CancellationToken cancellationToken = default) =>

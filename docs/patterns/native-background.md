@@ -128,6 +128,23 @@ compilation; actual OS callback ordering, suspension, relaunch and file protecti
 
 ## Required device qualification
 
+The Apple reference AppDelegate now connects this recipe: `EnsureDownloadsAsync` reopens only registered accounts;
+`HandleEventsForBackgroundUrl` routes exact session identifiers; `QueueDownloadAsync`, `GetDownloadsAsync` and
+`ResumeDownloadAsync` expose durable receipt preparation and fresh-ticket recovery. No signed URL enters the catalog.
+Finished callbacks and foreground activation drain receipts through a fresh account/cache scope. `DeleteDemoAsync`
+first writes a durable tombstone, then cancels/joins OS tasks and imports, closes stores and deletes download state.
+Unknown/deleted session callbacks cancel their OS session without provisioning an account. Demo deletion is permanent;
+a production host should use a fresh account generation when provisioning again.
+
+This sample explicitly permits plaintext OS downloads/spool and a plaintext demo destination. It applies
+`CompleteUntilFirstUserAuthentication` and excludes download state from backup; it does not claim cache encryption
+protects OS temporary files. Apple's [policy documentation](https://developer.apple.com/documentation/foundation/urlfileprotection/completeuntilfirstuserauthentication)
+defines access after the first unlock following boot, including subsequent locks. File attributes and backup flags
+use the [.NET file manager](https://learn.microsoft.com/en-us/dotnet/api/foundation.nsfilemanager.setattributes)
+and [URL resource](https://learn.microsoft.com/en-us/dotnet/api/foundation.nsurl.setresource) bindings. These newly wired
+platform branches still require a matching Apple SDK build and device qualification; earlier binding-check results
+do not qualify this continuation.
+
 Run OS-delivered jobs (not only manual invocation), kill/relaunch, expiry during upload, foreground ownership overlap,
 locked-device keys, revoked credentials, charging/connectivity changes and prolonged postponement. Assert durable work
 remains pending after every unavailable/deferred outcome. Record simulator/emulator results separately from hardware.

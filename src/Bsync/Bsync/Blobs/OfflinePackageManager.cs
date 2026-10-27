@@ -156,10 +156,11 @@ public sealed partial class OfflinePackageManager
     }
     private async Task Queue(OfflinePackageManifest manifest, CancellationToken ct)
     {
-        foreach (var item in manifest.Items)
+        foreach (var group in manifest.Items.GroupBy(i => i.Sha256))
         {
+            var item = group.First();
             await _cache.PinAsync(item.Sha256, Owner(manifest), ct).ConfigureAwait(false);
-            var job = await _transfers.EnqueueAsync(item.Sha256, item.Size, BlobTransferDirection.Download, item.Required ? 1 : 0, ct).ConfigureAwait(false);
+            var job = await _transfers.EnqueueAsync(item.Sha256, item.Size, BlobTransferDirection.Download, group.Any(i => i.Required) ? 1 : 0, ct).ConfigureAwait(false);
             if (job.State == BlobTransferState.Complete)
                 await _transfers.RevalidateDownloadAsync(item.Sha256, item.Size, ct).ConfigureAwait(false);
         }
@@ -209,7 +210,7 @@ public sealed partial class OfflinePackageManager
         if (latest?.Payload != revision) return false;
         var manifest = Decode(await _store.ReadAsync(RevisionKey(packageId, revision), cancellationToken).ConfigureAwait(false) ?? throw new InvalidDataException("Missing staged manifest."));
         await Authorize(manifest, cancellationToken).ConfigureAwait(false);
-        foreach (var item in manifest.Items) await _cache.PinAsync(item.Sha256, Owner(manifest), cancellationToken).ConfigureAwait(false);
+        foreach (var item in manifest.Items.DistinctBy(i => i.Sha256)) await _cache.PinAsync(item.Sha256, Owner(manifest), cancellationToken).ConfigureAwait(false);
         var missing = await Missing(manifest, cancellationToken).ConfigureAwait(false);
         if (missing.Required.Length > 0) return false;
         var active = await _store.ReadAsync(activeKey, cancellationToken).ConfigureAwait(false);
@@ -219,9 +220,13 @@ public sealed partial class OfflinePackageManager
     {
         var required = Required(manifest); var missing = new List<string>(); var optional = new List<string>(); long bytes = 0;
         var counted = new HashSet<string>(StringComparer.Ordinal);
+        var verified = new Dictionary<string, BlobVerificationResult>(StringComparer.Ordinal);
         foreach (var item in manifest.Items)
         {
-            if (await BlobVerification.VerifyAsync(_cache, item.Sha256, item.Size, ct).ConfigureAwait(false) == BlobVerificationResult.Verified) continue;
+            ct.ThrowIfCancellationRequested();
+            if (!verified.TryGetValue(item.Sha256, out var result))
+                verified.Add(item.Sha256, result = await BlobVerification.VerifyAsync(_cache, item.Sha256, item.Size, ct).ConfigureAwait(false));
+            if (result == BlobVerificationResult.Verified) continue;
             if (required.Contains(item.Id)) { missing.Add(item.Id); if (counted.Add(item.Sha256)) bytes = checked(bytes + item.Size); }
             else optional.Add(item.Id);
         }
@@ -313,19 +318,23 @@ public sealed partial class OfflinePackageManager
         await using var held = await _locks.AcquireAsync(Hash("package/" + packageId), cancellationToken).ConfigureAwait(false);
         var active = await _store.ReadAsync(Prefix(packageId) + "active", cancellationToken).ConfigureAwait(false) ?? throw new InvalidOperationException("No complete package revision is active.");
         var manifest = Decode(await _store.ReadAsync(RevisionKey(packageId, active.Payload), cancellationToken).ConfigureAwait(false) ?? throw new InvalidDataException("Missing active manifest."));
+        return await OpenSnapshotAsync(manifest, cancellationToken).ConfigureAwait(false);
+    }
+    private async Task<PackageSnapshot> OpenSnapshotAsync(OfflinePackageManifest manifest, CancellationToken cancellationToken)
+    {
         await Authorize(manifest, cancellationToken).ConfigureAwait(false);
         var name = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         var owner = "snapshot-v2/" + name;
         var lifetime = await _locks.AcquireAsync("lifetime-" + name, cancellationToken).ConfigureAwait(false);
         try
         {
-            foreach (var item in manifest.Items) await _cache.PinAsync(item.Sha256, owner, cancellationToken).ConfigureAwait(false);
+            foreach (var item in manifest.Items.DistinctBy(i => i.Sha256)) await _cache.PinAsync(item.Sha256, owner, cancellationToken).ConfigureAwait(false);
             if ((await Missing(manifest, cancellationToken).ConfigureAwait(false)).Required.Length > 0) throw new FileNotFoundException("The active package is incomplete; repair is required.");
             return new(manifest, _cache, owner, lifetime);
         }
         catch
         {
-            try { foreach (var item in manifest.Items) await _cache.UnpinAsync(item.Sha256, owner).ConfigureAwait(false); }
+            try { foreach (var item in manifest.Items.DistinctBy(i => i.Sha256)) await _cache.UnpinAsync(item.Sha256, owner).ConfigureAwait(false); }
             finally { await lifetime.DisposeAsync().ConfigureAwait(false); }
             throw;
         }
@@ -334,13 +343,15 @@ public sealed partial class OfflinePackageManager
     public async Task RemoveRetiredAsync(string packageId, string revision, CancellationToken cancellationToken = default)
     {
         await using var held = await _locks.AcquireAsync(Hash("package/" + packageId), cancellationToken).ConfigureAwait(false);
+        if ((await _store.ReadPageAsync(SetReferencePrefix(packageId, revision), null, 1, cancellationToken).ConfigureAwait(false)).Count != 0)
+            throw new InvalidOperationException("A package set still owns this revision; retire that set first.");
         foreach (var pointer in new[] { "active", "latest" })
             if ((await _store.ReadAsync(Prefix(packageId) + pointer, cancellationToken).ConfigureAwait(false))?.Payload == revision)
                 throw new InvalidOperationException("The active or preparing revision cannot be retired.");
         var key = RevisionKey(packageId, revision); var record = await _store.ReadAsync(key, cancellationToken).ConfigureAwait(false);
         if (record is null) return;
         var manifest = Decode(record);
-        foreach (var item in manifest.Items) await _cache.UnpinAsync(item.Sha256, Owner(manifest), cancellationToken).ConfigureAwait(false);
+        foreach (var item in manifest.Items.DistinctBy(i => i.Sha256)) await _cache.UnpinAsync(item.Sha256, Owner(manifest), cancellationToken).ConfigureAwait(false);
         await _store.TryWriteAsync([new(key, record.Revision, null)], cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 }
@@ -377,7 +388,7 @@ public sealed class PackageSnapshot : IAsyncDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        try { foreach (var item in _manifest.Items) await _cache.UnpinAsync(item.Sha256, _owner).ConfigureAwait(false); }
+        try { foreach (var item in _manifest.Items.DistinctBy(i => i.Sha256)) await _cache.UnpinAsync(item.Sha256, _owner).ConfigureAwait(false); }
         finally { await _lifetime.DisposeAsync().ConfigureAwait(false); }
     }
 }

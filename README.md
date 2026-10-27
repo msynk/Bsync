@@ -3,18 +3,26 @@
 Local-first document replication for .NET and Blazor: local writes that never wait for the network,
 change tracking, retry-safe push, checkpointed pull and pluggable conflict resolution.
 
-> **Status:** `0.4.0` is published on NuGet. This branch targets
-> `0.5.0` (not yet published); development artifacts require unique preview suffixes. Pre-1.0: minor versions may
+> **Status:** `0.5.0` is published on NuGet; release qualification remains open. This branch targets
+> unreleased `0.6.0`; development artifacts require unique preview suffixes. Pre-1.0: minor versions may
 > break. What is released, tested and where: [Status](#status). Targets `net10.0`.
 
 ## Status
 
 This section is the single source of truth for release and verification status; other documents link here.
 
-- **Packages.** Six packages were downloaded at `0.4.0` from NuGet.org on 2026-10-17: `Bsync`, `Bsync.Blazor`,
+- **Capabilities continuation.** The unreleased 0.6.0 source adds encryption-use admission, indexed browser capacity
+  accounting, experimental multipart transport/S3 recipe, atomic package sets and public SQL Server workflow/Change
+  Tracking helpers. [Implementation and remaining gates](docs/review/capabilities-closure-2026-10-26.md) distinguish
+  local tests from production qualification. The [remaining implementation audit](docs/review/capabilities-remaining-implementation-2026-10-26.md)
+  covers raw browser streaming, optional package children, isolated capture generations and Apple download callbacks.
+  Native qualification, independent crypto review and hosted release gates remain open.
+
+- **Packages.** Six packages were downloaded at `0.5.0` from NuGet.org on 2026-10-24: `Bsync`, `Bsync.Blazor`,
   `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Server.SqlServer`.
-  All declare commit `e4286fe2141d0d1e836cfc88dbfa5dfd82154d37`; [archive hashes and repair evidence](docs/review/gap-closure-2026-10-17.md)
-  distinguish the published baseline from subsequent local changes. This does not establish clean tagged provenance.
+  All declare commit `7a5169b3df212a99f128f4d55ecb80bc483ababc`; [archive inventory and B01 evidence](docs/review/capabilities-b01-2026-10-24.md)
+  distinguish publication from qualification. Distributed symbol/source verification and clean tagged provenance remain open.
+  The [0.4.0 archive hashes and repair evidence](docs/review/gap-closure-2026-10-17.md) remain historical evidence.
   The older 0.2.0 source-provenance mismatch remains unresolved; see its [historical inventory](docs/review/release-baseline-2026-10-16.md)
   and [release validation](docs/operations/releases.md). `Bsync.Testing` is now in `Bsync`
   (namespace unchanged). `Bsync.Storage.Sqlite` covers plain and encrypted (SQLCipher)
@@ -28,7 +36,7 @@ This section is the single source of truth for release and verification status; 
   and samples.
 - **Stores.** SQLite on native hosts, IndexedDB in browsers; in-memory for tests.
 - **Offline orchestration.** Account lifecycle, durable transfer jobs, pinned cache budgets,
-  immutable packages, bounded encrypted blob envelopes, workflow recovery, derived read-model generations and optional native scheduler recipes are present in 0.4.0. Subsequent unreleased work adds automatic plaintext repair, account composition,
+  immutable packages, bounded encrypted blob envelopes, workflow recovery, derived read-model generations and optional native scheduler recipes are present in 0.4.0. The 0.5.0 source adds automatic plaintext repair, account composition,
   protected metadata, owned read-model cleanup, experimental chunked encryption and integration hosts.
   [Gap-closure implementation and remaining qualification](docs/review/gap-closure-local-qualification-2026-10-19.md) distinguish tested behavior from external gates. See
   [managed content](docs/patterns/managed-content.md), [account maintenance](docs/patterns/account-maintenance.md), [recoverable work](docs/patterns/recoverable-work.md),
@@ -669,8 +677,8 @@ Consume the packages exactly as a NuGet user would (no project references; `src/
 ```bash
 for p in Bsync Bsync.Blazor Bsync.Server.AspNetCore Bsync.Server.PostgreSql Bsync.Server.SqlServer Bsync.Storage.Sqlite; do
   dotnet pack src/Bsync/$p -c Release -o artifacts/packages -p:VersionSuffix=local; done
-dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.5.0-local
-dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.5.0-local -o artifacts/consumer-web
+dotnet test src/Tests/PackageConsumers/Bsync.PackageConsumer.Tests -c Release -p:BsyncPackageVersion=0.6.0-local
+dotnet publish src/Tests/PackageConsumers/Bsync.PackageConsumer.Web -c Release -p:BsyncPackageVersion=0.6.0-local -o artifacts/consumer-web
 dotnet artifacts/consumer-web/Bsync.PackageConsumer.Web.dll --smoke
 ```
 

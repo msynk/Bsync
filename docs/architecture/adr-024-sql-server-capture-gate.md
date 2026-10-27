@@ -1,6 +1,6 @@
 # ADR-024: Retain controlled publication after a bounded SQL Server capture spike
 
-Status: Decision recorded; automatic capture adapter not shipped
+Status: historical spike decision; bounded experimental implementation added by [ADR-041](adr-041-bounded-change-tracking-capture.md), not production-qualified
 
 ## Decision and experiment
 
@@ -36,7 +36,7 @@ resnapshot. Retention is operational capacity, not permission to silently skip o
 managed source epoch; a numerically valid version alone cannot detect lost history.
 [Microsoft consistency and restore guidance](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/work-with-change-tracking-sql-server).
 
-Proposed Bsync integration, **not implemented**:
+Original proposed integration (historical; implemented subset and remaining bounds are now recorded in ADR-041):
 
 1. Materialize a capture batch into durable staging, including source epoch, schema identity, lower/upper boundary and
    affected projection IDs. Seal the batch only after complete source enumeration. Unsealed staging is abandoned on crash.

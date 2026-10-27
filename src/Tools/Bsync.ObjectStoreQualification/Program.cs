@@ -112,6 +112,8 @@ internal static class Qualification
                 await Check("browser-origin-startup", () => origin.StartAsync(deadline.Token));
                 foreach (var engine in new[] { "chromium", "firefox", "webkit" })
                     await Check("cors-put-get-range-" + engine, () => BrowserAsync(engine, settings.Origin, store, deadline.Token));
+                await MultipartQualification.RunAsync(s3, settings.Bucket, prefix, settings.Endpoint,
+                    settings.Origin, local, Check, deadline.Token);
                 await Check("orphan-collection-preserves-completed-object", async () =>
                 {
                     var upload = "orphan-" + Guid.NewGuid().ToString("N");
@@ -131,6 +133,13 @@ internal static class Qualification
             if (safeToWrite) await Check("isolated-prefix-cleanup", async () =>
             {
                 using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var uploads = await s3.ListMultipartUploadsAsync(new Amazon.S3.Model.ListMultipartUploadsRequest() { BucketName = settings.Bucket, Prefix = prefix, MaxUploads = 100 }, cleanup.Token);
+                Require(uploads.IsTruncated != true, "unexpected-cleanup-upload-count");
+                foreach (var upload in uploads.MultipartUploads ?? [])
+                {
+                    Require(upload.Key.StartsWith(prefix, StringComparison.Ordinal), "cleanup-upload-outside-run-prefix");
+                    await s3.AbortMultipartUploadAsync(new() { BucketName = settings.Bucket, Key = upload.Key, UploadId = upload.UploadId }, cleanup.Token);
+                }
                 var objects = await s3.ListObjectsV2Async(new() { BucketName = settings.Bucket, Prefix = prefix, MaxKeys = 100 }, cleanup.Token);
                 Require(objects.IsTruncated != true, "unexpected-cleanup-inventory-size");
                 foreach (var item in objects.S3Objects ?? [])
@@ -141,13 +150,14 @@ internal static class Qualification
                 var remaining = await s3.ListObjectsV2Async(new() { BucketName = settings.Bucket, Prefix = prefix, MaxKeys = 1 }, cleanup.Token);
                 Require((remaining.S3Objects?.Count ?? 0) == 0, "cleanup-left-objects");
             });
-            await Check("local-snapshot-cleanup", () =>
+            await Check("local-snapshot-cleanup", async () =>
             {
                 var resolved = Path.GetFullPath(local);
                 Require(resolved.StartsWith(Path.GetFullPath(Path.GetTempPath()), StringComparison.OrdinalIgnoreCase) &&
                     Path.GetFileName(resolved).StartsWith("bsync-objectstore-", StringComparison.Ordinal), "cleanup-path-outside-temporary-root");
+                foreach (var name in new[] { "multipart-server.db", "multipart-client.db" })
+                    await Bsync.Storage.Sqlite.SqliteStorePool.DeleteDatabaseAsync(Path.Combine(resolved, name));
                 Directory.Delete(resolved, true);
-                return Task.CompletedTask;
             });
             var report = new
             {

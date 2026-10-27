@@ -14,7 +14,12 @@ public static partial class Harness
 {
     // A bounded caller buffer, unlike the functional fixtures which intentionally hold whole test objects.
     [JSInvokable(nameof(QualifyChunkBuffers))]
-    public static async Task<string> QualifyChunkBuffers(string name, int sizeMiB, string hash)
+    public static Task<string> QualifyChunkBuffers(string name, int sizeMiB, string hash) => QualifyChunkBuffersCore(name, sizeMiB, hash, false);
+
+    [JSInvokable(nameof(QualifyFiniteChunkBuffers))]
+    public static Task<string> QualifyFiniteChunkBuffers(string name, int sizeMiB, string hash) => QualifyChunkBuffersCore(name, sizeMiB, hash, true);
+
+    private static async Task<string> QualifyChunkBuffersCore(string name, int sizeMiB, string hash, bool finite)
     {
         if (sizeMiB is < 1 or > 1024) throw new ArgumentOutOfRangeException(nameof(sizeMiB));
         const int chunk = 1048576;
@@ -26,7 +31,8 @@ public static partial class Harness
         var backing = await BrowserBlobStore.OpenAsync(_js, account.StorageKey);
         var measured = new QualificationChunks(new BlobCacheChunkStore(backing));
         var cache = new ChunkedEncryptedBlobCache(measured, metadata, operations, lifetimes,
-            new BlobTestKeys(), new(account, "qualification", 1), crypto);
+            new BlobTestKeys(), new(account, "qualification", 1), crypto,
+            hardBudgetBytes: finite ? sizeMiB * (chunk + 28L) : long.MaxValue);
         var buffer = new byte[chunk];
         for (var i = 0; i < chunk; i++) buffer[i] = (byte)(i % 251);
         if (hash.Length != 64 || !hash.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')) throw new ArgumentException("Invalid reference hash.", nameof(hash));
@@ -40,7 +46,7 @@ public static partial class Harness
         {
             await Measure("append", sizeMiB, async () => await cache.AppendPartialAsync(hash, buffer));
             if (measured.Written != sizeMiB * (chunk + 28L)) throw new InvalidDataException("Nonlinear ciphertext payload writes.");
-            if (measured.InventoryReads != 0) throw new InvalidDataException("Unlimited appends rescanned physical inventory.");
+            if (measured.InventoryReads != (finite ? sizeMiB : 0)) throw new InvalidDataException("Capacity admission read count is not proportional to appended chunks.");
             await Measure("complete", 1, async () =>
             { if (!await cache.CompletePartialAsync(hash)) throw new InvalidDataException("Publication hash mismatch."); });
             await using (var reader = await cache.OpenReadAsync(hash) ?? throw new InvalidDataException("Missing object."))
