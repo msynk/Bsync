@@ -47,7 +47,8 @@ public sealed class SyncTestHost : IAsyncDisposable
         var group = app.MapSyncCollection("notes", authority, Json, new SyncEndpointOptions
         {
             SupportedSchemas = new HashSet<string>(supportedSchemas ?? [SchemaId], StringComparer.Ordinal),
-            ResolveScope = requireAuthentication ? http => http.User.FindFirst("tenant")?.Value : static _ => "default",
+            ResolveScope = requireAuthentication ? http => http.User.FindFirst("tenant")?.Value : SyncEndpointOptions.SharedScope(),
+            AllowAnonymous = !requireAuthentication,
             MaxRequestBodyBytes = maxRequestBodyBytes,
             ReplicaAudit = replicaAudit,
         });

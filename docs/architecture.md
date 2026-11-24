@@ -131,8 +131,8 @@ Checkpoints are opaque, carry an epoch and cover a committed, gap-free prefix. V
 (timestamps, `rowversion`, `IDENTITY`) are never feed positions: a slower transaction could commit a lower value after a
 reader passed it. PostgreSQL and SQL Server lock the feed row for the whole push, so version `n+1` becomes visible only
 after `n` committed or rolled back (verified with a real uncommitted lower version and with 12 writers on two instances).
-Cost: one writer per feed; a `pg_snapshot_xmin` watermark is the fallback if throughput requires it. Remaining:
-PostgreSQL version floor for feeds created after a restore (A2) and set-based push (P1), tracked in
+Cost: one writer per feed; a `pg_snapshot_xmin` watermark is the fallback if throughput requires it. A new epoch's version
+floor also applies to feeds created afterwards, on every authority (A2). Remaining: set-based push (P1), tracked in
 [implementation plan](implementation-plan.md). **Status:** Accepted; in-memory, PostgreSQL, SQL Server.
 
 ### ADR-006: Conflict model, policies and defaults
@@ -279,8 +279,9 @@ collection, filter, schema version); its fingerprint is bound into checkpoints, 
 `reset-required` (`scope-changed`). Receipts are per scope with a request fingerprint; replays and conflicts are filtered
 by read authorization. Replicas have an id and incarnation (new after restore or cloning). Revocation removes local
 copies without global deletion. No database credentials or client secrets in WebAssembly; logs redact tokens and
-documents. Endpoints currently fall back to a shared scope when `ResolveScope` is not configured; failing closed (A1) and
-blob route hardening (A12) are tracked in [implementation plan](implementation-plan.md). **Status:** Accepted.
+documents. Every route fails closed (A1): `ResolveScope` is required, anonymous callers get 401 unless the application sets
+`AllowAnonymous`, and a scope shared by every caller (`SharedScope`) is logged at startup. Blob routes answer with
+`nosniff` and attachment downloads, and can require `Bsync-Protocol` so browsers always preflight (A12). **Status:** Accepted.
 
 ### ADR-016: Encryption at rest and replica wipe
 
@@ -514,7 +515,7 @@ qualifier says where), **Partial** (gap stated), **Open**.
 | I03 | Page and checkpoint commit together; never advance past unrepresented data. | Enforced (reference) | `CrashDuringPageApplyIsAtomic`. |
 | I04 | Retries reuse id and payload; duplicates replay; a reused id with other content fails. | Enforced (reference) | Receipts with fingerprints. A replay after receipt purge becomes a conflict, so receipts must outlive offline periods (C10). |
 | I05 | Base-version compare and write are one atomic server operation. | Enforced (reference, PostgreSQL) | Feed row locked for the push. |
-| I06 | A cursor covers a committed, gap-free prefix in an explicit epoch. | Enforced (reference, PostgreSQL) | `DelayedCommitIsNeverSkipped`. PostgreSQL floor for new feeds after restore open (A2). |
+| I06 | A cursor covers a committed, gap-free prefix in an explicit epoch. | Enforced (reference, PostgreSQL) | `DelayedCommitIsNeverSkipped`; conformance "a feed first written after a new epoch starts above the version floor" (A2). |
 | I07 | Isolation across tenant, principal, collection, filter, replica. | Enforced (reference) | Scope from principal, fingerprint in checkpoints. Fail-closed default open (A1). |
 | I08 | Work is bounded; exhaustion reports resumable remaining work. | Partial | Custom query order reads the whole collection (P11); no pull byte budget (P2). |
 | I09 | No regression of versions or cursors; bad outcomes never mark data clean. | Enforced (reference) | `CorrelateOutcomes`, `ValidatePullPage`, invalid fixtures. |

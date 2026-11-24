@@ -339,7 +339,8 @@ start is an error and is not retried.
   and some browsers then never let a new version take over.
 - Limits (maximum operations per push, maximum page size) are advertised in every pull response (`limits`,
   section 3.2) and enforced with `payload-too-large`. The maximum body size is enforced but not advertised.
-- Scope and principal are taken from the authenticated request, never from the body (ADR-010).
+- Scope and principal are taken from the authenticated request, never from the body (ADR-010). Servers refuse
+  unauthenticated callers with `401` `unauthorized` unless they explicitly serve public data.
 - **Pull batches (optional, feature `pull-batch`).** A server that maps several collections as one group
   advertises `pull-batch` (and `hints-multiplex`) in their pull responses and accepts
   `POST {base}/pull` with `{ "collections": { "{collection}": {pull request}, ... } }`. It answers `200` with
@@ -347,11 +348,16 @@ start is an error and is not retried.
   each collection is pulled exactly as its own endpoint would, with the same status codes and problem members, and one
   collection's failure does not affect the others. Authentication, headers and body limits apply to the batch request
   as a whole. Clients send a collection at most once per batch and use batches only after the feature was advertised;
-  a server without it answers `404`, and clients then pull per collection.
+  a server without it answers `404`, and clients then pull per collection. A batch that names a collection twice, or
+  has more parts than the server maps collections, is refused as a whole with `400` `invalid-request`. Servers MAY pull
+  a bounded number of parts at a time and stream the parts in request order.
 - **Blobs (optional).** Content named by documents (attachments) is transferred beside the protocol, under its own
   prefix (`{blobs}`, by default `{base}/blobs`), with the same authentication and scope. `{sha256}` is 64 lowercase
   hexadecimal characters; anything else is `400`. Responses are JSON `{ "received": n, "complete": bool }`, plus an
-  optional `uploadUrl`, with `Cache-Control: no-store`; refusals with a code use `application/problem+json`.
+  optional `uploadUrl`, with `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; refusals with a code use
+  `application/problem+json`. Clients send `Bsync-Protocol: 1` on every blob request to the server except a plain
+  `GET {blobs}/{sha256}`, which may be redirected to an object store. A server MAY require the header (then a request
+  without it is `400`); another value is `400` `upgrade-required`. Clients before 0.6.0 send no header.
   - `POST {blobs}/{sha256}/uploads?size=n` starts or resumes an upload: `complete: true` when the caller's scope
     already holds the content, else how many bytes the server holds. When the server's store offers it and nothing is
     held yet, `uploadUrl` is a short-lived absolute URL to which the client MAY send the whole content in one `PUT`
@@ -361,9 +367,12 @@ start is an error and is not retried.
     with the real `received`. Bytes that arrive before a connection drops are kept.
   - `POST {blobs}/{sha256}/uploads/finish` verifies the hash of what was received (in chunks or at `uploadUrl`) and
     records that the caller's scope holds the content: `complete: true`. A mismatch discards the upload: `422`
-    `blob-hash-mismatch`. Repeating a finish is harmless. The object is stored once per hash, whichever scopes upload it.
-  - `GET {blobs}/{sha256}` returns the content with range support, or a temporary redirect to a presigned URL that
-    serves it (also with ranges). A caller who may not read it gets `404`, whether or not the content exists.
+    `blob-hash-mismatch`. Repeating a finish is harmless, including after a fault between verification and recording.
+    When the server holds nothing for the upload any more, it answers `complete: false, received: 0` and the client
+    uploads again. The object is stored once per hash, whichever scopes upload it.
+  - `GET {blobs}/{sha256}` returns the content with range support and `Content-Disposition: attachment`, or a temporary
+    redirect to a presigned URL that serves it (also with ranges). A caller who may not read it gets `404`, whether or
+    not the content exists.
 
 ## 9. Versioning
 

@@ -21,8 +21,9 @@ namespace Bsync.Server.AspNetCore;
 /// application/json</c>. Errors are RFC 9457 problem details with a <c>code</c> member.
 /// </para>
 /// <para>
-/// Authentication and authorization policies are applied by the caller on the returned route group
-/// (<c>.RequireAuthorization(...)</c>). With cookie authentication, the required custom header and JSON
+/// Anonymous callers are refused with <c>401 unauthorized</c> unless <see cref="SyncEndpointOptions.AllowAnonymous"/>
+/// is set, and every caller's scope comes from the required <see cref="SyncEndpointOptions.ResolveScope"/>. Further
+/// authorization policies are applied by the caller on the returned route group (<c>.RequireAuthorization(...)</c>). With cookie authentication, the required custom header and JSON
 /// content type make every call a CORS-preflighted request, so cross-site form posts cannot reach the
 /// endpoints; do not relax CORS for untrusted origins. Request and response bodies are never logged.
 /// </para>
@@ -84,6 +85,12 @@ public static class SyncEndpoints
         }
 
         var logger = endpoints.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Bsync.Server") ?? NullLogger.Instance;
+        if (!multiplexedHints)
+        {
+            // A group warns once for all its collections (MapSyncCollections).
+            options.WarnIfShared(logger, $"{prefix.Trim('/')}/collections/{collection}");
+        }
+
         Func<SyncCallContext, PullRequest, CancellationToken, Task<PullResult<TDocument>>> pull = multiplexedHints
             ? async (context, request, cancellationToken) =>
             {
@@ -217,6 +224,7 @@ public static class SyncEndpoints
         var builder = new SyncCollectionGroupBuilder(group, options);
         collections(builder);
         var logger = endpoints.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Bsync.Server") ?? NullLogger.Instance;
+        options.WarnIfShared(logger, prefix.Trim('/'));
         var site = new Site("*", "hints", logger);
         var notifiers = builder.Notifiers;
         group.MapGet("hints", (RequestDelegate)(context => MultiplexedHintsAsync(context, site, options, notifiers)));
@@ -402,6 +410,13 @@ public static class SyncEndpoints
     /// <summary>Checks protocol, schema, content type and scope; writes the problem response and returns null if any fails.</summary>
     private static async Task<string?> AuthorizeAsync(HttpContext http, Site site, SyncEndpointOptions options, bool requireJson)
     {
+        // Fail closed (A1): an anonymous caller never reaches the scope resolver unless the application opted in.
+        if (!options.Admits(http))
+        {
+            await ProblemAsync(http, site, StatusCodes.Status401Unauthorized, SyncErrorCodes.Unauthorized, "Authentication is required.");
+            return null;
+        }
+
         var headers = http.Request.Headers;
         if (!headers.TryGetValue("Bsync-Protocol", out var protocol) || protocol.Count != 1)
         {
@@ -549,8 +564,9 @@ public static class SyncEndpoints
     /// <summary>
     /// <c>POST {prefix}/pull</c> (task C3, protocol §8.5): <c>{ "collections": { "name": pullRequest, ... } }</c> answered by
     /// <c>{ "results": { "name": { "status": 200, "result": pullResult } | { "status": 409, "problem": {...} } } }</c>.
-    /// Each collection is pulled exactly as its own endpoint would, concurrently; one collection's failure does not
-    /// affect the others.
+    /// Each collection is pulled exactly as its own endpoint would, up to <see cref="SyncEndpointOptions.MaxConcurrentBatchPulls"/>
+    /// at a time; one collection's failure does not affect the others. A batch that repeats a name or has more parts than
+    /// the group maps is refused with <c>400 invalid-request</c> (A6). Parts are streamed in request order.
     /// </summary>
     private static async Task PullBatchAsync(HttpContext http, Site site, SyncEndpointOptions options, IReadOnlyDictionary<string, BatchPull> pulls)
     {
@@ -580,37 +596,83 @@ public static class SyncEndpoints
                 return;
             }
 
-            var context = new SyncCallContext(http.User, scope);
-            var parts = requested.EnumerateObject()
-                .Select(entry => (entry.Name, Part: pulls.TryGetValue(entry.Name, out var pull)
-                    ? pull(context, entry.Value, http.RequestAborted)
-                    : Task.FromResult(BatchPart.Problem(site, StatusCodes.Status404NotFound, SyncErrorCodes.InvalidRequest, "No such collection in this group."))))
-                .ToList();
-            await Task.WhenAll(parts.Select(p => p.Part));
-
-            site.Count(Ok);
-            http.Response.StatusCode = StatusCodes.Status200OK;
-            http.Response.Headers.CacheControl = "no-store";
-            http.Response.ContentType = "application/json; charset=utf-8";
-            // Written to memory first: serializing a part flushes its writer, and response bodies allow only asynchronous writes.
-            var buffer = new System.Buffers.ArrayBufferWriter<byte>();
-            await using var writer = new Utf8JsonWriter(buffer);
-            writer.WriteStartObject();
-            writer.WriteStartObject("results");
-            foreach (var (name, part) in parts)
+            // A6: names are unique and no more than the group maps, so one request cannot start unbounded pulls.
+            var names = new List<(string Name, JsonElement Request)>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in requested.EnumerateObject())
             {
-                var result = await part;
-                writer.WriteStartObject(name);
-                writer.WriteNumber("status", result.Status);
-                writer.WritePropertyName(result.Status == StatusCodes.Status200OK ? "result" : "problem");
-                result.Write(writer);
-                writer.WriteEndObject();
+                if (!seen.Add(entry.Name))
+                {
+                    await ProblemAsync(http, site, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, "The pull batch names a collection more than once.");
+                    return;
+                }
+
+                if (names.Count == pulls.Count)
+                {
+                    await ProblemAsync(http, site, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest, "The pull batch has more parts than this group has collections.");
+                    return;
+                }
+
+                names.Add((entry.Name, entry.Value));
             }
 
-            writer.WriteEndObject();
-            writer.WriteEndObject();
-            await writer.FlushAsync(http.RequestAborted);
-            await http.Response.Body.WriteAsync(buffer.WrittenMemory, http.RequestAborted);
+            // At most MaxConcurrentBatchPulls authority pulls at a time; parts are written in request order as they finish.
+            var context = new SyncCallContext(http.User, scope);
+            using var slots = new SemaphoreSlim(options.MaxConcurrentBatchPulls);
+            async Task<BatchPart> RunAsync(string name, JsonElement request)
+            {
+                if (!pulls.TryGetValue(name, out var pull))
+                {
+                    return BatchPart.Problem(site, StatusCodes.Status404NotFound, SyncErrorCodes.InvalidRequest, "No such collection in this group.");
+                }
+
+                await slots.WaitAsync(http.RequestAborted).ConfigureAwait(false);
+                try
+                {
+                    return await pull(context, request, http.RequestAborted).ConfigureAwait(false);
+                }
+                finally
+                {
+                    slots.Release();
+                }
+            }
+
+            var parts = names.Select(part => (part.Name, Part: RunAsync(part.Name, part.Request))).ToList();
+            try
+            {
+                site.Count(Ok);
+                http.Response.StatusCode = StatusCodes.Status200OK;
+                http.Response.Headers.CacheControl = "no-store";
+                http.Response.ContentType = "application/json; charset=utf-8";
+
+                // Streamed: each part is serialized into the response pipe (no synchronous I/O) and flushed once complete,
+                // so the server holds one part at a time instead of the whole batch.
+                var body = http.Response.BodyWriter;
+                await using var writer = new Utf8JsonWriter(body);
+                writer.WriteStartObject();
+                writer.WriteStartObject("results");
+                foreach (var (name, part) in parts)
+                {
+                    var result = await part;
+                    writer.WriteStartObject(name);
+                    writer.WriteNumber("status", result.Status);
+                    writer.WritePropertyName(result.Status == StatusCodes.Status200OK ? "result" : "problem");
+                    result.Write(writer);
+                    writer.WriteEndObject();
+                    writer.Flush();
+                    await body.FlushAsync(http.RequestAborted);
+                }
+
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+                writer.Flush();
+                await body.FlushAsync(http.RequestAborted);
+            }
+            finally
+            {
+                // Never leave a pull running past the request (the semaphore is disposed with this scope).
+                await Task.WhenAll(parts.Select(p => p.Part)).ContinueWith(static _ => { }, TaskScheduler.Default);
+            }
         }
     }
 

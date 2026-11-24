@@ -140,12 +140,17 @@ IBlobStore store = new FileSystemBlobStore(Path.Combine(contentRoot, "blobs"));
 app.MapSyncBlobs(store, new MyBlobAccess(connectionString), syncOptions).RequireAuthorization();
 ```
 
-- `syncOptions` is your sync routes' `SyncEndpointOptions`; the scope comes from its `ResolveScope`. Always set it and
-  require authorization: routes are not closed by default yet (A1).
+- `syncOptions` is your sync routes' `SyncEndpointOptions`; the scope comes from its required `ResolveScope`. Anonymous
+  callers get 401 unless `AllowAnonymous` is set; add your own policy with `.RequireAuthorization(...)`.
 - Your `IBlobAccess` tracks which scope uploaded what (`HoldsAsync`, `RecordAsync`) and decides reads (`CanReadAsync`).
   Unauthorized reads get 404, so a hash does not reveal existence. Storage is deduplicated, uploads are not: each scope
   uploads content itself before it counts as holding it.
 - `SyncBlobEndpointOptions.MaxSize` defaults to 200 MiB. Routes are in [protocol](protocol.md), section 8.
+- With cookie authentication, set `SyncBlobEndpointOptions.RequireProtocolHeader = true` once every client is 0.6.0 or
+  later, and use `HttpBlobTransferOptions.DownloadTickets`: every blob request then carries `Bsync-Protocol`, so browsers
+  preflight it and other sites cannot use the user's cookies on these routes.
+- A custom `IBlobStore` should implement `GetCompletedSizeAsync` and `ForgetCompletedAsync` (as `FileSystemBlobStore`
+  does) so a finish repeated after a fault needs no new upload; without them such a finish restarts the upload.
 
 #### Transfers and object storage
 
@@ -618,9 +623,9 @@ version (continue above a **version floor**), and keep the receipts in the backu
 5. Watch `bsync.resets{reason="epoch"}` and `bsync.server.push.operations{outcome="Conflict"}` for a few hours.
 
 Replicas keep unsynchronized edits and kept conflicts; a replayed upload is answered from its receipt. Clean copies of
-documents created after the backup are hidden as `MissingAfterReset`, not deleted. **Known gap (A2):** on PostgreSQL
-the floor raises only feeds that exist at restore time; a feed first created afterwards restarts at version 1 (SQL
-Server is not affected). Scripted restore drills are planned (O6).
+documents created after the backup are hidden as `MissingAfterReset`, not deleted. The floor also applies to feeds
+first created after the restore (on PostgreSQL from 0.6.0, stored as `version_floor` in `bs_meta`; earlier PostgreSQL
+versions restarted such feeds at version 1). Scripted restore drills are planned (O6).
 
 #### 2. Retention of tombstones and receipts
 
@@ -692,7 +697,7 @@ one `bsync.document_access` row per principal per document with read membership.
 - Backups and a **tested** restore that starts a new epoch with a version floor.
 - Receipt retention longer than the longest offline period; a tombstone retention users understand.
 - Alerts on rejections, conflicts and `bsync.server.requests{result="unavailable"}`.
-- Sync and blob routes require authorization with an explicit `ResolveScope` (A1).
+- Scopes resolved from authenticated claims, `AllowAnonymous` off and no `SharedScope` warning in the startup log (A1).
 - A scheduled blob garbage-collection job if you use attachments.
 
 ### Release process
@@ -881,7 +886,13 @@ No document wire or schema change; new APIs are additive. Behaviour changes to c
 
 #### 0.5.0 → 0.6.0 (unreleased)
 
-The public APIs add to 0.5.0. Everything new is experimental.
+Apart from the fail-closed endpoints below, the public APIs add to 0.5.0. Everything new is experimental.
+
+- **Sync and blob routes fail closed (A1).** `SyncEndpointOptions.ResolveScope` is now required, so code that relied on
+  the old `"default"` scope stops compiling. Resolve the scope from a tenant or user claim, or, only when every caller may
+  share one data set, use `ResolveScope = SyncEndpointOptions.SharedScope()` (mapping then logs a warning). Anonymous
+  callers now get `401 unauthorized` on every route even without `.RequireAuthorization()`; set `AllowAnonymous = true`
+  for public data, demos and tests.
 
 - **SQL Server workflow classes** moved from the Tasks sample into `Bsync.Server.SqlServer.Workflows`. Update the
   namespace and give each receiver a stable `Identity`.

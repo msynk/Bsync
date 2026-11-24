@@ -30,6 +30,9 @@ public sealed class InMemoryAuthorityDriver : IAuthorityConformanceDriver
         private readonly object _gate = new();
         private Router? _router;
 
+        // Feeds created after a new epoch start above it too (A2): the lost history may have issued any version below.
+        private long _versionFloor;
+
         public override ISyncAuthority<ConformanceDocument> Authority => _router ??= new Router(this);
 
         public override Task PurgeTombstonesAsync(string scope, long throughVersion, CancellationToken cancellationToken = default)
@@ -48,6 +51,7 @@ public sealed class InMemoryAuthorityDriver : IAuthorityConformanceDriver
         {
             lock (_gate)
             {
+                _versionFloor = Math.Max(_versionFloor, versionFloor);
                 foreach (var scope in _servers.Keys.ToList())
                 {
                     _servers[scope] = Create(_servers[scope].CreateBackup(), versionFloor);
@@ -63,7 +67,7 @@ public sealed class InMemoryAuthorityDriver : IAuthorityConformanceDriver
             {
                 if (!_servers.TryGetValue(scope, out var server))
                 {
-                    _servers[scope] = server = Create(restoreFrom: null, versionFloor: 0);
+                    _servers[scope] = server = Create(restoreFrom: null, _versionFloor);
                 }
 
                 return server;

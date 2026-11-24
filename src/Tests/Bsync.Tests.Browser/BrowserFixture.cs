@@ -50,6 +50,8 @@ public sealed class BrowserFixture : IAsyncLifetime
         app.MapSyncCollection("notes", Authority, SyncJsonTypes<ConformanceDocument>.From(ConformanceJsonContext.Default), new SyncEndpointOptions
         {
             SupportedSchemas = new HashSet<string>(StringComparer.Ordinal) { "notes-v1" },
+            ResolveScope = SyncEndpointOptions.SharedScope(),
+            AllowAnonymous = true,
         });
         await app.StartAsync();
         _app = app;

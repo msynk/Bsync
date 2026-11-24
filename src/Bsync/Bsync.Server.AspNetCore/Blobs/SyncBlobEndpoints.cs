@@ -3,6 +3,9 @@ using Bsync.Blobs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Bsync.Server.AspNetCore.Blobs;
 
@@ -17,12 +20,23 @@ public sealed class SyncBlobEndpointOptions
 
     /// <summary>How long a presigned upload URL is valid, when the store offers them. Default fifteen minutes.</summary>
     public TimeSpan PresignedWriteValidity { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// Refuses blob requests without <c>Bsync-Protocol: 1</c> with <c>400 invalid-request</c> (A12). The custom header
+    /// makes every browser call CORS-preflighted, so cross-site pages cannot start uploads or probe for content with the
+    /// user's cookies. Clients from 0.6.0 send it; earlier clients do not, so the default is <see langword="false"/> until
+    /// they are retired. Plain reads (<c>GET {sha256}</c> without <c>proxy=1</c>) are exempt because they may redirect to
+    /// an object store, which would then have to allow the header in its CORS rules; use download tickets to cover reads.
+    /// A header with another value is always refused with <c>upgrade-required</c>.
+    /// </summary>
+    public bool RequireProtocolHeader { get; init; }
 }
 
 /// <summary>
 /// The blob routes (protocol §8.6, task F1). Uploads are resumable and per scope: a scope proves it has the content by
 /// uploading it, even when another scope already stored the same bytes, so a hash never reveals what others hold; the
-/// object itself is stored once. Reads are allowed by <see cref="IBlobAccess.CanReadAsync"/> and answered with 404
+/// object itself is stored once. Anonymous callers are refused with 401 unless
+/// <see cref="SyncEndpointOptions.AllowAnonymous"/> is set. Reads are allowed by <see cref="IBlobAccess.CanReadAsync"/> and answered with 404
 /// otherwise (whether content exists is not disclosed). Records <c>bsync.server.blob.bytes</c> and
 /// <c>bsync.server.blob.requests</c> on the <c>Bsync.Server</c> meter.
 /// </summary>
@@ -53,11 +67,14 @@ public static class SyncBlobEndpoints
         ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(options);
         blobOptions ??= new SyncBlobEndpointOptions();
+        options.WarnIfShared(
+            endpoints.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("Bsync.Server") ?? NullLogger.Instance,
+            prefix.Trim('/'));
         var group = endpoints.MapGroup($"{prefix.Trim('/')}/{{sha256}}");
 
         // Starts or resumes an upload: how much the server already holds, and a presigned upload URL when the store offers
         // one and nothing is held yet.
-        group.MapPost("/uploads", (RequestDelegate)(async http =>
+        group.MapPost("/uploads", Admitted(options, blobOptions, "start", async http =>
         {
             if (Caller(http, options) is not { } caller || !long.TryParse(http.Request.Query["size"], out var size) || size < 0)
             {
@@ -87,7 +104,7 @@ public static class SyncBlobEndpoints
         }));
 
         // Appends one chunk at the offset the client believes the server is at; 409 with the real offset otherwise.
-        group.MapPut("/uploads/{offset:long}", (RequestDelegate)(async http =>
+        group.MapPut("/uploads/{offset:long}", Admitted(options, blobOptions, "append", async http =>
         {
             if (Caller(http, options) is not { } caller || !long.TryParse(http.Request.RouteValues["offset"]?.ToString(), out var offset) || offset < 0)
             {
@@ -115,8 +132,9 @@ public static class SyncBlobEndpoints
             }
         }));
 
-        // Verifies the hash and records that this scope holds the content. Repeating it (a lost response) is harmless.
-        group.MapPost("/uploads/finish", (RequestDelegate)(async http =>
+        // Verifies the hash and records that this scope holds the content. Repeating it (a lost response, a failed access
+        // record) is harmless and needs no new upload when the store keeps completions (A13).
+        group.MapPost("/uploads/finish", Admitted(options, blobOptions, "finish", async http =>
         {
             if (Caller(http, options) is not { } caller)
             {
@@ -133,7 +151,26 @@ public static class SyncBlobEndpoints
             }
 
             var upload = FileSystemBlobStore.UploadKey(caller.Scope, sha256);
+            if (await store.GetCompletedSizeAsync(upload, sha256, http.RequestAborted) is { } completed)
+            {
+                // A13: verified earlier, but recording access failed or its answer was lost.
+                await access.RecordAsync(caller, sha256, completed, http.RequestAborted);
+                await store.ForgetCompletedAsync(upload, http.RequestAborted);
+                Requests.Add(1, Tag("finish"), Ok);
+                await StatusAsync(http, StatusCodes.Status200OK, completed, complete: true);
+                return;
+            }
+
             var size = await store.GetReceivedAsync(upload, http.RequestAborted);
+            if (size == 0 && sha256 != EmptySha256)
+            {
+                // Nothing held to verify (purged, or completed by a store that keeps no completions): restart the upload
+                // rather than reporting a hash mismatch, which clients treat as corruption (A13).
+                Requests.Add(1, Tag("finish"), Result("restart"));
+                await StatusAsync(http, StatusCodes.Status200OK, 0, complete: false);
+                return;
+            }
+
             if (size > blobOptions.MaxSize)
             {
                 // Only possible through a presigned upload, which the store cannot limit; the collector removes it.
@@ -148,12 +185,13 @@ public static class SyncBlobEndpoints
             }
 
             await access.RecordAsync(caller, sha256, size, http.RequestAborted);
+            await store.ForgetCompletedAsync(upload, http.RequestAborted);
             Requests.Add(1, Tag("finish"), Ok);
             await StatusAsync(http, StatusCodes.Status200OK, size, complete: true);
         }));
 
         // Optional v1 tickets keep application credentials on the authority request. Old clients retain redirect behavior.
-        group.MapGet("/download", (RequestDelegate)(async http =>
+        group.MapGet("/download", Admitted(options, blobOptions, "ticket", async http =>
         {
             if (Caller(http, options) is not { } caller)
             { await RefuseAsync(http, "ticket", StatusCodes.Status400BadRequest); return; }
@@ -173,7 +211,7 @@ public static class SyncBlobEndpoints
 
         // Reads a blob the caller may read: a redirect to a presigned URL when the store has them, else the bytes, with
         // range requests (resumable downloads) either way.
-        group.MapGet("/", (RequestDelegate)(async http =>
+        group.MapGet("/", Admitted(options, blobOptions, "read", async http =>
         {
             if (Caller(http, options) is not { } caller)
             {
@@ -202,6 +240,7 @@ public static class SyncBlobEndpoints
             }
 
             Requests.Add(1, Tag("read"), Ok);
+            http.Response.Headers.ContentDisposition = $"attachment; filename=\"{sha256}\"";
             await Results.Stream(new CountingStream(stream), "application/octet-stream", enableRangeProcessing: true).ExecuteAsync(http);
         }));
 
@@ -209,6 +248,37 @@ public static class SyncBlobEndpoints
     }
 
     private static readonly KeyValuePair<string, object?> Ok = Result("ok");
+
+    /// <summary>The SHA-256 of empty content.</summary>
+    private const string EmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+    /// <summary>
+    /// Runs before every blob handler: refuses anonymous callers with 401 unless the options allow them (A1), checks the
+    /// <c>Bsync-Protocol</c> header (A12) and sets <c>X-Content-Type-Options: nosniff</c> on every answer.
+    /// </summary>
+    private static RequestDelegate Admitted(SyncEndpointOptions options, SyncBlobEndpointOptions blobOptions, string endpoint, RequestDelegate handler) => http =>
+    {
+        http.Response.Headers.XContentTypeOptions = "nosniff";
+        if (!options.Admits(http))
+        {
+            return RefuseAsync(http, endpoint, StatusCodes.Status401Unauthorized, SyncErrorCodes.Unauthorized);
+        }
+
+        var protocol = http.Request.Headers["Bsync-Protocol"];
+        if (protocol.Count > 0 && (protocol.Count != 1 || protocol[0] != SyncEndpoints.ProtocolVersion))
+        {
+            return RefuseAsync(http, endpoint, StatusCodes.Status400BadRequest, SyncErrorCodes.UpgradeRequired);
+        }
+
+        // Plain reads may redirect to an object store and stay exempt (see RequireProtocolHeader).
+        var exempt = endpoint == "read" && http.Request.Query["proxy"] != "1";
+        if (protocol.Count == 0 && blobOptions.RequireProtocolHeader && !exempt)
+        {
+            return RefuseAsync(http, endpoint, StatusCodes.Status400BadRequest, SyncErrorCodes.InvalidRequest);
+        }
+
+        return handler(http);
+    };
 
     private static KeyValuePair<string, object?> Tag(string endpoint) => new("bsync.endpoint", endpoint);
 

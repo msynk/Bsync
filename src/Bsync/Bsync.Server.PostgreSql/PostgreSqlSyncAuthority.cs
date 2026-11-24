@@ -199,7 +199,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         // Lock the feed: versions of this scope are assigned and committed one transaction at a time.
-        await ExecuteAsync(connection, transaction, "INSERT INTO bs_feeds (collection, scope, sequence, purged_through) VALUES ($1, $2, 0, 0) ON CONFLICT DO NOTHING", cancellationToken, _options.Collection, context.Scope).ConfigureAwait(false);
+        await ExecuteAsync(connection, transaction, CreateFeedSql, cancellationToken, _options.Collection, context.Scope).ConfigureAwait(false);
         long sequence, purgedThrough;
         await using (var lockFeed = new NpgsqlCommand("SELECT sequence, purged_through FROM bs_feeds WHERE collection = $1 AND scope = $2 FOR UPDATE", connection, transaction))
         {
@@ -555,7 +555,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
             var changed = new List<string>();
             foreach (var scope in ordered)
             {
-                await ExecuteAsync(connection, active, "INSERT INTO bs_feeds (collection, scope, sequence, purged_through) VALUES ($1, $2, 0, 0) ON CONFLICT DO NOTHING", cancellationToken, _options.Collection, scope).ConfigureAwait(false);
+                await ExecuteAsync(connection, active, CreateFeedSql, cancellationToken, _options.Collection, scope).ConfigureAwait(false);
                 var sequence = await ScalarAsync<long>(connection, active, "SELECT sequence FROM bs_feeds WHERE collection = $1 AND scope = $2 FOR UPDATE", cancellationToken, _options.Collection, scope).ConfigureAwait(false);
                 var start = sequence;
                 total = total.Add(await publish(new PublishScope(connection, active, scope, () => ++sequence), cancellationToken).ConfigureAwait(false));
@@ -901,10 +901,20 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
     }
 
     /// <summary>
+    /// Creates a scope's feed on first write. A new feed starts at the version floor of the last new epoch (A2), so a feed
+    /// that did not exist in a restored backup never reissues versions the lost history may have issued.
+    /// </summary>
+    private const string CreateFeedSql = """
+        INSERT INTO bs_feeds (collection, scope, sequence, purged_through)
+        SELECT $1, $2, COALESCE((SELECT value::bigint FROM bs_meta WHERE key = 'version_floor'), 0), 0
+        ON CONFLICT DO NOTHING
+        """;
+
+    /// <summary>
     /// Starts a new epoch after the database was restored from a backup: every checkpoint issued before gets
     /// <c>reset-required</c> (<c>epoch</c>), and every feed continues above <paramref name="versionFloor"/>, which must be
-    /// at or above any version the lost history may have issued. Affects every collection in the database and every
-    /// instance (they re-read the epoch on their next pull).
+    /// at or above any version the lost history may have issued; feeds created afterwards start above it as well. Affects
+    /// every collection in the database and every instance (they re-read the epoch on their next pull).
     /// </summary>
     public async Task BeginNewEpochAsync(long versionFloor, CancellationToken cancellationToken = default)
     {
@@ -912,6 +922,11 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
         await using var connection = await _source.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await ExecuteAsync(connection, transaction, "UPDATE bs_feeds SET sequence = GREATEST(sequence, $1)", cancellationToken, versionFloor).ConfigureAwait(false);
+        // Feeds created later start at the floor too (A2). Kept as the highest floor ever set; older binaries ignore it.
+        await ExecuteAsync(connection, transaction, """
+            INSERT INTO bs_meta (key, value) VALUES ('version_floor', $1)
+            ON CONFLICT (key) DO UPDATE SET value = GREATEST(bs_meta.value::bigint, EXCLUDED.value::bigint)::text
+            """, cancellationToken, versionFloor.ToString(System.Globalization.CultureInfo.InvariantCulture)).ConfigureAwait(false);
         await ExecuteAsync(connection, transaction, "UPDATE bs_meta SET value = $1 WHERE key = 'epoch'", cancellationToken, PostgreSqlSchema.NewEpoch()).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         _epoch = null;

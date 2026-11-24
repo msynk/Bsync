@@ -7,6 +7,8 @@
     <IsPackable>false</IsPackable>
     <BsyncFixtureVersion Condition="'$(BsyncFixtureVersion)' == ''">0.2.0</BsyncFixtureVersion>
     <DefineConstants Condition="'$(BsyncFixtureVersion)' != '0.2.0'">$(DefineConstants);DOWNLOAD_TICKETS</DefineConstants>
+    <!-- 0.6.0 and later refuse anonymous callers unless the endpoint options opt in (plan item A1). -->
+    <DefineConstants Condition="$([MSBuild]::VersionGreaterThanOrEquals($(BsyncFixtureVersion.Split('-')[0]), '0.6.0'))">$(DefineConstants);ANONYMOUS_OPT_IN</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Bsync" Version="[$(BsyncFixtureVersion)]" />

@@ -18,7 +18,14 @@ if (args[0] == "server")
     builder.WebHost.UseUrls(address.AbsoluteUri);
     var app = builder.Build();
     var files = new FileSystemBlobStore(Path.Combine(directory, "server"));
-    app.MapSyncBlobs(files, new Access(), new SyncEndpointOptions { SupportedSchemas = new HashSet<string>(["blobs-v1"]), ResolveScope = _ => "fixture" });
+    app.MapSyncBlobs(files, new Access(), new SyncEndpointOptions
+    {
+        SupportedSchemas = new HashSet<string>(["blobs-v1"]),
+        ResolveScope = _ => "fixture",
+#if ANONYMOUS_OPT_IN
+        AllowAnonymous = true,
+#endif
+    });
     app.MapGet("/health", () => typeof(HttpBlobTransfer).Assembly.GetName().Version!.ToString());
     await app.RunAsync();
     return;

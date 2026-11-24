@@ -36,6 +36,17 @@ public interface IBlobStore
     Task<bool> CompleteAsync(string upload, string sha256, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The size of <paramref name="upload"/> when <see cref="CompleteAsync"/> verified it as <paramref name="sha256"/> and the
+    /// completion was not yet forgotten, else <see langword="null"/>. Lets a finish repeated after a fault (recording access
+    /// failed, the process stopped) record access without a new upload (A13). Default: <see langword="null"/>, so such a
+    /// finish restarts the upload.
+    /// </summary>
+    Task<long?> GetCompletedSizeAsync(string upload, string sha256, CancellationToken cancellationToken = default) => Task.FromResult<long?>(null);
+
+    /// <summary>Forgets a completion recorded by <see cref="CompleteAsync"/> once access was recorded (A13). Default: nothing.</summary>
+    Task ForgetCompletedAsync(string upload, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>
     /// A short-lived URL to which a client sends the whole content of the upload <paramref name="upload"/> in one
     /// <c>PUT</c>, bypassing the application server, or <see langword="null"/> when the store has none (the default).
     /// Content stored that way is verified by <see cref="CompleteAsync"/> like a chunked upload, and
@@ -52,11 +63,17 @@ public interface IBlobStore
     /// <summary>Deletes an object.</summary>
     Task DeleteAsync(string sha256, CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes partial uploads not appended to since <paramref name="before"/>. Returns how many.</summary>
+    /// <summary>
+    /// Deletes partial uploads not appended to since <paramref name="before"/>, and completions older than that which were
+    /// never forgotten. Returns how many partial uploads.
+    /// </summary>
     Task<int> PurgePartialsAsync(DateTimeOffset before, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Blob storage in a directory: <c>objects/ab/&lt;sha256&gt;</c> and <c>uploads/&lt;upload&gt;.part</c>.</summary>
+/// <summary>
+/// Blob storage in a directory: <c>objects/ab/&lt;sha256&gt;</c>, <c>uploads/&lt;upload&gt;.part</c> and, between a verified
+/// completion and the access record, <c>uploads/&lt;upload&gt;.done</c>.
+/// </summary>
 public sealed class FileSystemBlobStore : IBlobStore
 {
     private readonly string _objects;
@@ -79,6 +96,9 @@ public sealed class FileSystemBlobStore : IBlobStore
 
     /// <summary>The file of a partial upload (for stores that keep only partial uploads here, such as the S3 store).</summary>
     public string UploadFile(string upload) => Path.Combine(_uploads, upload + ".part");
+
+    /// <summary>The completion marker of an upload: its verified hash and size, until access is recorded (A13).</summary>
+    private string CompletedFile(string upload) => Path.Combine(_uploads, upload + ".done");
 
     /// <inheritdoc />
     public Task<bool> ExistsAsync(string sha256, CancellationToken cancellationToken = default) => Task.FromResult(File.Exists(ObjectPath(sha256)));
@@ -151,6 +171,12 @@ public sealed class FileSystemBlobStore : IBlobStore
                 return false;
             }
 
+            // Written before the partial goes, so a finish repeated after a fault still knows this upload was verified.
+            var size = new FileInfo(partial).Length;
+            var marker = CompletedFile(upload);
+            await File.WriteAllTextAsync(marker + ".tmp", $"{sha256}\n{size.ToString(System.Globalization.CultureInfo.InvariantCulture)}", cancellationToken).ConfigureAwait(false);
+            File.Move(marker + ".tmp", marker, overwrite: true);
+
             var target = ObjectPath(sha256);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             if (File.Exists(target))
@@ -168,6 +194,29 @@ public sealed class FileSystemBlobStore : IBlobStore
         {
             gate.Release();
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<long?> GetCompletedSizeAsync(string upload, string sha256, CancellationToken cancellationToken = default)
+    {
+        var marker = CompletedFile(upload);
+        if (!File.Exists(marker) || !File.Exists(ObjectPath(sha256)))
+        {
+            return null;
+        }
+
+        var lines = (await File.ReadAllTextAsync(marker, cancellationToken).ConfigureAwait(false)).Split('\n');
+        return lines.Length == 2 && string.Equals(lines[0], sha256, StringComparison.Ordinal)
+            && long.TryParse(lines[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var size)
+            ? size
+            : null;
+    }
+
+    /// <inheritdoc />
+    public Task ForgetCompletedAsync(string upload, CancellationToken cancellationToken = default)
+    {
+        File.Delete(CompletedFile(upload));
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -199,6 +248,14 @@ public sealed class FileSystemBlobStore : IBlobStore
             {
                 file.Delete();
                 removed++;
+            }
+        }
+
+        foreach (var file in new DirectoryInfo(_uploads).EnumerateFiles("*.done*"))
+        {
+            if (file.LastWriteTimeUtc < before.UtcDateTime)
+            {
+                file.Delete();
             }
         }
 

@@ -396,6 +396,25 @@ public static class AuthorityConformance
             Check.Sequence(["a", "b"], snapshot.Select(c => c.Document.Id).Order(StringComparer.Ordinal));
         }),
 
+        new("Authority A2 I14: a feed first written after a new epoch starts above the version floor", AuthorityCapabilities.NewEpoch | AuthorityCapabilities.ScopeIsolation, async driver =>
+        {
+            // The restored backup predates this scope's feed, so the lost history may have issued any version up to the
+            // floor in it; a base version from that history must never match a new document state.
+            await using var authority = await CreateAsync(driver);
+            var existing = authority.Connect(Caller("tenant-a"));
+            var v1 = (await Push(existing, Op("o1", "a", null)))[0].Version!.Value;
+            var floor = v1 + 1000;
+
+            await authority.BeginNewEpochAsync(floor);
+            var created = authority.Connect(Caller("tenant-new"));
+            var first = (await Push(created, Op("o1", "x", null)))[0];
+            var stale = (await Push(created, Op("o2", "x", 1, "from lost history")))[0];
+
+            Check.Equal(PushOutcomeKind.Accepted, first.Kind);
+            Check.True(first.Version > floor);
+            Check.Equal(PushOutcomeKind.Conflict, stale.Kind);
+        }),
+
         new("Authority B3: a published document gets a version and a timestamp; republishing unchanged content adds no feed entry", AuthorityCapabilities.Publisher, async driver =>
         {
             await using var authority = await CreateAsync(driver);

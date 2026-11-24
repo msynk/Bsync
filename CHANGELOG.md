@@ -4,8 +4,27 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ([compatibility policy](docs/architecture.md#compatibility-policy)); every breaking change also has a migration note in
 [docs/guide.md#upgrading-between-versions](docs/guide.md#upgrading-between-versions). Release status: [README](README.md#status).
 
-## 0.6.0 - 2026-10-27
+## 0.6.0 (unreleased)
 
+- **Breaking (security, plan item A1):** every sync, hint, pull-batch and blob route now fails closed.
+  `SyncEndpointOptions.ResolveScope` is required (there is no `"default"` scope any more), and anonymous callers get
+  `401 unauthorized` unless `AllowAnonymous = true`, whether or not an authorization policy is put on the route group.
+  `SyncEndpointOptions.SharedScope(...)` puts every caller in one scope and logs a warning when routes are mapped.
+- **Fix (A2):** after `PostgreSqlSyncAuthority.BeginNewEpochAsync(versionFloor)`, feeds created later start above the
+  floor too (stored as `version_floor` in `bs_meta`), so a feed missing from the restored backup no longer reissues
+  versions from 1. New authority conformance case for every provider; the in-memory test driver had the same gap.
+- **Pull batches (A6):** a batch that names a collection twice or has more parts than the group maps is refused with
+  `400 invalid-request`; at most `SyncEndpointOptions.MaxConcurrentBatchPulls` (default 4) parts are pulled at a time,
+  and parts are streamed in request order instead of buffering the whole response.
+- **Blob routes (A12):** every answer carries `X-Content-Type-Options: nosniff`, downloads are
+  `Content-Disposition: attachment`, and `HttpBlobTransfer` sends `Bsync-Protocol: 1` (not on redirectable plain reads).
+  `SyncBlobEndpointOptions.RequireProtocolHeader` (off by default while pre-0.6 clients exist) refuses requests without it,
+  so cookie-authenticated browsers are always CORS-preflighted. Another protocol version is refused with `upgrade-required`.
+- **Blob finish is retry-safe (A13):** `FileSystemBlobStore` keeps a completion marker from hash verification until access
+  is recorded, so a finish repeated after a fault succeeds without a new upload. New default interface members
+  `IBlobStore.GetCompletedSizeAsync`/`ForgetCompletedAsync`; stores without them restart the upload. A finish for an
+  upload the server no longer holds now answers `complete: false, received: 0` (restart) instead of `422`, which clients
+  treated as corruption.
 - Add optional encryption-use admission keyed by actual key material, with a durable monotone invocation ceiling.
 - Add an IndexedDB capacity ledger with atomic accounting, paged crash-resumable reconciliation and stale-part
   completion/rename refusal. Schema 3 adds bounded managed hashing, Blob-backed raw reads and transactional completion;

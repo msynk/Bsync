@@ -36,6 +36,11 @@ app.UseStaticFiles();
 app.MapSyncCollection("notes", authority, SyncJsonTypes<Note>.From(NotesJson.Default), new SyncEndpointOptions
 {
     SupportedSchemas = new HashSet<string>(StringComparer.Ordinal) { NotesJson.SchemaId },
+
+    // A demo without sign-in: every visitor shares one data set. Real apps resolve the scope from a tenant or user
+    // claim and keep AllowAnonymous off.
+    ResolveScope = SyncEndpointOptions.SharedScope(),
+    AllowAnonymous = true,
 });
 app.MapFallbackToFile("index.html");
 

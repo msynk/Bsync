@@ -109,7 +109,7 @@ public sealed class HttpBlobTransfer
                     (available, verified) => Report(sha256, BlobTransferDirection.Upload, available, source.Length, verified), cancellationToken).ConfigureAwait(false);
                 if (multipartBytes is { } uploaded) { Bytes.Add(uploaded, Up); result = "complete"; return uploaded; }
             }
-            var status = await StatusAsync(await _http.PostAsync($"{_base}/{sha256}/uploads?size={source.Length}", null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+            var status = await StatusAsync(await SendAsync(HttpMethod.Post, $"{_base}/{sha256}/uploads?size={source.Length}", null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
             var buffer = new byte[(int)Math.Min(_options.ChunkSize, Math.Max(source.Length, 1))];
             while (!status.Complete)
             {
@@ -128,7 +128,7 @@ public sealed class HttpBlobTransfer
                         {
                             if (refreshedDirectUrl) throw new IOException("The refreshed object-store upload URL was refused.");
                             refreshedDirectUrl = true;
-                            status = await StatusAsync(await _http.PostAsync($"{_base}/{sha256}/uploads?size={source.Length}", null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                            status = await StatusAsync(await SendAsync(HttpMethod.Post, $"{_base}/{sha256}/uploads?size={source.Length}", null, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
                             continue;
                         }
                         stored.EnsureSuccessStatusCode();
@@ -142,7 +142,7 @@ public sealed class HttpBlobTransfer
 
                 if (status.Received >= source.Length)
                 {
-                    var finish = await _http.PostAsync($"{_base}/{sha256}/uploads/finish", null, cancellationToken).ConfigureAwait(false);
+                    var finish = await SendAsync(HttpMethod.Post, $"{_base}/{sha256}/uploads/finish", null, cancellationToken).ConfigureAwait(false);
                     if (finish.StatusCode == HttpStatusCode.UnprocessableEntity)
                     {
                         result = "corrupt";
@@ -163,7 +163,7 @@ public sealed class HttpBlobTransfer
 
                 using var content = new ByteArrayContent(buffer, 0, count);
                 content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                var response = await _http.PutAsync($"{_base}/{sha256}/uploads/{status.Received}", content, cancellationToken).ConfigureAwait(false);
+                var response = await SendAsync(HttpMethod.Put, $"{_base}/{sha256}/uploads/{status.Received}", content, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     sent += count;
@@ -297,6 +297,21 @@ public sealed class HttpBlobTransfer
         }
     }
 
+    private const string ProtocolHeader = "Bsync-Protocol";
+
+    private const string ProtocolVersion = "1";
+
+    /// <summary>
+    /// A request to the authority's blob routes, with <c>Bsync-Protocol: 1</c> so servers can require it (A12); older
+    /// servers ignore it. Never used for presigned object-store URLs.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string uri, HttpContent? content, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, uri) { Content = content };
+        request.Headers.Add(ProtocolHeader, ProtocolVersion);
+        return await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<HttpResponseMessage> DownloadResponseAsync(string hash, long held, CancellationToken ct)
     {
         for (var attempt = 0; ; attempt++)
@@ -306,6 +321,7 @@ public sealed class HttpBlobTransfer
             {
                 using var ticketRequest = new HttpRequestMessage(HttpMethod.Get, $"{_base}/{hash}/download");
                 ticketRequest.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
+                ticketRequest.Headers.Add(ProtocolHeader, ProtocolVersion);
                 using var ticket = await _http.SendAsync(ticketRequest, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 ticket.EnsureSuccessStatusCode(); // No redirect fallback to an older server.
                 await using var body = await ticket.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
@@ -323,6 +339,9 @@ public sealed class HttpBlobTransfer
             }
             using var request = new HttpRequestMessage(HttpMethod.Get, direct?.AbsoluteUri ?? $"{_base}/{hash}" + (_options.DownloadTickets ? "?proxy=1" : ""));
             if (held > 0) request.Headers.Range = new RangeHeaderValue(held, null);
+            // Proxied reads carry the protocol header (A12); a plain read may be redirected to an object store, which
+            // would then need the header in its CORS rules, so it is sent without.
+            if (direct is null && _options.DownloadTickets) request.Headers.Add(ProtocolHeader, ProtocolVersion);
             var client = direct is null ? _http : _options.DirectClient ?? SharedDirectClient.Value;
             var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             if (direct is not null && response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)

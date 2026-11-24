@@ -46,6 +46,9 @@ public sealed class BlobRouteTests : IDisposable
 
         public int Recorded;
 
+        /// <summary>Makes the next <see cref="RecordAsync"/> fail, as a database fault would.</summary>
+        public bool FailNextRecord;
+
         public void Grant(string scope, string sha256) => _granted[(scope, sha256)] = true;
 
         public Task<bool> HoldsAsync(SyncCallContext caller, string sha256, CancellationToken cancellationToken = default) =>
@@ -53,6 +56,12 @@ public sealed class BlobRouteTests : IDisposable
 
         public Task RecordAsync(SyncCallContext caller, string sha256, long size, CancellationToken cancellationToken = default)
         {
+            if (FailNextRecord)
+            {
+                FailNextRecord = false;
+                throw new IOException("The access table is unavailable.");
+            }
+
             Interlocked.Increment(ref Recorded);
             _held[(caller.Scope, sha256)] = size;
             return Task.CompletedTask;
@@ -113,7 +122,7 @@ public sealed class BlobRouteTests : IDisposable
         public ValueTask DisposeAsync() => app.DisposeAsync();
     }
 
-    private async Task<Host> StartAsync(bool presign = false, long maxSize = 200L * 1024 * 1024)
+    private async Task<Host> StartAsync(bool presign = false, long maxSize = 200L * 1024 * 1024, bool requireProtocolHeader = false)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
@@ -131,7 +140,7 @@ public sealed class BlobRouteTests : IDisposable
                 store,
                 access,
                 new SyncEndpointOptions { SupportedSchemas = new HashSet<string>(["blobs-v1"]), ResolveScope = http => http.User.FindFirst("tenant")?.Value },
-                new SyncBlobEndpointOptions { MaxSize = maxSize })
+                new SyncBlobEndpointOptions { MaxSize = maxSize, RequireProtocolHeader = requireProtocolHeader })
             .RequireAuthorization();
         app.MapPut("/direct/{upload}", (RequestDelegate)(async http =>
         {
@@ -173,6 +182,100 @@ public sealed class BlobRouteTests : IDisposable
             var target = new FileBlobCache(Path.Combine(_root, "ticket-target"));
             Assert.Equal(blob.Size, await new HttpBlobTransfer(client, new() { DownloadTickets = true }).DownloadAsync(target, blob.Sha256, blob.Size));
         }
+    }
+
+    [Fact(DisplayName = "A12: with RequireProtocolHeader, blob routes refuse requests without Bsync-Protocol except plain reads")]
+    public async Task ProtocolHeaderIsRequiredWhenConfigured()
+    {
+        await using var host = await StartAsync(requireProtocolHeader: true);
+        using var client = host.Client("team-1");
+        var (cache, sha256) = await CachedAsync("header-source", Content(2048, 5));
+        await new HttpBlobTransfer(client, new() { DirectUploads = false, ChunkSize = 1024 }).UploadAsync(cache, sha256);
+
+        using var start = await client.PostAsync($"sync/blobs/{sha256}/uploads?size=1", null);
+        using var finish = await client.PostAsync($"sync/blobs/{sha256}/uploads/finish", null);
+        using var ticket = await client.GetAsync($"sync/blobs/{sha256}/download");
+        using var proxied = await client.GetAsync($"sync/blobs/{sha256}?proxy=1");
+        using var plain = await client.GetAsync($"sync/blobs/{sha256}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, start.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, finish.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, ticket.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, proxied.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, plain.StatusCode); // may redirect to an object store: exempt
+        var target = new FileBlobCache(Path.Combine(_root, "header-target"));
+        Assert.Equal(2048L, await new HttpBlobTransfer(client, new() { DownloadTickets = true }).DownloadAsync(target, sha256, 2048));
+    }
+
+    [Fact(DisplayName = "A13: a finish repeated after recording access failed succeeds without uploading again")]
+    public async Task FinishIsRetrySafe()
+    {
+        await using var host = await StartAsync();
+        using var client = host.Client("team-1");
+        var content = Content(3000, 7);
+        var sha256 = Sha(content);
+        await client.PostAsync($"sync/blobs/{sha256}/uploads?size={content.Length}", null);
+        using (var append = await client.PutAsync($"sync/blobs/{sha256}/uploads/0", new ByteArrayContent(content)))
+        {
+            Assert.Equal(HttpStatusCode.OK, append.StatusCode);
+        }
+
+        host.Access.FailNextRecord = true;
+        await Assert.ThrowsAnyAsync<Exception>(async () => (await client.PostAsync($"sync/blobs/{sha256}/uploads/finish", null)).EnsureSuccessStatusCode());
+        using var retried = await client.PostAsync($"sync/blobs/{sha256}/uploads/finish", null);
+        using var status = System.Text.Json.JsonDocument.Parse(await retried.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        Assert.True(status.RootElement.GetProperty("complete").GetBoolean());
+        Assert.Equal(content.Length, status.RootElement.GetProperty("received").GetInt64());
+        Assert.Equal(1, host.Access.Recorded);
+        Assert.Equal(content, await (await client.GetAsync($"sync/blobs/{sha256}")).Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact(DisplayName = "A13: a finish for an upload the server no longer holds restarts it instead of reporting corruption")]
+    public async Task FinishWithoutPartialRestarts()
+    {
+        await using var host = await StartAsync();
+        using var client = host.Client("team-1");
+        var sha256 = Sha(Content(100, 8));
+
+        using var finish = await client.PostAsync($"sync/blobs/{sha256}/uploads/finish", null);
+        using var status = System.Text.Json.JsonDocument.Parse(await finish.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, finish.StatusCode);
+        Assert.False(status.RootElement.GetProperty("complete").GetBoolean());
+        Assert.Equal(0, status.RootElement.GetProperty("received").GetInt64());
+    }
+
+    [Fact(DisplayName = "A12: a Bsync-Protocol header with another version is refused with upgrade-required")]
+    public async Task OtherProtocolVersionIsRefused()
+    {
+        await using var host = await StartAsync();
+        using var client = host.Client("team-1");
+        client.DefaultRequestHeaders.Add("Bsync-Protocol", "2");
+
+        using var response = await client.PostAsync($"sync/blobs/{new string('a', 64)}/uploads?size=1", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(SyncErrorCodes.UpgradeRequired, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "A12: blob answers carry nosniff, and downloads are attachments named by their hash")]
+    public async Task DownloadsCarrySecurityHeaders()
+    {
+        await using var host = await StartAsync();
+        using var client = host.Client("team-1");
+        var (cache, sha256) = await CachedAsync("headers", Content(512, 6));
+        await new HttpBlobTransfer(client, new() { DirectUploads = false }).UploadAsync(cache, sha256);
+
+        using var read = await client.GetAsync($"sync/blobs/{sha256}");
+        using var missing = await client.GetAsync($"sync/blobs/{new string('b', 64)}");
+
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        Assert.Equal("nosniff", Assert.Single(read.Headers.GetValues("X-Content-Type-Options")));
+        Assert.Equal("attachment", read.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal(sha256, read.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        Assert.Equal("nosniff", Assert.Single(missing.Headers.GetValues("X-Content-Type-Options")));
     }
 
     private static byte[] Content(int length, int seed)

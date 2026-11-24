@@ -35,6 +35,8 @@ var authority = new InMemorySyncServer<Item>(new InMemorySyncServerOptions<Item>
 var syncOptions = new SyncEndpointOptions
 {
     SupportedSchemas = new HashSet<string>(["items-v1"], StringComparer.Ordinal),
+    ResolveScope = SyncEndpointOptions.SharedScope(),
+    AllowAnonymous = true,
 };
 app.MapSyncCollection("items", authority, SyncJsonTypes<Item>.From(ItemJson.Default), syncOptions);
 var blobDirectory = Directory.CreateTempSubdirectory("bsync-consumer-blobs-");
