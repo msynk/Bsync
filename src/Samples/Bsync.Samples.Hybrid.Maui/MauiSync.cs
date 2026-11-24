@@ -8,7 +8,7 @@ namespace Bsync.Samples.Hybrid.Maui;
 /// <summary>
 /// Wires a <see cref="SyncSession{TDocument}"/> to a .NET MAUI app (task G1): it syncs when the device regains internet
 /// access, pauses when the app's window stops (goes to the background) and resumes, syncing at once, when it comes back.
-/// A recipe (task G1, docs/patterns/maui.md): copy this file into a MAUI app; it uses only public Bsync API.
+/// A recipe (task G1, docs/guide.md#maui-and-native-background): copy this file into a MAUI app; it uses only public Bsync API.
 /// </summary>
 public static class MauiSync
 {

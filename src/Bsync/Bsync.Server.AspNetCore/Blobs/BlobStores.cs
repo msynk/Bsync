@@ -6,7 +6,7 @@ namespace Bsync.Server.AspNetCore.Blobs;
 
 /// <summary>
 /// Server-side blob storage (task F1): one object per SHA-256, plus partial uploads per uploader. Implementations keep
-/// objects in a file system (<see cref="FileSystemBlobStore"/>), an S3-compatible bucket (a recipe in the Tasks sample, docs/patterns/attachments.md)
+/// objects in a file system (<see cref="FileSystemBlobStore"/>), an S3-compatible bucket (a recipe in the Tasks sample, docs/guide.md#attachments-and-managed-content)
 /// or elsewhere; the routes of <see cref="SyncBlobEndpoints"/> do not care.
 /// </summary>
 public interface IBlobStore

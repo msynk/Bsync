@@ -13,24 +13,24 @@ This section is the single source of truth for release and verification status; 
 
 - **Capabilities continuation.** The unreleased 0.6.0 source adds encryption-use admission, indexed browser capacity
   accounting, experimental multipart transport/S3 recipe, atomic package sets and public SQL Server workflow/Change
-  Tracking helpers. [Implementation and remaining gates](docs/review/capabilities-closure-2026-10-26.md) distinguish
-  local tests from production qualification. The [remaining implementation audit](docs/review/capabilities-remaining-implementation-2026-10-26.md)
+  Tracking helpers. [Implementation and remaining gates](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/capabilities-closure-2026-10-26.md) distinguish
+  local tests from production qualification. The [remaining implementation audit](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/capabilities-remaining-implementation-2026-10-26.md)
   covers raw browser streaming, optional package children, isolated capture generations and Apple download callbacks.
   Native qualification, independent crypto review and hosted release gates remain open.
 
 - **Packages.** Six packages were downloaded at `0.5.0` from NuGet.org on 2026-10-24: `Bsync`, `Bsync.Blazor`,
   `Bsync.Storage.Sqlite`, `Bsync.Server.AspNetCore`, `Bsync.Server.PostgreSql` and `Bsync.Server.SqlServer`.
-  All declare commit `7a5169b3df212a99f128f4d55ecb80bc483ababc`; [archive inventory and B01 evidence](docs/review/capabilities-b01-2026-10-24.md)
+  All declare commit `7a5169b3df212a99f128f4d55ecb80bc483ababc`; [archive inventory and B01 evidence](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/capabilities-b01-2026-10-24.md)
   distinguish publication from qualification. Distributed symbol/source verification and clean tagged provenance remain open.
-  The [0.4.0 archive hashes and repair evidence](docs/review/gap-closure-2026-10-17.md) remain historical evidence.
-  The older 0.2.0 source-provenance mismatch remains unresolved; see its [historical inventory](docs/review/release-baseline-2026-10-16.md)
-  and [release validation](docs/operations/releases.md). `Bsync.Testing` is now in `Bsync`
+  The [0.4.0 archive hashes and repair evidence](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/gap-closure-2026-10-17.md) remain historical evidence.
+  The older 0.2.0 source-provenance mismatch remains unresolved; see its [historical inventory](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/release-baseline-2026-10-16.md)
+  and [release validation](docs/guide.md#release-process). `Bsync.Testing` is now in `Bsync`
   (namespace unchanged). `Bsync.Storage.Sqlite` covers plain and encrypted (SQLCipher)
   replicas and leaves the native SQLite library to the application. S3 blob storage and the MAUI helpers are recipes
-  in the samples, not packages ([attachments](docs/patterns/attachments.md), [MAUI](docs/patterns/maui.md)).
+  in the samples, not packages ([attachments](docs/guide.md#attachments-and-managed-content), [MAUI](docs/guide.md#maui-and-native-background)).
   Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - **Versioning.** Pre-1.0: a minor release may break the public API or behaviour, a patch release never does
-  ([compatibility policy](docs/compatibility.md#policy)).
+  ([compatibility policy](docs/architecture.md#compatibility-policy)).
 - **Authorities.** Durable: PostgreSQL (`Bsync.Server.PostgreSql`, released) and SQL Server
   (`Bsync.Server.SqlServer`; source verified on SQL Server 2025 LocalDB). The in-memory authority is for tests
   and samples.
@@ -38,23 +38,23 @@ This section is the single source of truth for release and verification status; 
 - **Offline orchestration.** Account lifecycle, durable transfer jobs, pinned cache budgets,
   immutable packages, bounded encrypted blob envelopes, workflow recovery, derived read-model generations and optional native scheduler recipes are present in 0.4.0. The 0.5.0 source adds automatic plaintext repair, account composition,
   protected metadata, owned read-model cleanup, experimental chunked encryption and integration hosts.
-  [Gap-closure implementation and remaining qualification](docs/review/gap-closure-local-qualification-2026-10-19.md) distinguish tested behavior from external gates. See
-  [managed content](docs/patterns/managed-content.md), [account maintenance](docs/patterns/account-maintenance.md), [recoverable work](docs/patterns/recoverable-work.md),
-  [local unlock](docs/patterns/local-unlock.md), [native background recipes](docs/patterns/native-background.md), and the [improvement plan](docs/Improvement-Plan.md). This is not a claim that all roadmap work or native
+  [Gap-closure implementation and remaining qualification](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/gap-closure-local-qualification-2026-10-19.md) distinguish tested behavior from external gates. See
+  [managed content](docs/guide.md#attachments-and-managed-content), [account maintenance](docs/guide.md#accounts-local-unlock-and-maintenance), [recoverable work](docs/guide.md#intents-and-recoverable-work),
+  [local unlock](docs/guide.md#accounts-local-unlock-and-maintenance), [native background recipes](docs/guide.md#maui-and-native-background), and the [implementation plan](docs/implementation-plan.md). This is not a claim that all roadmap work or native
   background qualification is complete.
-- **Evidence.** Hosts, versions and test runs are recorded in [docs/support-matrix.md](docs/support-matrix.md),
+- **Evidence.** Hosts, versions and test runs are recorded in [docs/guide.md#support-matrix](docs/guide.md#support-matrix),
   including what has *not* been run (Android, iOS, Mac Catalyst, native Safari). Most runs so far used one
   Windows machine.
 - **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push: unit tests on Windows, Linux
   and macOS (with the encrypted SQLite store); the PostgreSQL authority on Linux; the SQL Server authority and the
   tasks sample on Linux, with an S3-compatible server; browser and WPF tests on Windows; pack, plus a build and test of
   consumers that reference only the packed packages. Its current state is in the support matrix.
-- **Roadmap.** [docs/roadmap.md](docs/roadmap.md).
+- **Roadmap.** [docs/implementation-plan.md](docs/implementation-plan.md).
 
 ## What it guarantees today
 
 Precisely, for the reference authority and the stores that pass the conformance suite (in-memory, SQLite,
-IndexedDB; details and evidence in [docs/architecture/invariants.md](docs/architecture/invariants.md)):
+IndexedDB; details and evidence in [docs/architecture.md#invariants](docs/architecture.md#invariants)):
 
 - **Atomic local writes.** A write and its pending upload commit together and never wait for the network.
 - **No lost local edits.** An acknowledgement, pull or conflict resolution never overwrites or marks clean
@@ -113,10 +113,10 @@ src/Tests/Bsync.Tests.PostgreSql/       Authority conformance and PostgreSQL-spe
 src/Tests/Bsync.Tests.SqlServer/        Authority conformance and SQL Server-specific tests (needs BSYNC_SQLSERVER)
 src/Tests/Bsync.Tests.Browser/          Playwright tests (Chromium, Firefox, WebKit) and their WASM harness
 src/Tests/Bsync.Tests.CrashHost/        Helper process the tests kill mid-write
-src/Tests/Bsync.Benchmarks/             BenchmarkDotNet workloads (docs/benchmarks.md)
+src/Tests/Bsync.Benchmarks/             BenchmarkDotNet workloads (docs/guide.md#benchmarks)
 src/Tests/api/                          Public API baselines checked by PublicApiTests
 src/Tests/PackageConsumers/             Projects that use only the packed packages (CI pack job)
-docs/                                   Baseline review, architecture decisions, invariants, roadmap, compatibility
+docs/                                   Implementation plan, architecture decisions, invariants, protocol, compatibility
 ```
 
 ## How it works
@@ -381,7 +381,7 @@ var store = await SqliteLocalStore<Note>.OpenAsync(new SqliteLocalStoreOptions
 ```
 
 A wrong or missing key fails explicitly; it never opens an empty replica. See
-[ADR-016](docs/architecture/adr-016-encryption-at-rest.md) for the threat model and what stays readable.
+[ADR-016](docs/architecture.md#adr-016-encryption-at-rest-and-replica-wipe) for the threat model and what stays readable.
 
 ## Server restores, access changes and retention
 
@@ -407,7 +407,7 @@ Tombstones and operation receipts can be purged on the server (`PurgeTombstones`
 replica offline for longer than the retention horizon resets (`expired`), and an edit based on a purged
 document is rejected with `base-expired` rather than resurrecting it; writing it again recreates it.
 `SyncResult.ResetPerformed`, `MissingAfterReset` and `PurgedAfterReset` report what happened. See
-`docs/protocol/v1.md` §4 and §6.1.
+`docs/protocol.md` §4 and §6.1.
 
 To purge on a schedule, register the retention service; it purges what is older than the offline horizon in
 every authority it is given, and refuses (at startup) a receipt horizon shorter than that horizon:
@@ -500,9 +500,9 @@ server processes are announced by polling the feed heads (`CommitPollInterval`, 
 `NotifyCommitted` from your own message bus. After a restore call `BeginNewEpochAsync(versionFloor)`.
 A complete example with EF Core, bearer tokens and two kinds of clients: `src/Samples/Bsync.Samples.Tasks.Server`.
 Actions that must run exactly once (complete, approve, send) are modeled as immutable intents executed by a write
-handler; see [the intents pattern](docs/patterns/intents.md), which the Tasks sample implements. Files attached to
-documents are uploaded before the document and transferred resumably; see [the attachments pattern](docs/patterns/attachments.md).
-Sets of files that must switch version together are [bundles](docs/patterns/bundles.md).
+handler; see [the intents pattern](docs/guide.md#intents-and-recoverable-work), which the Tasks sample implements. Files attached to
+documents are uploaded before the document and transferred resumably; see [the attachments pattern](docs/guide.md#attachments-and-managed-content).
+Sets of files that must switch version together are [bundles](docs/guide.md#attachments-and-managed-content).
 Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true" dotnet test src/Tests/Bsync.Tests.SqlServer`.
 
 ## Native apps (WPF, .NET MAUI)
@@ -512,7 +512,7 @@ Tests: `BSYNC_SQLSERVER="Server=(localdb)\MSSQLLocalDB;Integrated Security=true"
 is minimized or the app is in the background. Both have a `--smoke` mode that the tests use to drive the real UI.
 
 MAUI apps can copy the `MauiSync` recipe from the MAUI sample
-([`MauiSync.cs`](src/Samples/Bsync.Samples.Hybrid.Maui/MauiSync.cs), see [docs/patterns/maui.md](docs/patterns/maui.md));
+([`MauiSync.cs`](src/Samples/Bsync.Samples.Hybrid.Maui/MauiSync.cs), see [docs/guide.md#maui-and-native-background](docs/guide.md#maui-and-native-background));
 it uses only public `Bsync` API:
 
 ```csharp
@@ -535,7 +535,7 @@ those tasks is platform code in the app, and it has not been verified here.
 - A damaged SQLite file: `SqliteStoreRecovery.CheckAsync(path)`, then `RebuildAsync(path)`. The rebuild moves
   the file aside (never deletes it), keeps every readable record with local work, and resyncs the rest.
 
-See [docs/operations/disaster-recovery.md](docs/operations/disaster-recovery.md) for server restores,
+See [docs/guide.md#disaster-recovery-and-stuck-replicas](docs/guide.md#disaster-recovery-and-stuck-replicas) for server restores,
 retention, schema roll-outs and the full runbook.
 
 ## Observability
@@ -550,8 +550,8 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(m => m.AddMeter(SyncDiagnostics.SourceName, SyncEndpoints.MeterName));
 ```
 
-Instruments, tags and alert suggestions: [docs/operations/observability.md](docs/operations/observability.md).
-Benchmark results: [docs/benchmarks.md](docs/benchmarks.md).
+Instruments, tags and alert suggestions: [docs/guide.md#observability](docs/guide.md#observability).
+Benchmark results: [docs/guide.md#benchmarks](docs/guide.md#benchmarks).
 
 ## Observing changes
 
@@ -595,8 +595,8 @@ per document. For a durable authority see [A durable server: PostgreSQL](#a-dura
 ## Wire protocol
 
 The messages, JSON encoding (64-bit versions as digit strings, canonical HLC strings, opaque checkpoints)
-and the rules for authorities and replicas are specified in [docs/protocol/v1.md](docs/protocol/v1.md),
-with fixtures in `docs/protocol/fixtures`. Add the protocol types for your document to a
+and the rules for authorities and replicas are specified in [docs/protocol.md](docs/protocol.md),
+with fixtures in `src/Tests/Bsync.Tests/Fixtures/protocol`. Add the protocol types for your document to a
 `JsonSerializerContext` (`PullRequest`, `PullResult<T>`, `PushRequest<T>`, `PushResult<T>`). Give
 documents a `[JsonExtensionData]` member so fields unknown to older clients are not erased.
 
@@ -693,14 +693,14 @@ dotnet test src/Bsync.slnx --filter "DisplayName~I04"
 
 ## Documentation
 
-- [Baseline review](docs/review/baseline.md): reproduced defects and what changed.
-- [Architecture decisions and invariants](docs/architecture/README.md).
-- [Protocol specification v1](docs/protocol/v1.md).
-- [Compatibility policy and migration notes](docs/compatibility.md).
-- [Disaster recovery and stuck replicas](docs/operations/disaster-recovery.md) and [observability](docs/operations/observability.md).
-- Patterns: [immutable intents](docs/patterns/intents.md), [attachments](docs/patterns/attachments.md) and [bundles](docs/patterns/bundles.md).
-- [Benchmarks](docs/benchmarks.md).
-- [Support matrix](docs/support-matrix.md) and [roadmap](docs/roadmap.md).
+- [Baseline review](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/baseline.md): reproduced defects and what changed.
+- [Architecture decisions and invariants](docs/architecture.md).
+- [Protocol specification v1](docs/protocol.md).
+- [Compatibility policy and migration notes](docs/guide.md#upgrading-between-versions).
+- [Disaster recovery and stuck replicas](docs/guide.md#disaster-recovery-and-stuck-replicas) and [observability](docs/guide.md#observability).
+- Patterns: [immutable intents](docs/guide.md#intents-and-recoverable-work), [attachments](docs/guide.md#attachments-and-managed-content) and [bundles](docs/guide.md#attachments-and-managed-content).
+- [Benchmarks](docs/guide.md#benchmarks).
+- [Support matrix](docs/guide.md#support-matrix) and [implementation plan](docs/implementation-plan.md).
 
 ## License
 

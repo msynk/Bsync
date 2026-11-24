@@ -7,7 +7,7 @@ using Bsync.Transport;
 namespace Bsync.Testing;
 
 /// <summary>
-/// The push/pull semantics every <see cref="ISyncAuthority{TDocument}"/> must provide (docs/protocol/v1.md §4–§6,
+/// The push/pull semantics every <see cref="ISyncAuthority{TDocument}"/> must provide (docs/protocol.md §4–§6,
 /// ADR-002, ADR-005), observed only through the client's <see cref="ISyncTransport{TDocument}"/>. An authority is not
 /// supported until every case its driver can run passes. Provider-specific drills (delayed commits, several
 /// processes, crashes, restores from real backups) are tested separately per provider.

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Bsync.Documents;
 
 /// <summary>
-/// Helpers for upgrading documents written by older versions of an application (ADR-011, docs/operations/disaster-recovery.md
+/// Helpers for upgrading documents written by older versions of an application (ADR-011, docs/guide.md#disaster-recovery-and-stuck-replicas
 /// §7). Bsync stores and transmits documents as JSON and reads them with the application's current contract, so the
 /// upgrade belongs in the document type itself, where every reader uses it: in the local stores, on the wire and on the
 /// server.

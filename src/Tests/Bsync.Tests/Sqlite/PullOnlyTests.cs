@@ -62,7 +62,7 @@ public sealed class PullOnlyTests(ITestOutputHelper output) : IDisposable
     }
 
     // Before D8 a two-way replica stored the base copy of every clean record too: 41,811,968 bytes against 14,450,688 for
-    // pull-only (34.6%, docs/benchmarks.md). Since SQLite schema 4 stores that copy once, clean records cost the same in both
+    // pull-only (34.6%, docs/guide.md#benchmarks). Since SQLite schema 4 stores that copy once, clean records cost the same in both
     // modes; pull-only still never stores base, pending or conflict copies.
     [Fact(DisplayName = "C2 D8 F11: 10,000 clean SQLite records cost no more than one copy each, in pull-only and in two-way mode")]
     public async Task PullOnlyHalvesStorage()

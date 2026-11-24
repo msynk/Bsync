@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Bsync.Tests.Http;
 
-/// <summary>Phase 10: server-side logs and metrics (docs/operations/observability.md).</summary>
+/// <summary>Phase 10: server-side logs and metrics (docs/guide.md#observability).</summary>
 public sealed class ServerObservabilityTests
 {
     private sealed class Logs : ILoggerProvider, ILogger

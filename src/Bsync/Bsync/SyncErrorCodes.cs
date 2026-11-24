@@ -1,6 +1,6 @@
 namespace Bsync;
 
-/// <summary>Request-level error codes (docs/protocol/v1.md §7). Operation-level codes are in <c>PushErrorCodes</c>.</summary>
+/// <summary>Request-level error codes (docs/protocol.md §7). Operation-level codes are in <c>PushErrorCodes</c>.</summary>
 public static class SyncErrorCodes
 {
     /// <summary>The checkpoint cannot be served; the replica must reset.</summary>

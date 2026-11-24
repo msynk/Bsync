@@ -7,7 +7,7 @@ using Bsync.Server.AspNetCore.Blobs;
 namespace Bsync.Samples.Tasks.Server;
 
 /// <summary>
-/// An <see cref="IBlobStore"/> in an S3-compatible bucket (task F1; a recipe, see docs/patterns/attachments.md: copy it
+/// An <see cref="IBlobStore"/> in an S3-compatible bucket (task F1; a recipe, see docs/guide.md#attachments-and-managed-content: copy it
 /// into the application, which then owns the AWS SDK dependency). Chunked uploads in progress stay on the server's
 /// disk (<paramref name="partials"/>), because S3 multipart parts must be at least 5 MB and clients send smaller chunks; a
 /// verified upload is written to the bucket once (deduplicated by hash) and its partial file removed. With

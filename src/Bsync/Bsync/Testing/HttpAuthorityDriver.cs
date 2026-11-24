@@ -5,7 +5,7 @@ using Bsync.Transport;
 namespace Bsync.Testing;
 
 /// <summary>
-/// Runs the cases through the HTTP binding (docs/protocol/v1.md §8): authorities come from an inner driver, the host
+/// Runs the cases through the HTTP binding (docs/protocol.md §8): authorities come from an inner driver, the host
 /// serves each one, and the cases talk to it with <see cref="HttpSyncTransport{TDocument}"/>. Retention and epoch
 /// operations go to the inner driver.
 /// </summary>

@@ -9,7 +9,7 @@ namespace Bsync.Tests;
 
 /// <summary>
 /// Phase 8: access changes (revoke, regrant, filter change) and retention (purged tombstones, expired checkpoints,
-/// receipt expiry), all through the reset machinery (docs/protocol/v1.md §6.1).
+/// receipt expiry), all through the reset machinery (docs/protocol.md §6.1).
 /// </summary>
 public sealed class SelectiveSyncTests
 {

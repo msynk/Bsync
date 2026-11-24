@@ -10,7 +10,7 @@ namespace Bsync.Tests;
 
 /// <summary>
 /// Phase 9: stuck-queue tooling (rejections, revert), moving local work between stores, and rebuilding a damaged
-/// SQLite replica (docs/operations/disaster-recovery.md).
+/// SQLite replica (docs/guide.md#disaster-recovery-and-stuck-replicas).
 /// </summary>
 public sealed class RecoveryTests(ITestOutputHelper output) : IDisposable
 {

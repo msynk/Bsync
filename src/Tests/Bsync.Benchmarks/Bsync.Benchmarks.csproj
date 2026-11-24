@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <Description>BenchmarkDotNet measurements of the ADR-012 workloads (docs/benchmarks.md). Run: dotnet run -c Release --project src/Bsync.Benchmarks -- --filter *</Description>
+    <Description>BenchmarkDotNet measurements of the ADR-012 workloads (docs/guide.md#benchmarks). Run: dotnet run -c Release --project src/Bsync.Benchmarks -- --filter *</Description>
   </PropertyGroup>
 
   <ItemGroup>

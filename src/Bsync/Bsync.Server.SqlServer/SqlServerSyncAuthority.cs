@@ -29,7 +29,7 @@ namespace Bsync.Server.SqlServer;
 /// </para>
 /// <para>
 /// <b>Restores.</b> After restoring the database, call <see cref="BeginNewEpochAsync"/> with a version floor at or
-/// above anything the lost history may have issued (docs/operations/disaster-recovery.md).
+/// above anything the lost history may have issued (docs/guide.md#disaster-recovery-and-stuck-replicas).
 /// </para>
 /// </remarks>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>
@@ -459,7 +459,7 @@ public sealed class SqlServerSyncAuthority<TDocument> : ISyncAuthority<TDocument
     }
 
     /// <summary>Removes receipts of operations of <paramref name="scope"/> accepted at or below <paramref name="throughVersion"/>.</summary>
-    /// <remarks>Keep receipts longer than any replica may stay offline; see docs/operations/disaster-recovery.md.</remarks>
+    /// <remarks>Keep receipts longer than any replica may stay offline; see docs/guide.md#disaster-recovery-and-stuck-replicas.</remarks>
     /// <returns>The number of receipts removed.</returns>
     public async Task<int> PurgeReceiptsAsync(string scope, long throughVersion, CancellationToken cancellationToken = default)
     {

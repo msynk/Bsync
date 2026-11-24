@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 namespace Bsync.Client;
 
 /// <summary>
-/// The local-replica registration recipe (docs/architecture/adr-007). It needs only a service container, so it
+/// The local-replica registration recipe (docs/architecture.md#adr-007-hosting-profiles-application-api-and-lifecycle). It needs only a service container, so it
 /// works in Blazor WebAssembly and Hybrid apps as well as in native UIs without Blazor (MAUI, WPF, WinForms,
 /// Avalonia) and in console or service hosts.
 /// </summary>

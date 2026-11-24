@@ -33,7 +33,7 @@ This runs all five sizes, three times each, in separate 64-bit processes with an
 The command above selects the default 31 MiB profile. Earlier candidates reproduced a 1 GiB append OOM on Windows/.NET
 10.0.13 with preview `.2`. An exploratory optimized source run failed later during rotation. A fresh exact `.3` pilot
 completed all stages, but its repeated 31 MiB matrix failed during rotation. All fifteen `.3` cases passed at 64 MiB.
-The [envelope memory continuation](../../../docs/review/gap-closure-envelope-memory-2026-10-19.md) records the new
+The [envelope memory continuation](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/gap-closure-envelope-memory-2026-10-19.md) records the new
 candidate's fifteen passing 31 MiB cases after removing unnecessary Base64 escaping in internal storage JSON. A whole-heap cap alone
 does not supply the attribution required by the plan's less-than-32-MiB cache-only working-buffer gate.
 The tool checks the effective runtime setting and refuses an unconstrained or mismatched run. The runner removes inherited per-heap limit

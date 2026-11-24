@@ -20,7 +20,7 @@ namespace Bsync.Server;
 /// <para>
 /// Because every operation executes under one lock, the commit sequence is also the visibility order,
 /// so every issued checkpoint trivially covers a committed, gap-free prefix. A database-backed server
-/// must prove the same property explicitly (see <c>docs/architecture/adr-005-feed-ordering.md</c>).
+/// must prove the same property explicitly (see <c>docs/architecture.md#adr-005-committed-prefix-feed-ordering-and-epochs</c>).
 /// </para>
 /// <para>
 /// State, including operation receipts, lives only for the lifetime of the instance; receipts are never

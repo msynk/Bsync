@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 namespace Bsync.Diagnostics;
 
 /// <summary>
-/// Names of the traces and metrics Bsync emits (docs/operations/observability.md). Subscribe with
+/// Names of the traces and metrics Bsync emits (docs/guide.md#observability). Subscribe with
 /// OpenTelemetry (<c>AddSource(SyncDiagnostics.SourceName)</c>, <c>AddMeter(SyncDiagnostics.SourceName)</c>) or any
 /// <see cref="ActivityListener"/>/<see cref="MeterListener"/>. Nothing is emitted, and nothing allocated, without a
 /// listener. Document contents and ids are never recorded; tags carry counts, outcome kinds, error codes and the

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Bsync.Tests;
 
-/// <summary>Phase 10: traces and metrics (docs/operations/observability.md). Each test filters by a unique engine name.</summary>
+/// <summary>Phase 10: traces and metrics (docs/guide.md#observability). Each test filters by a unique engine name.</summary>
 public sealed class DiagnosticsTests
 {
     private sealed class Recorder : IDisposable

@@ -7,7 +7,7 @@ namespace Bsync.Tests;
 
 /// <summary>
 /// Desired-behaviour regressions for the ten scenarios reproduced against commit 0083a02
-/// (docs/review/baseline.md). Each test names the scenario (S), catalogue test (T) and invariant (I).
+/// (https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/baseline.md). Each test names the scenario (S), catalogue test (T) and invariant (I).
 /// </summary>
 public sealed class BaselineRegressionTests
 {

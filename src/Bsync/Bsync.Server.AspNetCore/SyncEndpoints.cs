@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Bsync.Server.AspNetCore;
 
-/// <summary>Maps the Bsync HTTP binding (docs/protocol/v1.md §8).</summary>
+/// <summary>Maps the Bsync HTTP binding (docs/protocol.md §8).</summary>
 /// <remarks>
 /// <para>
 /// Endpoints: <c>POST {prefix}/collections/{collection}/pull</c> and <c>…/push</c>. Every request must carry
@@ -28,7 +28,7 @@ namespace Bsync.Server.AspNetCore;
 /// </para>
 /// <para>
 /// Refused requests are logged (category <c>Bsync.Server</c>) with their code, status, collection and
-/// endpoint, and every request is counted in the <see cref="MeterName"/> meter (docs/operations/observability.md).
+/// endpoint, and every request is counted in the <see cref="MeterName"/> meter (docs/guide.md#observability).
 /// An unexpected exception from the authority is logged as an error and answered with <c>503 unavailable</c>,
 /// which clients retry with backoff.
 /// </para>

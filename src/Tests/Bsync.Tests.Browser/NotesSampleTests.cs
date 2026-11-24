@@ -20,7 +20,7 @@ public sealed class NotesSampleTests(BrowserFixture fixture) : IAsyncLifetime
 
     // Playwright's WebKit build on Windows fails with "WebKit encountered an internal error" when a page is
     // reloaded through a service worker under emulated offline mode (seen with Playwright 1.63). The offline
-    // app shell is therefore unverified in WebKit; docs/support-matrix.md says so.
+    // app shell is therefore unverified in WebKit; docs/guide.md#support-matrix says so.
     public static TheoryData<string> OfflineReloadBrowsers() => new() { "chromium", "firefox" };
 
     public Task InitializeAsync() => _server.StartAsync();

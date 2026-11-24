@@ -7,7 +7,7 @@ namespace Bsync.Tests;
 /// <summary>
 /// Phase 10: the public API of every package is recorded in <c>Tests/api/{assembly}.txt</c> (ADR-011, ADR-012). A change to
 /// the public surface fails this test until the baseline is updated on purpose: run the tests with
-/// <c>BSYNC_UPDATE_API=1</c>, review the diff, and add breaking changes to docs/compatibility.md.
+/// <c>BSYNC_UPDATE_API=1</c>, review the diff, and add breaking changes to docs/guide.md#upgrading-between-versions.
 /// </summary>
 public sealed class PublicApiTests
 {

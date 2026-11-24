@@ -8,7 +8,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsAotCompatible>true</IsAotCompatible>
-    <Description>ASP.NET Core endpoints for the Bsync protocol over any ISyncAuthority (docs/protocol/v1.md section 8).</Description>
+    <Description>ASP.NET Core endpoints for the Bsync protocol over any ISyncAuthority (docs/protocol.md section 8).</Description>
   </PropertyGroup>
 
   <ItemGroup>

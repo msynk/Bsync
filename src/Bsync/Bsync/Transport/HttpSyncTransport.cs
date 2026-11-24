@@ -8,7 +8,7 @@ using Bsync.Protocol;
 namespace Bsync.Transport;
 
 /// <summary>
-/// An <see cref="ISyncTransport{TDocument}"/> for the HTTP binding (docs/protocol/v1.md §8). Failures are
+/// An <see cref="ISyncTransport{TDocument}"/> for the HTTP binding (docs/protocol.md §8). Failures are
 /// classified: <see cref="SyncResetRequiredException"/> for <c>reset-required</c>,
 /// <see cref="SyncProtocolException"/> for malformed responses, and <see cref="SyncTransportException"/> with
 /// <see cref="SyncTransportException.IsTransient"/> and <see cref="SyncTransportException.RetryAfter"/> for

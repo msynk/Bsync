@@ -21,7 +21,7 @@ public sealed class Note : ISyncEntity
 
     /// <summary>
     /// Fields added by newer versions of the app. Kept so that editing a note in an older version does not
-    /// erase them (docs/protocol/v1.md §2.1).
+    /// erase them (docs/protocol.md §2.1).
     /// </summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Unknown { get; set; }

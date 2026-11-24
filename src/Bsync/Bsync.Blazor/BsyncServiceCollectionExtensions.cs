@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Bsync.Blazor;
 
 /// <summary>
-/// The server-connected registration recipe (docs/architecture/adr-007). Register exactly one
+/// The server-connected registration recipe (docs/architecture.md#adr-007-hosting-profiles-application-api-and-lifecycle). Register exactly one
 /// <see cref="ISyncCollection{TDocument}"/> per runtime: in a Blazor Web App the server project registers the
 /// server-connected collection and the WebAssembly client project registers the local one
 /// (<see cref="ClientServiceCollectionExtensions.AddLocalSyncCollection{TDocument}"/> in <c>Bsync</c>); each

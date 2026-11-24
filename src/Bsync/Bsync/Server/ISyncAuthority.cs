@@ -3,7 +3,7 @@ using Bsync.Protocol;
 namespace Bsync.Server;
 
 /// <summary>
-/// The server side of the protocol for one collection (docs/protocol/v1.md §4 and §6). Implementations
+/// The server side of the protocol for one collection (docs/protocol.md §4 and §6). Implementations
 /// must pass the cases in <c>Bsync.Testing.AuthorityConformance</c> (in this package).
 /// </summary>
 /// <typeparam name="TDocument">The synchronized entity type.</typeparam>

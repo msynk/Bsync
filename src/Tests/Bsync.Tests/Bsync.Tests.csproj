@@ -19,7 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\..\docs\protocol\fixtures\**\*.json" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+    <None Remove="Fixtures\protocol\**" />
+    <None Include="Fixtures\protocol\**\*.json" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures\*.db" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures\published040.zip" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="Fixtures\chunked-v2-vector.json" LogicalName="chunked-v2-vector.json" />

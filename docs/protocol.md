@@ -4,9 +4,9 @@
   (`Bsync.Server.AspNetCore`, `HttpSyncTransport` in `Bsync`) by the in-memory reference authority and the
   PostgreSQL authority (`Bsync.Server.PostgreSql`), and checked by fixtures and by running the authority
   conformance suite in process, through the JSON encoding, over HTTP and on PostgreSQL. Release status:
-  [README](../../README.md#status).
-- **Fixtures:** [`fixtures/valid`](fixtures/valid) must decode and re-encode to equivalent JSON;
-  [`fixtures/invalid`](fixtures/invalid) must be refused. `WireFormatTests` enforces both.
+  [README](../README.md#status).
+- **Fixtures:** [`fixtures/valid`](../src/Tests/Bsync.Tests/Fixtures/protocol/valid) must decode and re-encode to equivalent JSON;
+  [`fixtures/invalid`](../src/Tests/Bsync.Tests/Fixtures/protocol/invalid) must be refused. `WireFormatTests` enforces both.
 - **Conformance:** `LocalStoreConformance` and `AuthorityConformance` in the `Bsync` package, namespace
   `Bsync.Testing` (`src/Bsync/Bsync/Testing`) are the executable form of sections 4–6.
 

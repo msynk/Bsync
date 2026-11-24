@@ -5,7 +5,7 @@ namespace Bsync.Storage.Sqlite;
 
 /// <summary>
 /// Detects a damaged replica database and rebuilds it without losing unsynchronized work that can still be read
-/// (docs/operations/disaster-recovery.md).
+/// (docs/guide.md#disaster-recovery-and-stuck-replicas).
 /// </summary>
 /// <remarks>
 /// Close every engine and store that uses the file before calling <see cref="RebuildAsync(string, CancellationToken)"/>. The damaged file is

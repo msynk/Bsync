@@ -4,7 +4,7 @@ using Xunit;
 namespace Bsync.Tests.Http;
 
 /// <summary>
-/// Phase 9, I17: a rolling domain-schema upgrade (docs/operations/disaster-recovery.md, "Schema upgrades"). The
+/// Phase 9, I17: a rolling domain-schema upgrade (docs/guide.md#disaster-recovery-and-stuck-replicas, "Schema upgrades"). The
 /// server first accepts both schema ids, then drops the old one; an old client stops with upgrade-required and
 /// keeps its work, and the upgraded app uploads that work from the same replica without duplicating it.
 /// </summary>

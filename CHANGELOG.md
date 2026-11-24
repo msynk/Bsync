@@ -1,8 +1,8 @@
 # Changelog
 
 User-visible changes per release. Pre-1.0: a minor release may break, a patch release never does
-([compatibility policy](docs/compatibility.md#policy)); every breaking change also has a migration note in
-[docs/compatibility.md](docs/compatibility.md). Release status: [README](README.md#status).
+([compatibility policy](docs/architecture.md#compatibility-policy)); every breaking change also has a migration note in
+[docs/guide.md#upgrading-between-versions](docs/guide.md#upgrading-between-versions). Release status: [README](README.md#status).
 
 ## 0.6.0 - 2026-10-27
 
@@ -25,7 +25,7 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
   ticket renewal and joined deletion. Native SDK/device qualification remains pending.
 - Keep SHA-256 round constants in one static array, avoiding per-block allocations in Debug builds as well as Release.
 - Add LocalDB, protocol/fault, browser accounting and package-only workflow coverage. Record outstanding qualification
-  and implementation requirements in the [capabilities hardening record](docs/review/capabilities-closure-2026-10-26.md).
+  and implementation requirements in the [capabilities hardening record](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/capabilities-closure-2026-10-26.md).
 
 - Isolate the streaming SHA-256 allocation regression from the platform reference digest; preserve the 513 MiB
   correctness check and existing allocation ceiling. Keep SQLCipher CI execution and its test artifacts after core failures.
@@ -34,7 +34,7 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
 ## 0.5.0 - 2026-10-19
 
 Publication confirmed by downloads on 2026-10-24; the heading date is retained from the existing changelog.
-See the [B01 inventory](docs/review/capabilities-b01-2026-10-24.md) for package identities and open qualification gates.
+See the [B01 inventory](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/capabilities-b01-2026-10-24.md) for package identities and open qualification gates.
 
 - Bound full-content SHA-256 on WebAssembly instead of using the runtime's whole-input buffering fallback. Keep
   native platform hashing, plaintext identities and formats unchanged; add independent digest and allocation regressions.
@@ -100,13 +100,13 @@ See the [B01 inventory](docs/review/capabilities-b01-2026-10-24.md) for package 
   and upload prerequisites, including queueing and transfer ownership waits.
 - Journal terminal transfer pin release and expose bounded recovery with `ReconcileReleasedAsync`.
 - Add structured verification and optional replacement capability without changing `IBlobCache` or the wire protocol.
-  See [ADR-026](docs/architecture/adr-026-verified-content-repair.md) for limits and compatibility.
+  See [ADR-026](docs/architecture.md#adr-026-verified-content-repair-and-cooperative-preparation-deadlines) for limits and compatibility.
 
 ## 0.4.0 (published; observed 2026-10-17)
 
 All six downloaded archives declare source commit `e4286fe2141d0d1e836cfc88dbfa5dfd82154d37`.
 This corrects the former unreleased heading; it does not assert a historical tag or clean-build provenance.
-Archive hashes and new regression evidence are in the [execution record](docs/review/gap-closure-2026-10-17.md).
+Archive hashes and new regression evidence are in the [execution record](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/gap-closure-2026-10-17.md).
 
 - Fixed direct document reads/listing to enforce reader membership in all three authorities before page limits.
 - Added optional AES-GCM encrypted blob caches for native and browser storage, with bounded authenticated ranges,
@@ -146,7 +146,7 @@ Archive hashes and new regression evidence are in the [execution record](docs/re
 - Blob progress distinguishes partial offsets from verified completion; mismatched announced lengths retain existing
   content and fail explicitly. New reader/snapshot pins recover after process/tab termination using physical lifetime locks.
 
-These orchestration APIs remain under qualification; see [implementation progress](docs/Improvement-Plan.md).
+These orchestration APIs remain under qualification; see [implementation progress](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/Improvement-Plan.md).
 Blob encryption, automatic read-model reclamation, online/membership-aware server rebuilds, native scheduling adapters and full release gates are
 not claimed complete.
 
@@ -157,12 +157,12 @@ not claimed complete.
 - Release candidates require a clean version tag, matching changelog and package metadata, and emit
   checksums/toolchain/Source Link build maps. CI and nightly artifacts also carry provenance.
 - Dependency auditing covers transitive packages and fails on findings or audit failures; the package-only
-  web consumer exercises central package management. See [release validation](docs/operations/releases.md).
+  web consumer exercises central package management. See [release validation](docs/guide.md#release-process).
 
 ## 0.2.0 source baseline (published artifact provenance unresolved)
 
 Six 0.2.0 packages are published on NuGet. They identify an earlier source commit, so this source
-change list is not proof of exact binary contents ([inventory](docs/review/release-baseline-2026-10-16.md)).
+change list is not proof of exact binary contents ([inventory](https://github.com/msynk/Bsync/blob/7a49dafad358240c7d1fd1afe0bcd08e51bfafee/docs/review/release-baseline-2026-10-16.md)).
 Breaking: the package set, two signatures and one status behaviour (see Changed).
 
 ### Added
@@ -221,7 +221,7 @@ Breaking: the package set, two signatures and one status behaviour (see Changed)
   an account's replicas and delete them from the device (`SqliteStorePool.DeleteDatabaseAsync`; the browser recipe
   deletes the IndexedDB database). The browser recipe requests persistent storage and reports it in
   `SyncStatus.PersistentStorage`.
-- A MAUI recipe (`MauiSync`, in the MAUI sample; `docs/patterns/maui.md`): sync on reconnect, pause and resume with
+- A MAUI recipe (`MauiSync`, in the MAUI sample; `docs/guide.md#maui-and-native-background`): sync on reconnect, pause and resume with
   the app, budgeted background runs, keys in `SecureStorage`. Used by the MAUI sample on Windows; mobile targets not
   yet built or run.
 - Protocol: pull responses advertise the server's limits (feature `limits`); replicas clamp their push and pull
@@ -235,7 +235,7 @@ Breaking: the package set, two signatures and one status behaviour (see Changed)
   (server); an optional replica acknowledgement audit (`SyncEndpointOptions.ReplicaAudit`, `SqlServerReplicaAudit`)
   recording which checkpoint each replica reached and when; a SQL Server restore drill, retention service and
   capacity guidance in the runbook; an authority throughput benchmark with concurrent sessions
-  (`docs/benchmarks.md`); `Bsync.Benchmarks push-alloc` measures allocations per pushed document.
+  (`docs/guide.md#benchmarks`); `Bsync.Benchmarks push-alloc` measures allocations per pushed document.
 - The authority conformance suite is public (namespace `Bsync.Testing`). `AuthorityConformance.Cases` (one outcome per
   operation, version and conflict rules, receipt replay, operation id reuse, malformed operations, origin timestamps
   and the clock-skew bound, validation, feed coverage and paging, resume, foreign checkpoints, filtered reads, scope
@@ -247,17 +247,17 @@ Breaking: the package set, two signatures and one status behaviour (see Changed)
 - Sample `Bsync.Samples.Tasks.*`: EF Core on SQL Server as the system of record, a write handler that computes a
   field and rejects with a stable code, a publisher used by an API endpoint, bearer tokens, a console client on
   SQLite and a WebAssembly client on IndexedDB, with automated end-to-end tests. It executes immutable intents
-  (complete, rename) exactly once in the write handler's transaction (`docs/patterns/intents.md`), distributes
-  bundles that devices switch to in one step once every item is verified (`docs/patterns/bundles.md`), and attaches
+  (complete, rename) exactly once in the write handler's transaction (`docs/guide.md#intents-and-recoverable-work`), distributes
+  bundles that devices switch to in one step once every item is verified (`docs/guide.md#attachments-and-managed-content`), and attaches
   files through the package blob routes, optionally kept in an S3-compatible bucket, with uploads recorded
-  (`dbo.TenantBlobs.UploadedAt`) so a job can collect content nothing references (`docs/patterns/attachments.md`).
+  (`dbo.TenantBlobs.UploadedAt`) so a job can collect content nothing references (`docs/guide.md#attachments-and-managed-content`).
   The browser client attaches files too: uploaded before their task, downloaded on demand, readable offline; tested
   in Chromium, Firefox and WebKit.
 - CI builds and tests projects that reference only the packed packages (`src/Tests/PackageConsumers`): the public
   conformance suites from the `Bsync` package, and an ASP.NET Core host with the browser store's static
   assets and a SQLite replica that syncs over HTTP.
 - A nightly workflow packs `-preview` packages as build artifacts (never published).
-- `CHANGELOG.md`, the 0.x compatibility policy and the release process (`docs/compatibility.md`).
+- `CHANGELOG.md`, the 0.x compatibility policy and the release process (`docs/guide.md#upgrading-between-versions`).
 - A migration test from a replica database written by the published 0.1.0 SQLite package (pending, conflict,
   rejection, group and unknown members kept through the upgrade to schema 5).
 
@@ -289,7 +289,7 @@ Breaking: the package set, two signatures and one status behaviour (see Changed)
   on first open.
 - Fewer allocations per synced document: pushing one document allocates 14.5 KB instead of 66.9 KB with the in-memory
   store and server, and 47.2 KB instead of 80.6 KB with SQLite; the in-memory server allocates 8.1 KB instead of
-  16.4 KB per accepted write (docs/benchmarks.md).
+  16.4 KB per accepted write (docs/guide.md#benchmarks).
 
 ### Fixed
 
@@ -323,4 +323,4 @@ First published release: `Bsync`, `Bsync.Blazor`, `Bsync.Storage.Sqlite`, `Bsync
   backoff, `Retry-After`, pause and resume, credential renewal).
 - OpenTelemetry traces and metrics; session and server logs.
 
-Details of every change before this release: [docs/compatibility.md](docs/compatibility.md#before-010).
+Details of every change before this release: [docs/guide.md#upgrading-between-versions](docs/guide.md#upgrading-between-versions).

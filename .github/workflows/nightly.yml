@@ -1,5 +1,5 @@
 # Nightly preview packages. Pack only: the packages are uploaded as build artifacts and never pushed to a feed.
-# Publishing remains a separate, explicitly authorized step (ADR-012, docs/compatibility.md "Release process").
+# Publishing remains a separate, explicitly authorized step (ADR-012, docs/guide.md "Release process").
 name: nightly
 
 on:

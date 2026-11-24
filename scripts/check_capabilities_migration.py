@@ -24,7 +24,7 @@ def main():
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     feed = ROOT / "artifacts/packages"
-    baseline = json.loads((ROOT / "docs/review/capabilities-b01-baseline-2026-10-24.json").read_text())
+    baseline = json.loads((ROOT / "scripts/baselines/published-0.5.0-packages.json").read_text())
     identities = []
     for name in ("Bsync", "Bsync.Storage.Sqlite"):
         record = next(p for p in baseline["packages"] if p["file"] == f"{name}.0.5.0.nupkg")

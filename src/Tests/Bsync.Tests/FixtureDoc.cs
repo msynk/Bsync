@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Bsync.Tests;
 
-/// <summary>A document type exercising the JSON rules of docs/protocol/v1.md.</summary>
+/// <summary>A document type exercising the JSON rules of docs/protocol.md.</summary>
 public sealed class FixtureDoc : ISyncEntity
 {
     public string Id { get; set; } = string.Empty;

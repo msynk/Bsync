@@ -45,7 +45,7 @@ public sealed class InMemorySyncServerOptions<TDocument>
     /// <summary>
     /// The lowest version the server may issue next is <c>VersionFloor + 1</c>. After a restore, set it at or
     /// above every version the lost history may have issued, so no version is ever reused for a different
-    /// state (docs/protocol/v1.md, section 6).
+    /// state (docs/protocol.md, section 6).
     /// </summary>
     public long VersionFloor { get; init; }
 

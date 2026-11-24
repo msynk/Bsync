@@ -2,7 +2,7 @@ namespace Bsync;
 
 /// <summary>
 /// Thrown when the server can no longer serve the client's checkpoint. The engine then resnapshots, keeping
-/// pending local work (docs/protocol/v1.md §6.1).
+/// pending local work (docs/protocol.md §6.1).
 /// </summary>
 public sealed class SyncResetRequiredException : SyncProtocolException
 {

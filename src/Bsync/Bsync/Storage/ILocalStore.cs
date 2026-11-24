@@ -11,7 +11,7 @@ namespace Bsync.Storage;
 /// All writes go through <see cref="UpdateAsync"/>, an atomic compare-and-transform over one or more
 /// records plus, optionally, the checkpoint. This is what keeps a local edit made during a network
 /// round trip from being overwritten by an acknowledgement or a pull that was computed from an older
-/// read (invariants I02 and I03 in <c>docs/architecture/invariants.md</c>).
+/// read (invariants I02 and I03 in <c>docs/architecture.md#invariants</c>).
 /// </para>
 /// <para>
 /// Stores must never hand out references to their internal state: records passed in or returned are

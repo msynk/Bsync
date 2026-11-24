@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Bsync.Tests.Http;
 
-/// <summary>The Server-Sent Events hint stream (docs/protocol/v1.md §8) through the real endpoint and client.</summary>
+/// <summary>The Server-Sent Events hint stream (docs/protocol.md §8) through the real endpoint and client.</summary>
 public sealed class HintStreamTests
 {
     private static PushRequest<Note> Push(string op, string id) =>

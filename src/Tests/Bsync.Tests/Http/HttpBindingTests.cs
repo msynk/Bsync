@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Bsync.Tests.Http;
 
-/// <summary>The HTTP binding (docs/protocol/v1.md §8): headers, errors, limits, authentication and scopes.</summary>
+/// <summary>The HTTP binding (docs/protocol.md §8): headers, errors, limits, authentication and scopes.</summary>
 public sealed class HttpBindingTests
 {
     private static InMemorySyncServer<Note> Server(

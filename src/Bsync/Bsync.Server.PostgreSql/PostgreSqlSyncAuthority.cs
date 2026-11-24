@@ -28,7 +28,7 @@ namespace Bsync.Server.PostgreSql;
 /// </para>
 /// <para>
 /// <b>Restores.</b> After restoring the database from a backup, call <see cref="BeginNewEpochAsync"/> with a version
-/// floor at or above anything the lost history may have issued; replicas then reset (docs/operations/disaster-recovery.md).
+/// floor at or above anything the lost history may have issued; replicas then reset (docs/guide.md#disaster-recovery-and-stuck-replicas).
 /// </para>
 /// <para>
 /// <b>Hints.</b> Commits are announced with <c>NOTIFY</c>; every instance that has subscribers to
@@ -889,7 +889,7 @@ public sealed class PostgreSqlSyncAuthority<TDocument> : ISyncAuthority<TDocumen
     }
 
     /// <summary>Removes receipts of operations of <paramref name="scope"/> accepted at or below <paramref name="throughVersion"/>.</summary>
-    /// <remarks>Keep receipts longer than any replica may stay offline; see docs/operations/disaster-recovery.md.</remarks>
+    /// <remarks>Keep receipts longer than any replica may stay offline; see docs/guide.md#disaster-recovery-and-stuck-replicas.</remarks>
     public async Task<int> PurgeReceiptsAsync(string scope, long throughVersion, CancellationToken cancellationToken = default)
     {
         await using var command = _source.CreateCommand("DELETE FROM bs_receipts WHERE collection = $1 AND scope = $2 AND kind = $3 AND version <= $4");
