@@ -10,14 +10,16 @@ namespace Bsync.Storage.Sqlite;
 /// </summary>
 public sealed class SqliteOrchestrationStore : IOrchestrationFeatureStore
 {
-    private readonly string _connectionString;
+    private readonly byte[]? _key;
+    private readonly string _dataSource;
     private readonly string _account;
     private readonly TimeProvider _time;
     private bool _disposed;
 
-    private SqliteOrchestrationStore(string connectionString, string account, TimeProvider time)
+    private SqliteOrchestrationStore(string dataSource, byte[]? key, string account, TimeProvider time)
     {
-        _connectionString = connectionString;
+        _dataSource = dataSource;
+        _key = key;
         _account = account;
         _time = time;
     }
@@ -28,7 +30,7 @@ public sealed class SqliteOrchestrationStore : IOrchestrationFeatureStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataSource);
         ArgumentNullException.ThrowIfNull(account);
-        var store = new SqliteOrchestrationStore(SqliteStorePool.ConnectionString(dataSource, encryptionKey), account.StorageKey, timeProvider ?? TimeProvider.System);
+        var store = new SqliteOrchestrationStore(dataSource, encryptionKey, account.StorageKey, timeProvider ?? TimeProvider.System);
         await using var connection = await store.ConnectionAsync(cancellationToken).ConfigureAwait(false);
         if (encryptionKey is not null && await ScalarAsync(connection, null, "PRAGMA cipher_version", cancellationToken).ConfigureAwait(false) is not string { Length: > 0 })
             throw new InvalidOperationException("Encrypted orchestration metadata requires SQLitePCLRaw.bundle_e_sqlcipher; never combine it with the plain bundle.");
@@ -73,10 +75,9 @@ public sealed class SqliteOrchestrationStore : IOrchestrationFeatureStore
     private async Task<SqliteConnection> ConnectionAsync(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var connection = new SqliteConnection(_connectionString);
+        var connection = await SqliteStorePool.OpenAsync(_dataSource, _key, cancellationToken).ConfigureAwait(false);
         try
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, "PRAGMA synchronous=FULL", cancellationToken).ConfigureAwait(false);
             return connection;
         }

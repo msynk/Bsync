@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
@@ -10,10 +12,17 @@ namespace Bsync.Storage.Sqlite;
 /// <summary>Connection-pool helpers.</summary>
 public static class SqliteStorePool
 {
-    // Every connection string used per file (one per key), so Release closes all of their pools.
+    // Every connection string in use per file (one per key), so Release closes all of their pools. Release and delete
+    // forget them (A10): a store that keeps working re-registers its string on its next connection.
     private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> Pools = new(StringComparer.OrdinalIgnoreCase);
 
     private static volatile bool _nativeLibraryFound;
+
+    // A10: connection strings never carry a key, so neither this class nor Microsoft.Data.Sqlite's pool registry keeps
+    // one. Each physical connection is keyed once with PRAGMA key and tagged with a one-way fingerprint of its key ("plain"
+    // for none), so a pooled connection is only ever reused for the same key.
+    private static readonly ConditionalWeakTable<SQLitePCL.sqlite3, byte[]> Keyed = new();
+    private static readonly byte[] Plain = [];
 
     /// <summary>
     /// Closes the pooled connections to one database file (for example before copying, restoring or deleting it).
@@ -22,7 +31,7 @@ public static class SqliteStorePool
     public static void Release(string dataSource)
     {
         ArgumentException.ThrowIfNullOrEmpty(dataSource);
-        var strings = Pools.TryGetValue(dataSource, out var known) ? [.. known.Keys] : new List<string>();
+        var strings = Pools.TryRemove(dataSource, out var known) ? [.. known.Keys] : new List<string>();
         strings.Add(ConnectionString(dataSource));
         foreach (var connectionString in strings.Distinct(StringComparer.Ordinal))
         {
@@ -58,27 +67,97 @@ public static class SqliteStorePool
         }
     }
 
-    internal static string ConnectionString(string dataSource, byte[]? key = null)
+    /// <summary>The connection string of a file: never with a key (A10).</summary>
+    internal static string ConnectionString(string dataSource, SqliteOpenMode mode = SqliteOpenMode.ReadWriteCreate, bool pooling = true)
     {
         EnsureNativeLibrary();
-        var builder = new SqliteConnectionStringBuilder
+        return new SqliteConnectionStringBuilder
         {
             DataSource = dataSource,
-            Mode = SqliteOpenMode.ReadWriteCreate,
-            Pooling = true,
-        };
-        if (key is not null)
-        {
-            builder.Password = Passphrase(key);
-        }
+            Mode = mode,
+            Pooling = pooling,
+        }.ToString();
+    }
 
-        var connectionString = builder.ToString();
-        if (key is not null)
+    /// <summary>
+    /// Opens a connection to <paramref name="dataSource"/>, keyed with <paramref name="key"/> (SQLCipher) or plain. A new
+    /// physical connection gets <c>PRAGMA key</c> as its first statement; a pooled one is reused only when it was keyed with
+    /// the same key, otherwise the file's idle pool is cleared and a new connection opened. A key without the SQLCipher
+    /// bundle fails instead of writing a plain file.
+    /// </summary>
+    internal static async Task<SqliteConnection> OpenAsync(string dataSource, byte[]? key, CancellationToken cancellationToken,
+        SqliteOpenMode mode = SqliteOpenMode.ReadWriteCreate, bool pooling = true)
+    {
+        var connectionString = ConnectionString(dataSource, mode, pooling);
+        Pools.GetOrAdd(dataSource, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal)).TryAdd(connectionString, 0);
+        var fingerprint = key is null ? Plain : Fingerprint(key);
+        for (var attempt = 0; ; attempt++)
         {
-            Pools.GetOrAdd(dataSource, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal)).TryAdd(connectionString, 0);
-        }
+            var connection = new SqliteConnection(connectionString);
+            try
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                var handle = connection.Handle ?? throw new InvalidOperationException("The SQLite connection has no handle.");
+                if (Keyed.TryGetValue(handle, out var used))
+                {
+                    if (CryptographicOperations.FixedTimeEquals(used, fingerprint))
+                    {
+                        return connection;
+                    }
 
-        return connectionString;
+                    // Pooled under another key (or plain): never hand it out; drop the idle pool and open afresh.
+                    if (attempt > 0)
+                    {
+                        throw new InvalidOperationException("A pooled SQLite connection keyed differently could not be replaced.");
+                    }
+
+                    SqliteConnection.ClearPool(connection);
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                    continue;
+                }
+
+                if (key is not null)
+                {
+                    await using (var keying = connection.CreateCommand())
+                    {
+                        keying.CommandText = $"PRAGMA key = \"{Passphrase(key)}\"";
+                        await keying.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    await using var cipher = connection.CreateCommand();
+                    cipher.CommandText = "PRAGMA cipher_version";
+                    if (await cipher.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not string { Length: > 0 })
+                    {
+                        throw new InvalidOperationException(
+                            "An encryption key needs SQLitePCLRaw.bundle_e_sqlcipher (ADR-016); the plain SQLite library cannot encrypt. Never combine both bundles.");
+                    }
+                }
+
+                Keyed.AddOrUpdate(handle, fingerprint);
+                return connection;
+            }
+            catch
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+    }
+
+    /// <summary>A one-way, non-secret tag of a key that tells pooled connections of different keys apart.</summary>
+    private static byte[] Fingerprint(byte[] key)
+    {
+        Span<byte> input = stackalloc byte[32 + 21];
+        "Bsync.sqlite.pool/v1\0"u8.CopyTo(input);
+        key.CopyTo(input[21..]);
+        try
+        {
+            return SHA256.HashData(input);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(input);
+        }
     }
 
     /// <summary>

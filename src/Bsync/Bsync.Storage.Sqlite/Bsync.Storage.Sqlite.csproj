@@ -14,6 +14,8 @@
   <ItemGroup>
     <!-- No native bundle: the application adds bundle_e_sqlite3 or bundle_e_sqlcipher (they cannot be combined). -->
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.12" />
+    <InternalsVisibleTo Include="Bsync.Tests.SqliteEncrypted" />
+    <InternalsVisibleTo Include="Bsync.Tests.SqliteEncrypted.CrashHost" />
   </ItemGroup>
 
   <ItemGroup>

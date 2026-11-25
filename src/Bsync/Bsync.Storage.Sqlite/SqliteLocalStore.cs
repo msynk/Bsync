@@ -38,7 +38,8 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
         "conflict_server, conflict_server_version, conflict_local, conflict_base, group_id, group_members, pending_group, pending_group_size, base_same, " +
         "rejection_arguments";
 
-    private readonly string _connectionString;
+    private readonly byte[]? _key;
+    private readonly string _dataSource;
     private readonly string _collection;
     private readonly JsonTypeInfo<TDocument> _typeInfo;
     private readonly string _synchronous;
@@ -50,7 +51,14 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
     {
         _indexes = indexes;
         _indexSignature = LocalStoreIndexing.Signature(indexes);
-        _connectionString = SqliteStorePool.ConnectionString(options.DataSource, options.EncryptionKey);
+        SqliteStorePool.EnsureNativeLibrary();
+        if (options.EncryptionKey is { Length: not SqliteEncryption.KeyLength })
+        {
+            throw new ArgumentException("An encryption key is 32 bytes (256 bits).", nameof(options));
+        }
+
+        _key = options.EncryptionKey;
+        _dataSource = options.DataSource;
         _collection = options.Collection;
         _typeInfo = typeInfo;
         _synchronous = options.Durability == SqliteDurability.Full ? "FULL" : "NORMAL";
@@ -690,10 +698,9 @@ public sealed class SqliteLocalStore<TDocument> : ILocalStore<TDocument>
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
-        var connection = new SqliteConnection(_connectionString);
+        var connection = await SqliteStorePool.OpenAsync(_dataSource, _key, cancellationToken).ConfigureAwait(false);
         try
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(
                 connection,
                 null,

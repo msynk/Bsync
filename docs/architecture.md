@@ -290,9 +290,12 @@ the server, or metadata (ids, sizes, index values, timing). Wipe: `DeleteReplica
 account's replica; the browser recipe requests persistent storage. SQLite uses SQLCipher (the app adds
 `bundle_e_sqlcipher` instead of `bundle_e_sqlite3`; raw 32-byte key, rekey, encrypt in place); IndexedDB uses an AES-GCM
 envelope per value with the record key as associated data (keys and index values stay plain). The app supplies keys; a
-wrong or missing key fails explicitly, never as an empty replica. Unmaintained SQLCipher bundle (R4), plaintext accepted by
-encrypted IndexedDB (A8) and SQLCipher key/WAL handling (A10, A11) are tracked in
-[implementation plan](implementation-plan.md). **Status:** Accepted; opt-in.
+wrong or missing key fails explicitly, never as an empty replica. SQLite connection strings never carry the key (A10):
+each physical connection is keyed with `PRAGMA key` and tagged with a one-way fingerprint, so pools (Bsync's and
+Microsoft.Data.Sqlite's) hold no key and a pooled connection is reused only for the same key. Encrypting in place folds
+and removes the plain write-ahead log before the swap and closes only that file's pool (A11); deleted plain blocks may
+survive on flash storage. Unmaintained SQLCipher bundle (R4) and plaintext accepted by encrypted IndexedDB (A8) are
+tracked in [implementation plan](implementation-plan.md). **Status:** Accepted; opt-in.
 
 ### ADR-025: Encrypted blob envelopes (v1)
 
@@ -320,8 +323,12 @@ AES-GCM envelope (fence records stay clear; credentials never belong there; no p
 encrypted manifest, binding account, hash, generation, key, index and length; fresh random nonces on every seal.
 Journals precede physical writes, so crashes leave accounted orphans, never progress pointing at missing data. Readers
 are asynchronous and hold one decrypted chunk. Recovery quarantines old state, which is never collected automatically.
-Proposed ceiling: 2^24 seals per actual key across all uses. Manifest completeness binding (A9), nonce strategy (B12)
-and independent review (R5) are tracked in [implementation plan](implementation-plan.md). **Status:** Experimental.
+Proposed ceiling: 2^24 seals per actual key across all uses. Manifest sealing 2 (A9) binds the manifest's role
+(`manifest/partial` or `manifest/complete`) and length into the associated data, and completion reseals the manifest as
+complete, so an earlier partial manifest cannot authenticate as a truncated object. Pre-0.6 manifests (sealing 0) stay
+readable: the first `OpenReadAsync` verifies the whole plaintext hash and reseals them; sequential reads to the end also
+check the hash. Nonce strategy (B12) and independent review (R5) are tracked in
+[implementation plan](implementation-plan.md). **Status:** Experimental.
 
 ### ADR-035: Chunk scrubbing and key-retention observations
 

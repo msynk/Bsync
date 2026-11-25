@@ -42,8 +42,7 @@ public static class SqliteStoreRecovery
 
         try
         {
-            await using var connection = new SqliteConnection(ReadOnly(dataSource, key));
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await ReadOnlyAsync(dataSource, key, cancellationToken).ConfigureAwait(false);
             await using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA quick_check";
             var problems = new List<string>();
@@ -92,8 +91,7 @@ public static class SqliteStoreRecovery
 
         var salvage = await SalvageAsync(damaged, key, cancellationToken).ConfigureAwait(false);
 
-        await using var connection = new SqliteConnection(SqliteStorePool.ConnectionString(dataSource, key));
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await SqliteStorePool.OpenAsync(dataSource, key, cancellationToken).ConfigureAwait(false);
         await SqliteSchema.EnsureAsync(connection, cancellationToken).ConfigureAwait(false);
         await using var transaction = connection.BeginTransaction(deferred: false);
         foreach (var row in salvage.Rows)
@@ -185,8 +183,7 @@ public static class SqliteStoreRecovery
         var highWater = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            await using var connection = new SqliteConnection(ReadOnly(damaged, key));
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await ReadOnlyAsync(damaged, key, cancellationToken).ConfigureAwait(false);
             var version = await SqliteSchema.ReadVersionAsync(connection, null, cancellationToken).ConfigureAwait(false);
             if (version is < 1 or > SqliteSchema.CurrentVersion)
             {
@@ -285,15 +282,6 @@ public static class SqliteStoreRecovery
         }
     }
 
-    private static string ReadOnly(string dataSource, byte[]? key)
-    {
-        SqliteStorePool.EnsureNativeLibrary();
-        return new SqliteConnectionStringBuilder
-        {
-            DataSource = dataSource,
-            Mode = SqliteOpenMode.ReadOnly,
-            Pooling = false,
-            Password = key is null ? string.Empty : SqliteStorePool.Passphrase(key),
-        }.ToString();
-    }
+    private static Task<SqliteConnection> ReadOnlyAsync(string dataSource, byte[]? key, CancellationToken cancellationToken) =>
+        SqliteStorePool.OpenAsync(dataSource, key, cancellationToken, SqliteOpenMode.ReadOnly, pooling: false);
 }

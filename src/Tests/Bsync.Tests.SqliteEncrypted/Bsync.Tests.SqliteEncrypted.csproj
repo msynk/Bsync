@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Bsync\Bsync.Storage.Sqlite\Bsync.Storage.Sqlite.csproj" />
     <ProjectReference Include="..\..\Bsync\Bsync\Bsync.csproj" />
+    <ProjectReference Include="..\Bsync.Tests.SqliteEncrypted.CrashHost\Bsync.Tests.SqliteEncrypted.CrashHost.csproj" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.11" />
   </ItemGroup>
 

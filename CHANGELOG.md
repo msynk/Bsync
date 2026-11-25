@@ -25,6 +25,16 @@ User-visible changes per release. Pre-1.0: a minor release may break, a patch re
   `IBlobStore.GetCompletedSizeAsync`/`ForgetCompletedAsync`; stores without them restart the upload. A finish for an
   upload the server no longer holds now answers `complete: false, received: 0` (restart) instead of `422`, which clients
   treated as corruption.
+- **Chunked encrypted blobs (A9, experimental format v2):** manifests are sealed for their role and length (sealing 2),
+  and completing an upload reseals the manifest as complete, so a captured partial manifest can no longer authenticate as
+  a truncated object. Manifests written before 0.6.0 stay readable; the first `OpenReadAsync` verifies the whole hash and
+  reseals them (one full read). Reading a chunked object sequentially to its end now also checks its SHA-256.
+- **SQLCipher keys are no longer kept process-wide (A10):** connection strings carry no key; each physical connection is
+  keyed with `PRAGMA key`, and pooled connections are reused only for the same key. `SqliteStorePool.Release` and
+  `DeleteDatabaseAsync` forget the file's pools. Opening with a key on the plain SQLite bundle fails as before.
+- **Encrypting in place is crash-safe (A11):** `SqliteEncryption.EncryptAsync` folds and deletes the plain write-ahead log
+  before replacing the file (a kill can no longer leave an encrypted database beside a plain log) and closes only that
+  file's pooled connections instead of every pool in the process. New SQLCipher process-kill tests.
 - Add optional encryption-use admission keyed by actual key material, with a durable monotone invocation ceiling.
 - Add an IndexedDB capacity ledger with atomic accounting, paged crash-resumable reconciliation and stale-part
   completion/rename refusal. Schema 3 adds bounded managed hashing, Blob-backed raw reads and transactional completion;

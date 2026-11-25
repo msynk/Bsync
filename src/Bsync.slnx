@@ -29,6 +29,7 @@
     <Project Path="Tests/Bsync.Tests.PostgreSql/Bsync.Tests.PostgreSql.csproj" />
     <Project Path="Tests/Bsync.Tests.SqlServer/Bsync.Tests.SqlServer.csproj" />
     <Project Path="Tests/Bsync.Tests.SqliteEncrypted/Bsync.Tests.SqliteEncrypted.csproj" />
+    <Project Path="Tests/Bsync.Tests.SqliteEncrypted.CrashHost/Bsync.Tests.SqliteEncrypted.CrashHost.csproj" />
     <Project Path="Tests/Bsync.Tests/Bsync.Tests.csproj" />
   </Folder>
   <Folder Name="/Tools/">

@@ -107,7 +107,7 @@ public sealed partial class ChunkedEncryptedBlobCache
             _ = deadline.Remaining;
             var state = Decode(await _store.ReadAsync(Key(sha256), deadline.Token).ConfigureAwait(false));
             if (state.Complete is not { } envelope) { _ = deadline.Remaining; return result with { Status = ChunkScrubStatus.Missing }; }
-            var manifest = await OpenManifest(sha256, envelope, deadline.Token).ConfigureAwait(false);
+            var manifest = await OpenManifest(sha256, envelope, complete: true, deadline.Token).ConfigureAwait(false);
             var stamp = Hash(Encoding.UTF8.GetBytes(envelope.Ciphertext));
             var key = Scrubs + manifest.Generation;
             var record = await _store.ReadAsync(key, deadline.Token).ConfigureAwait(false);

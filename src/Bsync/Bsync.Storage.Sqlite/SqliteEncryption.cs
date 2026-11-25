@@ -26,17 +26,42 @@ public static class SqliteEncryption
     /// (records, pending work, metadata and schema version), which then replaces the original. The original is kept
     /// until the replacement succeeded, then deleted.
     /// </summary>
-    public static async Task EncryptAsync(string dataSource, byte[] key, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// The plain write-ahead log is folded into the database and removed before the swap, so a process killed at any point
+    /// leaves either the complete plain database or the encrypted one, never an encrypted database beside a plain log
+    /// (A11). Only this file's pooled connections are closed. Deleting a file does not erase its blocks: flash storage and
+    /// file-system journals can keep plain pages of the old file until they are reused, so encrypt before storing
+    /// sensitive data whenever possible.
+    /// </remarks>
+    public static Task EncryptAsync(string dataSource, byte[] key, CancellationToken cancellationToken = default) =>
+        EncryptAsync(dataSource, key, reached: null, cancellationToken);
+
+    /// <summary>
+    /// <see cref="EncryptAsync(string, byte[], CancellationToken)"/>, reporting each durable step to
+    /// <paramref name="reached"/> (process-kill tests).
+    /// </summary>
+    internal static async Task EncryptAsync(string dataSource, byte[] key, Func<string, Task>? reached, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(dataSource);
         ArgumentNullException.ThrowIfNull(key);
+        reached ??= static _ => Task.CompletedTask;
         var passphrase = SqliteStorePool.Passphrase(key);
         SqliteStorePool.Release(dataSource);
         var encrypted = dataSource + ".encrypting";
         File.Delete(encrypted);
+        File.Delete(encrypted + "-journal");
         await using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = dataSource, Pooling = false }.ToString()))
         {
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            // Fold the plain write-ahead log into the database and leave WAL mode, which deletes the log (A11).
+            await ScalarAsync(connection, "PRAGMA wal_checkpoint(TRUNCATE)", cancellationToken).ConfigureAwait(false);
+            if (await ScalarAsync(connection, "PRAGMA journal_mode = DELETE", cancellationToken).ConfigureAwait(false) is not "delete")
+            {
+                throw new IOException("The plain write-ahead log could not be folded in; close every store using the database first.");
+            }
+
+            await reached("folded").ConfigureAwait(false);
             var version = Convert.ToInt32(await ScalarAsync(connection, "PRAGMA user_version", cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
             await using var export = connection.CreateCommand();
             export.CommandText = "ATTACH DATABASE $path AS encrypted KEY $key; SELECT sqlcipher_export('encrypted'); " +
@@ -46,10 +71,14 @@ public static class SqliteEncryption
             await export.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        SqliteConnection.ClearAllPools();
-        File.Move(encrypted, dataSource, overwrite: true);
+        // Nothing of the plain log may outlive the swap; normally neither file exists any more.
+        SqliteStorePool.Release(dataSource);
         File.Delete(dataSource + "-wal");
         File.Delete(dataSource + "-shm");
+        File.Delete(dataSource + "-journal");
+        await reached("exported").ConfigureAwait(false);
+        File.Move(encrypted, dataSource, overwrite: true);
+        await reached("replaced").ConfigureAwait(false);
     }
 
     /// <summary>Changes the key of an encrypted database. A failure leaves the old key valid.</summary>
@@ -60,15 +89,9 @@ public static class SqliteEncryption
         ArgumentNullException.ThrowIfNull(newKey);
         var replacement = SqliteStorePool.Passphrase(newKey);
         SqliteStorePool.Release(dataSource);
-        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
-        {
-            DataSource = dataSource,
-            Pooling = false,
-            Password = SqliteStorePool.Passphrase(currentKey),
-        }.ToString());
         try
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await SqliteStorePool.OpenAsync(dataSource, currentKey, cancellationToken, pooling: false).ConfigureAwait(false);
             await ScalarAsync(connection, "SELECT count(*) FROM sqlite_master", cancellationToken).ConfigureAwait(false);
 
             // WAL mode: rekey needs the journal folded in first.

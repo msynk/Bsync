@@ -90,13 +90,28 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         if (access.Reference == reference) return access;
         access.Dispose(); throw new CryptographicException("Key provider returned another identity.");
     }
-    private async Task<ChunkManifest> OpenManifest(string hash, ChunkEnvelope envelope, CancellationToken token)
+    /// <summary>
+    /// Manifest sealing 2 (A9) binds the manifest's role (<c>partial</c> or <c>complete</c>) and its length into the AAD, so
+    /// an earlier partial manifest of the same generation can never authenticate as the complete object (a truncation).
+    /// Sealing 0 (written before 0.6.0) has neither; such a complete manifest is verified against its hash and resealed the
+    /// next time it is opened for reading.
+    /// </summary>
+    private const int ManifestSealing = 2;
+    private byte[] ManifestAad(string hash, ChunkEnvelope envelope, LocalKeyReference reference, bool complete) => envelope.Sealing switch
+    {
+        0 => Aad("manifest", hash, envelope.Generation, reference),
+        ManifestSealing => Aad(complete ? "manifest/complete" : "manifest/partial", hash, envelope.Generation, reference,
+            length: envelope.Length is >= 0 and <= 1073741824 ? (int)envelope.Length : throw new InvalidDataException("Invalid encrypted manifest bounds.")),
+        _ => throw new LocalStoreUnavailableException("outdated", "Unsupported manifest sealing; data retained."),
+    };
+    private async Task<ChunkManifest> OpenManifest(string hash, ChunkEnvelope envelope, bool complete, CancellationToken token)
     {
         if (!Guid.TryParseExact(envelope.Generation, "N", out _) || envelope.Ciphertext is null || envelope.Ciphertext.Length > 262144 ||
             string.IsNullOrEmpty(envelope.KeyId) || envelope.KeyVersion < 1) throw new InvalidDataException("Invalid encrypted manifest bounds.");
         var reference = Reference(envelope);
+        var aad = ManifestAad(hash, envelope, reference, complete);
         using var access = await Access(reference, token).ConfigureAwait(false);
-        var bytes = await _encryption.OpenAsync(access.Key, Convert.FromBase64String(envelope.Ciphertext), Aad("manifest", hash, envelope.Generation, reference), token).ConfigureAwait(false);
+        var bytes = await _encryption.OpenAsync(access.Key, Convert.FromBase64String(envelope.Ciphertext), aad, token).ConfigureAwait(false);
         try
         {
             var manifest = JsonSerializer.Deserialize(bytes, ChunkJson.Default.ChunkManifest) ?? throw new InvalidDataException("Missing manifest.");
@@ -115,18 +130,20 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
                 total = checked(total + chunk.Length);
             }
             if (total != manifest.Length) throw new InvalidDataException("Manifest length mismatch.");
+            if (envelope.Sealing == ManifestSealing && envelope.Length != manifest.Length) throw new InvalidDataException("Manifest length mismatch.");
             return manifest;
         }
         finally { CryptographicOperations.ZeroMemory(bytes); }
     }
-    private async Task<ChunkEnvelope> SealManifest(ChunkManifest manifest, LocalKeyReference reference, CancellationToken token)
+    private async Task<ChunkEnvelope> SealManifest(ChunkManifest manifest, LocalKeyReference reference, bool complete, CancellationToken token)
     {
         using var access = await Access(reference, token).ConfigureAwait(false);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, ChunkJson.Default.ChunkManifest);
         try
         {
-            var encrypted = await _encryption.SealAsync(access.Key, bytes, Aad("manifest", manifest.Hash, manifest.Generation, reference), token).ConfigureAwait(false);
-            return new(manifest.Generation, reference.KeyId, reference.Version, Convert.ToBase64String(encrypted));
+            var unsealed = new ChunkEnvelope(manifest.Generation, reference.KeyId, reference.Version, string.Empty, ManifestSealing, manifest.Length);
+            var encrypted = await _encryption.SealAsync(access.Key, bytes, ManifestAad(manifest.Hash, unsealed, reference, complete), token).ConfigureAwait(false);
+            return unsealed with { Ciphertext = Convert.ToBase64String(encrypted) };
         }
         finally { CryptographicOperations.ZeroMemory(bytes); }
     }
@@ -176,13 +193,13 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
     public async Task<long?> SizeAsync(string sha256, CancellationToken cancellationToken = default)
     {
         var state = Decode(await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false));
-        return state.Complete is { } complete ? (await OpenManifest(sha256, complete, cancellationToken).ConfigureAwait(false)).Length : null;
+        return state.Complete is { } complete ? (await OpenManifest(sha256, complete, complete: true, cancellationToken).ConfigureAwait(false)).Length : null;
     }
     /// <inheritdoc />
     public async Task<long> PartialLengthAsync(string sha256, CancellationToken cancellationToken = default)
     {
         var state = Decode(await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false));
-        return state.Partial is { } partial ? (await OpenManifest(sha256, partial, cancellationToken).ConfigureAwait(false)).Length : 0;
+        return state.Partial is { } partial ? (await OpenManifest(sha256, partial, complete: false, cancellationToken).ConfigureAwait(false)).Length : 0;
     }
     /// <inheritdoc />
     public async Task AppendPartialAsync(string sha256, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken = default)
@@ -196,12 +213,12 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         var state = Decode(record);
         ChunkManifest manifest; LocalKeyReference reference;
         if (state.Partial is { } partial)
-        { manifest = await OpenManifest(hash, partial, token).ConfigureAwait(false); reference = Reference(partial); }
+        { manifest = await OpenManifest(hash, partial, complete: false, token).ConfigureAwait(false); reference = Reference(partial); }
         else
         {
             manifest = new(2, hash, Guid.NewGuid().ToString("N"), _chunkSize, 0, []); reference = _writeKey;
             // Authenticate existing complete metadata before starting any replacement; wrong keys never trigger overwrite.
-            if (!state.RecoveryAuthorized && state.Complete is { } complete) await OpenManifest(hash, complete, token).ConfigureAwait(false);
+            if (!state.RecoveryAuthorized && state.Complete is { } complete) await OpenManifest(hash, complete, complete: true, token).ConfigureAwait(false);
             using var access = await Access(reference, token).ConfigureAwait(false); _ = access.Key;
             await RequireFormat(token).ConfigureAwait(false);
             if (!await _store.TryWriteAsync([
@@ -245,7 +262,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
                 }
             }
             var next = manifest with { Length = manifest.Length + bytes.Length, Chunks = descriptors.ToArray() };
-            var envelope = await SealManifest(next, reference, token).ConfigureAwait(false);
+            var envelope = await SealManifest(next, reference, complete: false, token).ConfigureAwait(false);
             await Save(hash, record, state with { Partial = envelope }, token).ConfigureAwait(false);
             if (oldTail is not null && bytes.Length > 0) await DeleteChunk(manifest.Generation, oldTail.Id, token).ConfigureAwait(false);
         }
@@ -262,7 +279,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         var record = await _store.ReadAsync(Key(hash), token).ConfigureAwait(false);
         var state = Decode(record);
         if (state.Partial is not { } partial) return false;
-        var manifest = await OpenManifest(hash, partial, token).ConfigureAwait(false);
+        var manifest = await OpenManifest(hash, partial, complete: false, token).ConfigureAwait(false);
         using var digest = new StreamingSha256();
         for (var i = 0; i < manifest.Chunks.Length; i++)
         {
@@ -274,7 +291,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         if (!state.RecoveryAuthorized && state.Complete is { } old)
         {
             // Ambiguous old authentication failures remain conservative; explicit quarantine recovery is separate.
-            var previous = await OpenManifest(hash, old, token).ConfigureAwait(false);
+            var previous = await OpenManifest(hash, old, complete: true, token).ConfigureAwait(false);
             for (var i = 0; i < previous.Chunks.Length; i++)
             {
                 var bytes = await ReadChunk(previous, old, i, token).ConfigureAwait(false);
@@ -287,8 +304,21 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
             if (protection?.Payload != hash) throw new InvalidDataException("Recovery quarantine ownership is missing; original data retained.");
         }
         token.ThrowIfCancellationRequested();
-        await Save(hash, record, state with { Complete = partial, Partial = null, RecoveryAuthorized = false, PartialPurpose = null }, token).ConfigureAwait(false);
+        // Published under a complete-role seal (A9): the partial manifests of this generation cannot stand in for it.
+        var published = await SealManifest(manifest, Reference(partial), complete: true, token).ConfigureAwait(false);
+        await Save(hash, record, state with { Complete = published, Partial = null, RecoveryAuthorized = false, PartialPurpose = null }, token).ConfigureAwait(false);
         return true;
+    }
+    /// <summary>Reads every chunk and checks the plaintext against the manifest's hash.</summary>
+    private async Task VerifyContent(ChunkManifest manifest, ChunkEnvelope envelope, CancellationToken token)
+    {
+        using var digest = new StreamingSha256();
+        for (var i = 0; i < manifest.Chunks.Length; i++)
+        {
+            var bytes = await ReadChunk(manifest, envelope, i, token).ConfigureAwait(false);
+            try { digest.AppendData(bytes); } finally { CryptographicOperations.ZeroMemory(bytes); }
+        }
+        if (Convert.ToHexStringLower(digest.GetHashAndReset()) != manifest.Hash) throw new BlobCorruptedException("Encrypted content does not match its hash; data retained.");
     }
     /// <inheritdoc />
     public async Task DiscardPartialAsync(string sha256, CancellationToken cancellationToken = default)
@@ -296,16 +326,24 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         await using var held = await Own(sha256, cancellationToken).ConfigureAwait(false);
         var record = await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false);
         var state = Decode(record);
-        if (state.Partial is { } partial) await OpenManifest(sha256, partial, cancellationToken).ConfigureAwait(false);
+        if (state.Partial is { } partial) await OpenManifest(sha256, partial, complete: false, cancellationToken).ConfigureAwait(false);
         await Save(sha256, record, state with { Partial = null, PartialPurpose = null }, cancellationToken).ConfigureAwait(false);
     }
     /// <inheritdoc />
     public async Task<Stream?> OpenReadAsync(string sha256, CancellationToken cancellationToken = default)
     {
         await using var held = await Own(sha256, cancellationToken).ConfigureAwait(false);
-        var state = Decode(await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false));
+        var record = await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false);
+        var state = Decode(record);
         if (state.Complete is not { } complete) return null;
-        var manifest = await OpenManifest(sha256, complete, cancellationToken).ConfigureAwait(false);
+        var manifest = await OpenManifest(sha256, complete, complete: true, cancellationToken).ConfigureAwait(false);
+        if (complete.Sealing != ManifestSealing)
+        {
+            // Written before 0.6.0: its seal does not say "complete", so prove the content first, then reseal (A9).
+            await VerifyContent(manifest, complete, cancellationToken).ConfigureAwait(false);
+            complete = await SealManifest(manifest, Reference(complete), complete: true, cancellationToken).ConfigureAwait(false);
+            await Save(sha256, record, state with { Complete = complete }, cancellationToken).ConfigureAwait(false);
+        }
         var lifetime = await _lifetimes.TryAcquireAsync(Scope(complete.Generation), false, cancellationToken).ConfigureAwait(false) ?? throw new AccountResourcesInUseException();
         return new ChunkReadStream(this, manifest, complete, lifetime);
     }
@@ -325,8 +363,8 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
     {
         var record = await _store.ReadAsync(Key(hash), token).ConfigureAwait(false);
         var state = Decode(record);
-        if (!state.RecoveryAuthorized && state.Complete is { } complete) await OpenManifest(hash, complete, token).ConfigureAwait(false);
-        var progress = state.Partial is { } partial ? await OpenManifest(hash, partial, token).ConfigureAwait(false) : null;
+        if (!state.RecoveryAuthorized && state.Complete is { } complete) await OpenManifest(hash, complete, complete: true, token).ConfigureAwait(false);
+        var progress = state.Partial is { } partial ? await OpenManifest(hash, partial, complete: false, token).ConfigureAwait(false) : null;
         using var writeAccess = await Access(_writeKey, token).ConfigureAwait(false); _ = writeAccess.Key;
         var resume = progress is not null && state.PartialPurpose == purpose && Reference(state.Partial!) == _writeKey && progress.Length <= source.Length - source.Position;
         if (resume) source.Position += progress!.Length;
@@ -353,7 +391,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         var state = Decode(await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false));
         if (state.Partial is not null && state.PartialPurpose != "rotation") throw new InvalidOperationException("Finish or explicitly discard the unrelated partial before rotating.");
         if (state.Complete is not { } complete) return;
-        var manifest = await OpenManifest(sha256, complete, cancellationToken).ConfigureAwait(false);
+        var manifest = await OpenManifest(sha256, complete, complete: true, cancellationToken).ConfigureAwait(false);
         var lifetime = await _lifetimes.TryAcquireAsync(Scope(complete.Generation), false, cancellationToken).ConfigureAwait(false) ?? throw new AccountResourcesInUseException();
         await using var source = new ChunkReadStream(this, manifest, complete, lifetime);
         await ReplaceFromStream(sha256, source, cancellationToken, "rotation").ConfigureAwait(false);
@@ -405,7 +443,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         await using var held = await Own(sha256, cancellationToken).ConfigureAwait(false);
         var record = await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false);
         var state = Decode(record);
-        if (state.Complete is { } complete) await OpenManifest(sha256, complete, cancellationToken).ConfigureAwait(false);
+        if (state.Complete is { } complete) await OpenManifest(sha256, complete, complete: true, cancellationToken).ConfigureAwait(false);
         await Save(sha256, record, state with { Complete = null }, cancellationToken).ConfigureAwait(false);
     }
     /// <summary>Bounded ordinal object-state inventory, including partial/empty states. Continuation is the last hash returned; SizeAsync distinguishes complete content.</summary>
@@ -443,7 +481,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         var state = Decode(await _store.ReadAsync(Key(sha256), cancellationToken).ConfigureAwait(false));
         var envelope = partial ? state.Partial : state.Complete;
         if (envelope is null) return new(0, 0, null, false);
-        var manifest = await OpenManifest(sha256, envelope, cancellationToken).ConfigureAwait(false);
+        var manifest = await OpenManifest(sha256, envelope, complete: !partial, cancellationToken).ConfigureAwait(false);
         var prefix = Chunks + manifest.Generation + "/";
         if (continuation is not null && !continuation.StartsWith(prefix, StringComparison.Ordinal)) throw new ArgumentException("Chunk continuation belongs to another generation.", nameof(continuation));
         await using var exclusive = await _lifetimes.TryAcquireAsync(Scope(manifest.Generation), true, cancellationToken).ConfigureAwait(false);
@@ -494,8 +532,8 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
             if (await _store.ReadAsync("encrypted-protected/v2/" + id, cancellationToken).ConfigureAwait(false) is not null) { continuation = generation.Key; continue; }
             await using var held = await Own(generation.Payload, cancellationToken).ConfigureAwait(false);
             var state = Decode(await _store.ReadAsync(Key(generation.Payload), cancellationToken).ConfigureAwait(false));
-            if (state.Complete is { } complete) await OpenManifest(generation.Payload, complete, cancellationToken).ConfigureAwait(false);
-            if (state.Partial is { } partial) await OpenManifest(generation.Payload, partial, cancellationToken).ConfigureAwait(false);
+            if (state.Complete is { } complete) await OpenManifest(generation.Payload, complete, complete: true, cancellationToken).ConfigureAwait(false);
+            if (state.Partial is { } partial) await OpenManifest(generation.Payload, partial, complete: false, cancellationToken).ConfigureAwait(false);
             if (state.Complete?.Generation == id || state.Partial?.Generation == id) { continuation = generation.Key; continue; }
             await using var exclusive = await _lifetimes.TryAcquireAsync(Scope(id), true, cancellationToken).ConfigureAwait(false);
             if (exclusive is null) { continuation = generation.Key; continue; }
@@ -521,6 +559,9 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
         private long _position;
         private bool _disposed;
         private readonly SemaphoreSlim _gate = new(1, 1);
+        // Plaintext hashed so far by contiguous reads from 0; null once a seek breaks the sequence.
+        private StreamingSha256? _digest = new();
+        private long _hashed;
         public override bool CanRead => !_disposed;
         public override bool CanSeek => !_disposed;
         public override bool CanWrite => false;
@@ -543,6 +584,13 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
                 }
                 var offset = (int)(_position % manifest.ChunkSize);
                 var count = Math.Min(destination.Length, _buffer!.Length - offset);
+                if (_digest is not null && _hashed == _position)
+                {
+                    _digest.AppendData(_buffer.AsSpan(offset, count)); _hashed += count;
+                    if (_hashed == Length && Convert.ToHexStringLower(_digest.GetHashAndReset()) != manifest.Hash)
+                        throw new BlobCorruptedException("Encrypted content does not match its hash.");
+                }
+                else if (_digest is not null) { _digest.Dispose(); _digest = null; }
                 _buffer.AsMemory(offset, count).CopyTo(destination); _position += count; return count;
             }
             finally { _gate.Release(); }
@@ -556,6 +604,7 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
             {
                 if (_disposed) return;
                 if (_buffer is not null) CryptographicOperations.ZeroMemory(_buffer);
+                _digest?.Dispose(); _digest = null;
                 await lifetime.DisposeAsync().ConfigureAwait(false); _buffer = null; _disposed = true;
             }
             finally { _gate.Release(); }
@@ -569,7 +618,8 @@ public sealed partial class ChunkedEncryptedBlobCache : IBlobCache, IBlobCacheIn
 }
 
 internal sealed record ChunkState(int Version, ChunkEnvelope? Complete, ChunkEnvelope? Partial, bool RecoveryAuthorized = false, string? PartialPurpose = null);
-internal sealed record ChunkEnvelope(string Generation, string KeyId, int KeyVersion, string Ciphertext);
+/// <summary>A sealed manifest. <paramref name="Sealing"/> 2 binds role and <paramref name="Length"/> (A9); 0 is the pre-0.6 seal.</summary>
+internal sealed record ChunkEnvelope(string Generation, string KeyId, int KeyVersion, string Ciphertext, int Sealing = 0, long Length = -1);
 internal sealed record ChunkManifest(int Version, string Hash, string Generation, int ChunkSize, long Length, ChunkDescriptor[] Chunks);
 internal sealed record ChunkDescriptor(string Id, int Length);
 /// <summary>One bounded chunk reconciliation pass. A busy reader preserves its entire generation.</summary>
